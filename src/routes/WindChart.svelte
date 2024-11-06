@@ -2,7 +2,7 @@
     import { Chart } from '@highcharts/svelte';
     import Highcharts, { type Options } from 'highcharts';
     import WindBarb from 'highcharts/modules/windbarb';
-    import { transformWindData } from '$lib/meteo';
+    import { getWindFieldAllLevels } from '$lib/charts/wind';
     import { weatherData } from '$lib/api'
 
     // Initialize WindBarb module
@@ -50,21 +50,17 @@
             gridLineWidth: 1
         },
         plotOptions: {
-            vector: {
-                rotationOrigin: 'start',
-                vectorLength: 15,
-                enableMouseTracking: false,
-                animation: false,
-                showInLegend: false
-            },
             windbarb: {
                 animation: false,
                 crisp: true,
                 vectorLength: 15,
-                enableMouseTracking: true
+                enableMouseTracking: true,
+                tooltip: {
+                    valueSuffix: ' m/s'
+                }
             }
         },
-        series: transformWindData(weatherData)
+        series: getWindFieldAllLevels(weatherData)
     } satisfies Options;
 </script>
 
