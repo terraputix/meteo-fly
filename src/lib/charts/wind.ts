@@ -1,12 +1,8 @@
 import type { SeriesOptionsType } from 'highcharts';
-import type { WeatherDataType } from '$lib/api';
-import type { PressureLevel } from '$lib/meteo/types';
+import type { WeatherDataType, WindDirectionKey, WindSpeedKey } from '$lib/api';
 import { interpolateWind } from '$lib/meteo/wind';
 import { getWindColor } from '$lib/charts/colors';
-
-type HourlyKeys = keyof WeatherDataType['hourly'];
-type WindSpeedKey = Extract<HourlyKeys, `windSpeed${number}hPa`>;
-type WindDirectionKey = Extract<HourlyKeys, `windDirection${number}hPa`>;
+import { allLevels, pressureLevels } from './pressureLevels';
 
 function getWindSpeed(data: WeatherDataType, pressure: number): Float32Array {
     return data.hourly[`windSpeed${pressure}hPa` as WindSpeedKey];
@@ -15,35 +11,6 @@ function getWindSpeed(data: WeatherDataType, pressure: number): Float32Array {
 function getWindDirection(data: WeatherDataType, pressure: number): Float32Array {
     return data.hourly[`windDirection${pressure}hPa` as WindDirectionKey];
 }
-
-const pressureLevels: PressureLevel[] = [
-    { hPa: 1000, heightMeters: 110 },
-    { hPa: 975, heightMeters: 320 },
-    { hPa: 950, heightMeters: 540 },
-    { hPa: 925, heightMeters: 770 },
-    { hPa: 900, heightMeters: 1000 },
-    { hPa: 850, heightMeters: 1500 },
-    { hPa: 800, heightMeters: 2000 },
-    { hPa: 700, heightMeters: 3000 },
-    { hPa: 600, heightMeters: 4200 },
-];
-
-const interpolatedLevels: PressureLevel[] = [
-    { hPa: -1, heightMeters: 1250 },
-    { hPa: -1, heightMeters: 1750 },
-    { hPa: -1, heightMeters: 2250 },
-    { hPa: -1, heightMeters: 2500 },
-    { hPa: -1, heightMeters: 2750 },
-    { hPa: -1, heightMeters: 3250 },
-    { hPa: -1, heightMeters: 3500 },
-    { hPa: -1, heightMeters: 3750 },
-    { hPa: -1, heightMeters: 4000 },
-];
-
-const allLevels: PressureLevel[] = [
-    ...pressureLevels,
-    ...interpolatedLevels
-].sort((a, b) => a.heightMeters - b.heightMeters);
 
 export function getWindFieldAllLevels(weatherData: WeatherDataType): SeriesOptionsType[] {
     return allLevels.map(level => {

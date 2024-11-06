@@ -2,12 +2,15 @@
     import { Chart } from '@highcharts/svelte';
     import Highcharts, { type Options } from 'highcharts';
     import WindBarb from 'highcharts/modules/windbarb';
+    import Heatmap from 'highcharts/modules/heatmap';
     import { getWindFieldAllLevels } from '$lib/charts/wind';
     import { weatherData } from '$lib/api'
+	import { getCloudCoverData } from '$lib/charts/clouds';
 
     // Initialize WindBarb module
     if (typeof window !== 'undefined') {
         WindBarb(Highcharts);
+        Heatmap(Highcharts);
         // Override the windArrow function to only draw simple arrows
         (Highcharts as any).seriesTypes.windbarb.prototype.windArrow = function(point: any) {
             const u = this.options.vectorLength / 20;
@@ -31,7 +34,7 @@
     $: chartOptions = {
         chart: {
             height: '600px',
-            type: 'vector',
+            type: 'heatmap',
         },
         title: {
             text: 'Wind Profile'
@@ -49,6 +52,22 @@
             max: 5000,
             gridLineWidth: 1
         },
+        colorAxis: {
+            stops: [
+                [0, '#ffffff'],
+                [0.25, '#e0e0e0'],
+                [0.5, '#c0c0c0'],
+                [0.75, '#909090'],
+                [1, '#606060']
+            ],
+            min: 0,
+            max: 100,
+            startOnTick: false,
+            endOnTick: false,
+            labels: {
+                format: '{value}%'
+            }
+        },
         plotOptions: {
             windbarb: {
                 animation: false,
@@ -58,9 +77,25 @@
                 tooltip: {
                     valueSuffix: ' m/s'
                 }
+            },
+            heatmap: {
+                animation: false,
+                nullColor: 'transparent',
+                enableMouseTracking: true,
+                borderWidth: 0,
+                colsize: 3600 * 1000,
+                rowsize: 250
             }
         },
-        series: getWindFieldAllLevels(weatherData)
+        series: [
+        {
+            name: "Cloud Cover",
+            type: 'heatmap',
+            data: getCloudCoverData(weatherData),
+            zIndex: 0
+        },
+        ...getWindFieldAllLevels(weatherData)
+    ]
     } satisfies Options;
 </script>
 
