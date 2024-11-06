@@ -16,7 +16,5 @@ export function getCloudCoverData(weatherData: WeatherDataType): Array<PointOpti
             });
         });
     });
-
-    console.log(data);
     return data;
 }

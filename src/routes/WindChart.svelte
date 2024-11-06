@@ -4,8 +4,10 @@
     import WindBarb from 'highcharts/modules/windbarb';
     import Heatmap from 'highcharts/modules/heatmap';
     import { getWindFieldAllLevels } from '$lib/charts/wind';
-    import { weatherData } from '$lib/api'
 	import { getCloudCoverData } from '$lib/charts/clouds';
+	import type { WeatherDataType } from '$lib/api';
+
+    export let weatherData: WeatherDataType;
 
     // Initialize WindBarb module
     if (typeof window !== 'undefined') {
@@ -92,7 +94,8 @@
             name: "Cloud Cover",
             type: 'heatmap',
             data: getCloudCoverData(weatherData),
-            zIndex: 0
+            zIndex: 0,
+            interpolation: true
         },
         ...getWindFieldAllLevels(weatherData)
     ]
