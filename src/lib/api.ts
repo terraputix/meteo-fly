@@ -5,6 +5,8 @@ export interface Location {
     longitude: number;
 }
 
+export type WeatherModel = 'icon_d2' | 'icon_seamless' | 'icon_eu' | 'icon_global';
+
 export interface HourlyData {
     time: Date[];
     precipitation: Float32Array;
@@ -69,9 +71,7 @@ export interface WeatherDataType {
 }
 
 const paramsTemplate = {
-    "hourly": ["precipitation", "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "cloud_cover_1000hPa", "cloud_cover_975hPa", "cloud_cover_950hPa", "cloud_cover_925hPa", "cloud_cover_900hPa", "cloud_cover_850hPa", "cloud_cover_800hPa", "cloud_cover_700hPa", "cloud_cover_600hPa", "cloud_cover_500hPa", "cloud_cover_400hPa", "cloud_cover_300hPa", "cloud_cover_250hPa", "cloud_cover_200hPa", "cloud_cover_150hPa", "cloud_cover_100hPa", "cloud_cover_70hPa", "cloud_cover_50hPa", "cloud_cover_30hPa", "wind_speed_1000hPa", "wind_speed_975hPa", "wind_speed_950hPa", "wind_speed_925hPa", "wind_speed_900hPa", "wind_speed_850hPa", "wind_speed_800hPa", "wind_speed_700hPa", "wind_speed_600hPa", "wind_direction_1000hPa", "wind_direction_975hPa", "wind_direction_950hPa", "wind_direction_925hPa", "wind_direction_900hPa", "wind_direction_850hPa", "wind_direction_800hPa", "wind_direction_700hPa", "wind_direction_600hPa"],
-    "forecast_days": 1,
-    "models": "icon_d2"
+    "hourly": ["precipitation", "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "cloud_cover_1000hPa", "cloud_cover_975hPa", "cloud_cover_950hPa", "cloud_cover_925hPa", "cloud_cover_900hPa", "cloud_cover_850hPa", "cloud_cover_800hPa", "cloud_cover_700hPa", "cloud_cover_600hPa", "cloud_cover_500hPa", "cloud_cover_400hPa", "cloud_cover_300hPa", "cloud_cover_250hPa", "cloud_cover_200hPa", "cloud_cover_150hPa", "cloud_cover_100hPa", "cloud_cover_70hPa", "cloud_cover_50hPa", "cloud_cover_30hPa", "wind_speed_1000hPa", "wind_speed_975hPa", "wind_speed_950hPa", "wind_speed_925hPa", "wind_speed_900hPa", "wind_speed_850hPa", "wind_speed_800hPa", "wind_speed_700hPa", "wind_speed_600hPa", "wind_direction_1000hPa", "wind_direction_975hPa", "wind_direction_950hPa", "wind_direction_925hPa", "wind_direction_900hPa", "wind_direction_850hPa", "wind_direction_800hPa", "wind_direction_700hPa", "wind_direction_600hPa"]
 };
 const url = "https://api.open-meteo.com/v1/forecast";
 
@@ -79,8 +79,17 @@ const url = "https://api.open-meteo.com/v1/forecast";
 const range = (start: number, stop: number, step: number) =>
     Array.from({ length: (stop - start) / step }, (_, i) => start + i * step);
 
-export async function fetchWeatherData(location: Location): Promise<WeatherDataType> {
-    const params = { ...paramsTemplate, latitude: location.latitude, longitude: location.longitude };
+export async function fetchWeatherData(location: Location, model: WeatherModel = "icon_d2", start: Date, numberOfDays: number = 1): Promise<WeatherDataType> {
+
+    // Format the start_date as 'YYYY-MM-DD'
+    const startDateStr = start.toISOString().split('T')[0];
+
+    // Calculate the end_date based on number_of_days
+    const endDate = new Date(start);
+    endDate.setDate(endDate.getDate() + numberOfDays - 1);
+    const endDateStr = endDate.toISOString().split('T')[0];
+
+    const params = { ...paramsTemplate, latitude: location.latitude, longitude: location.longitude, start_date: startDateStr, end_date: endDateStr, models: model };
     const responses = await fetchWeatherApi(url, params);
     // Process first location. Add a for-loop for multiple locations or weather models
     const response = responses[0];
