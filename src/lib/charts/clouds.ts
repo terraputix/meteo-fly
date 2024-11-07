@@ -29,7 +29,7 @@ export function getCloudCoverData(weatherData: WeatherDataType) {
                 x2: nextTime,
                 y1: y1,
                 y2: y2,
-                value: cloudCover,
+                value: parseFloat(cloudCover.toFixed(0)),
             });
         });
     });

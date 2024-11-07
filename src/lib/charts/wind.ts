@@ -1,5 +1,6 @@
 import type { WeatherDataType, WindDirectionKey, WindSpeedKey } from '$lib/api';
 import { interpolateWind } from '$lib/meteo/wind';
+import { parse } from 'svelte/compiler';
 import { allLevels, pressureLevels } from './pressureLevels';
 
 function getWindSpeed(data: WeatherDataType, pressure: number): Float32Array {
@@ -76,7 +77,7 @@ export function getWindFieldAllLevels(weatherData: WeatherDataType): Array<{ tim
                     time,
                     height: level.heightMeters,
                     speed: parseFloat(speed.toFixed(2)),
-                    direction,
+                    direction: parseFloat(direction.toFixed(0)),
                 });
             }
         });

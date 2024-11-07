@@ -90,7 +90,7 @@
 				Plot.vector(windData, {
 					x: 'time',
 					y: 'height',
-					rotate: (d) => d.direction,
+					rotate: (d) => d.direction - 180,
 					length: 15,
 					strokeWidth: (d) => strokeWidthScale(d.speed),
 					stroke: (d) => colorScale(d.speed),
@@ -108,8 +108,8 @@
 						);
 
 						return cloudPoint
-							? `Time: ${formattedTime}\nHeight: ${formattedHeight}\nWind Speed: ${d.speed} m/s\nDirection: ${d.direction}°\nCloud Cover: ${cloudPoint.value}%`
-							: `Time: ${formattedTime}\nHeight: ${formattedHeight}\nWind Speed: ${d.speed} m/s\nDirection: ${d.direction}°`;
+							? `Time: ${formattedTime}\nHeight: ${formattedHeight}\nWind Speed: ${d.speed} km/h\nDirection: ${d.direction}°\nCloud Cover: ${cloudPoint.value}%`
+							: `Time: ${formattedTime}\nHeight: ${formattedHeight}\nWind Speed: ${d.speed} km/h\nDirection: ${d.direction}°`;
 					},
 					tip: true
 				})
