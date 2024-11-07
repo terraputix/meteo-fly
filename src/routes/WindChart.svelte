@@ -33,9 +33,9 @@
 		// Define y-axis domain
 		const yDomain: [number, number] = [0, 4500];
 
-		const xMin = d3.min(windData, (d) => d.time) as Date;
-		const xMax = d3.max(windData, (d) => d.time) as Date;
-		const xDomain: [Date, Date] = [xMin.addSeconds(-1800), xMax.addSeconds(1800)];
+		const xMin = (d3.min(windData, (d) => d.time) as Date).addSeconds(-1800);
+		const xMax = (d3.max(windData, (d) => d.time) as Date).addSeconds(1800);
+		const xDomain: [Date, Date] = [xMin, xMax];
 
 		let cloudCoverScaleOptions: Plot.ScaleOptions = {
 			domain: [0, 100],
@@ -73,7 +73,7 @@
 					tickFormat: d3.timeFormat('%H:%M')
 				}),
 				Plot.ruleY([0]),
-				Plot.ruleX([xMin.addSeconds(-1800)]),
+				Plot.ruleX([xMin]),
 				// Cloud cover heatmap
 				Plot.raster(cloudData, {
 					x: 'x1',
@@ -115,7 +115,27 @@
 							: `Time: ${formattedTime}\nHeight: ${formattedHeight}\nWind Speed: ${d.speed} km/h\nDirection: ${d.direction}°`;
 					},
 					tip: true
-				})
+				}),
+				// Plot elevation as brown rectangle from 0 to elevation
+				Plot.rect(
+					[
+						{
+							x1: xMin,
+							x2: xMax,
+							y1: 0,
+							y2: weatherData.elevation,
+							value: 100
+						}
+					],
+					{
+						x1: 'x1',
+						x2: 'x2',
+						y1: 'y1',
+						y2: 'y2',
+						fill: '#7a6552',
+						opacity: 1.0
+					}
+				)
 			],
 			color: cloudCoverScaleOptions
 		});

@@ -68,6 +68,7 @@ export type CloudCoverKey = Extract<HourlyKeys, `cloudCover${number}hPa`>;
 
 export interface WeatherDataType {
     hourly: HourlyData;
+    elevation: number;
 }
 
 const paramsTemplate = {
@@ -100,9 +101,11 @@ export async function fetchWeatherData(location: Location, model: WeatherModel =
     // const timezoneAbbreviation = response.timezoneAbbreviation();
     // const latitude = response.latitude();
     // const longitude = response.longitude();
+    const elevation = response.elevation();
 
     const hourly = response.hourly()!;
     const weatherData = {
+        elevation: elevation,
         hourly: {
             time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
                 (t) => new Date((t + utcOffsetSeconds) * 1000)
