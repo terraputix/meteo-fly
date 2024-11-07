@@ -1,7 +1,5 @@
-import type { SeriesOptionsType } from 'highcharts';
 import type { WeatherDataType, WindDirectionKey, WindSpeedKey } from '$lib/api';
 import { interpolateWind } from '$lib/meteo/wind';
-import { getWindColor } from '$lib/charts/colors';
 import { allLevels, pressureLevels } from './pressureLevels';
 
 function getWindSpeed(data: WeatherDataType, pressure: number): Float32Array {
@@ -12,63 +10,77 @@ function getWindDirection(data: WeatherDataType, pressure: number): Float32Array
     return data.hourly[`windDirection${pressure}hPa` as WindDirectionKey];
 }
 
-export function getWindFieldAllLevels(weatherData: WeatherDataType): SeriesOptionsType[] {
-    return allLevels.map(level => {
-        if (level.hPa === -1) {
-            return {
-                name: `${level.heightMeters}m`,
-                type: 'windbarb',
-                data: weatherData.hourly.time.map((time: Date, i: number) => {
-                    const lowerLevel = pressureLevels.reverse().find(p => (p.heightMeters <= level.heightMeters && p.hPa !== -1))!;
-                    const upperLevel = pressureLevels.find(p => (p.heightMeters > level.heightMeters && p.hPa !== -1))!;
+export function getWindFieldAllLevels(weatherData: WeatherDataType): Array<{ time: Date; height: number; speed: number; direction: number }> {
+    const data: { time: Date; height: number; speed: number; direction: number; }[] = [];
 
-                    const lowerWind = {
-                        speed: getWindSpeed(weatherData, lowerLevel.hPa)[i],
-                        direction: getWindDirection(weatherData, lowerLevel.hPa)[i]
-                    };
-                    const upperWind = {
-                        speed: getWindSpeed(weatherData, upperLevel.hPa)[i],
-                        direction: getWindDirection(weatherData, upperLevel.hPa)[i]
-                    };
+    weatherData.hourly.time.forEach((time: Date, i: number) => {
+        allLevels.forEach((level) => {
+            let speed: number | null = null;
+            let direction: number | null = null;
 
-                    const interpolated = interpolateWind(
-                        level.heightMeters,
-                        lowerLevel,
-                        upperLevel,
-                        lowerWind,
-                        upperWind
-                    );
+            if (level.hPa === -1) {
+                // Interpolated levels
+                const lowerLevel = pressureLevels
+                    .slice()
+                    .reverse()
+                    .find((p) => p.heightMeters <= level.heightMeters && p.hPa !== -1);
+                const upperLevel = pressureLevels.find((p) => p.heightMeters > level.heightMeters && p.hPa !== -1);
 
-                    return {
-                        x: time.getTime(),
-                        y: level.heightMeters,
-                        value: parseFloat((interpolated.speed / 3.6).toFixed(2)), // km/h to m/s
-                        direction: interpolated.direction,
-                        color: getWindColor(interpolated.speed)
-                    };
-                }),
-                lineWidth: 4,
-                yOffset: 0,
-                showInLegend: false
-            };
-        } else {
-            const speed = getWindSpeed(weatherData, level.hPa);
-            const direction = getWindDirection(weatherData, level.hPa);
+                if (lowerLevel && upperLevel) {
+                    const lowerWindSpeedArray = getWindSpeed(weatherData, lowerLevel.hPa);
+                    const lowerWindDirectionArray = getWindDirection(weatherData, lowerLevel.hPa);
+                    const upperWindSpeedArray = getWindSpeed(weatherData, upperLevel.hPa);
+                    const upperWindDirectionArray = getWindDirection(weatherData, upperLevel.hPa);
 
-            return {
-                name: level.hPa === -1 ? `${level.heightMeters}m` : `${level.hPa}hPa`,
-                type: 'windbarb',
-                data: weatherData.hourly.time.map((time: Date, i: number) => ({
-                    x: time.getTime(),
-                    y: level.heightMeters,
-                    value: parseFloat((speed[i] / 3.6).toFixed(2)), // km/h to m/s
-                    direction: direction[i],
-                    color: getWindColor(speed[i])
-                })),
-                lineWidth: 4,
-                yOffset: 0,
-                showInLegend: false
-            };
-        }
+                    if (
+                        lowerWindSpeedArray &&
+                        lowerWindDirectionArray &&
+                        upperWindSpeedArray &&
+                        upperWindDirectionArray
+                    ) {
+                        const lowerWind = {
+                            speed: lowerWindSpeedArray[i],
+                            direction: lowerWindDirectionArray[i],
+                        };
+                        const upperWind = {
+                            speed: upperWindSpeedArray[i],
+                            direction: upperWindDirectionArray[i],
+                        };
+
+                        const interpolated = interpolateWind(
+                            level.heightMeters,
+                            lowerLevel,
+                            upperLevel,
+                            lowerWind,
+                            upperWind
+                        );
+
+                        speed = interpolated.speed;
+                        direction = interpolated.direction;
+                    }
+                }
+            } else {
+                // Direct levels
+                const speedArray = weatherData.hourly[`windSpeed${level.hPa}hPa` as WindSpeedKey];
+                const directionArray = weatherData.hourly[`windDirection${level.hPa}hPa` as WindDirectionKey];
+
+                if (speedArray && directionArray) {
+                    speed = speedArray[i];
+                    direction = directionArray[i];
+                }
+            }
+
+            // Add data point if speed and direction are valid
+            if (speed != null && direction != null && !isNaN(speed) && !isNaN(direction)) {
+                data.push({
+                    time,
+                    height: level.heightMeters,
+                    speed: parseFloat(speed.toFixed(2)),
+                    direction,
+                });
+            }
+        });
     });
+
+    return data;
 }
