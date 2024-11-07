@@ -1,6 +1,6 @@
 import * as d3 from 'd3';
 
-const maxSpeed = 40;
+export const maxSpeed = 40;
 export const colorScale = d3
     .scaleLinear<string>()
     .domain([0, maxSpeed / 2, maxSpeed])

@@ -5,7 +5,7 @@
 	import type { WeatherDataType } from '$lib/api';
 	import { getCloudCoverData } from '$lib/charts/clouds';
 	import { getWindFieldAllLevels } from '$lib/charts/wind';
-	import { colorScale, strokeWidthScale } from '$lib/charts/scales';
+	import { colorScale, maxSpeed, strokeWidthScale } from '$lib/charts/scales';
 
 	export let weatherData: WeatherDataType | null = null;
 	let chartContainer: HTMLDivElement;
@@ -35,8 +35,22 @@
 
 		const xMin = d3.min(windData, (d) => d.time) as Date;
 		const xMax = d3.max(windData, (d) => d.time) as Date;
-
 		const xDomain: [Date, Date] = [xMin.addSeconds(-1800), xMax.addSeconds(1800)];
+
+		let cloudCoverScaleOptions: Plot.ScaleOptions = {
+			domain: [0, 100],
+			range: ['white', 'gray'],
+			type: 'sequential',
+			label: 'Cloud Cover (%)'
+		};
+
+		// Define wind speed scale options
+		const windSpeedScaleOptions: Plot.ScaleOptions = {
+			domain: [0, maxSpeed],
+			range: ['#00FF00', '#FFA500', '#FF0000'],
+			type: 'sequential',
+			label: 'Wind Speed (km/h)'
+		};
 
 		// Create the Plot
 		const plot = Plot.plot({
@@ -70,7 +84,7 @@
 					opacity: 0.9,
 					fill: 'value',
 					title: (d) => `Cloud Cover: ${d.value}%`,
-					clip: true
+					tip: false
 				}),
 				// Wind barbs
 				Plot.vector(windData, {
@@ -80,20 +94,47 @@
 					length: 15,
 					strokeWidth: (d) => strokeWidthScale(d.speed),
 					stroke: (d) => colorScale(d.speed),
-					title: (d) => `Wind Speed: ${d.speed} m/s\nDirection: ${d.direction}°`
+					title: (d) => {
+						// Format time for display
+						const timeFormat = d3.timeFormat('%H:%M');
+						const formattedTime = timeFormat(d.time);
+
+						// Format height with units
+						const formattedHeight = `${Math.round(d.height)}m`;
+
+						// Find matching cloud cover data
+						const cloudPoint = cloudData.find(
+							(c) => c.x1.getTime() === d.time.getTime() && Math.abs(c.y1 - d.height) < 50
+						);
+
+						return cloudPoint
+							? `Time: ${formattedTime}\nHeight: ${formattedHeight}\nWind Speed: ${d.speed} m/s\nDirection: ${d.direction}°\nCloud Cover: ${cloudPoint.value}%`
+							: `Time: ${formattedTime}\nHeight: ${formattedHeight}\nWind Speed: ${d.speed} m/s\nDirection: ${d.direction}°`;
+					},
+					tip: true
 				})
 			],
-			color: {
-				type: 'sequential',
-				domain: [0, 100],
-				range: ['white', 'gray'],
-				legend: false,
-				label: 'Cloud Cover (%)'
-			}
+			color: cloudCoverScaleOptions
 		});
+
+		// Create legends
+		const cloudLegend = Plot.legend({
+			color: cloudCoverScaleOptions
+		});
+
+		const windLegend = Plot.legend({
+			color: windSpeedScaleOptions
+		});
+
+		// Create legend container
+		const legendContainer = document.createElement('div');
+		legendContainer.className = 'legend-container';
+		legendContainer.appendChild(cloudLegend);
+		legendContainer.appendChild(windLegend);
 
 		// Append the plot to the container
 		chartContainer.appendChild(plot);
+		chartContainer.appendChild(legendContainer);
 	}
 
 	onDestroy(() => {
@@ -113,5 +154,15 @@
 	.chart-container {
 		width: 100%;
 		margin: 0 auto;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	:global(.legend-container) {
+		display: flex;
+		gap: 2rem;
+		margin-top: 1rem;
+		justify-content: center;
 	}
 </style>
