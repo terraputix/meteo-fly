@@ -138,6 +138,11 @@
 		{#if weatherData}
 			<div class="relative mt-8">
 				<WindChart {weatherData} />
+				<p class="mt-2 text-right text-sm text-gray-500">
+					<a href="https://open-meteo.com/" target="_blank" class="underline"
+						>Weather data by Open-Meteo.com</a
+					>.
+				</p>
 				<!-- if isUpdating is true display a spinner on top of the current chart -->
 				{#if isUpdating}
 					<div
