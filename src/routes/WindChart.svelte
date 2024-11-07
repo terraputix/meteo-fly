@@ -90,8 +90,11 @@
 				Plot.vector(windData, {
 					x: 'time',
 					y: 'height',
+					shape: 'arrow',
+					r: 6,
 					rotate: (d) => d.direction - 180,
-					length: 15,
+					length: 18,
+					strokeLinecap: 'round',
 					strokeWidth: (d) => strokeWidthScale(d.speed),
 					stroke: (d) => colorScale(d.speed),
 					title: (d) => {
