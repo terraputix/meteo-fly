@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import * as Plot from '@observablehq/plot';
+	import * as d3 from 'd3';
 	import type { WeatherDataType } from '$lib/api';
 	import { getCloudCoverData } from '$lib/charts/clouds';
 	import { getWindFieldAllLevels } from '$lib/charts/wind';
@@ -28,21 +29,48 @@
 		const cloudData = getCloudCoverData(weatherData);
 		const windData = getWindFieldAllLevels(weatherData);
 
+		let yTicks = d3.ticks(0, 4500, 9);
+		// Define y-axis domain
+		const yDomain: [number, number] = [0, 4500];
+
+		const xMin = d3.min(windData, (d) => d.time) as Date;
+		const xMax = d3.max(windData, (d) => d.time) as Date;
+
+		const xDomain: [Date, Date] = [xMin.addSeconds(-1800), xMax.addSeconds(1800)];
+
 		// Create the Plot
 		const plot = Plot.plot({
 			height: 600,
-			x: { type: 'time', label: 'Time' },
-			y: { label: 'Height (m)' },
+			width: 850,
+			marginLeft: 60,
+			x: { type: 'time', domain: xDomain },
+			y: { domain: yDomain },
 			marks: [
+				Plot.axisY(yTicks, {
+					label: 'Height (m)',
+					// tickSize: 0,
+					// dx: -7,
+					tickFormat: (d) => `${d} m`
+				}),
+				Plot.axisX({
+					label: 'Time',
+					// tickSize: 0,
+					// dy: 3,
+					tickFormat: d3.timeFormat('%H:%M')
+				}),
+				Plot.ruleY([0]),
+				Plot.ruleX([xMin.addSeconds(-1800)]),
 				// Cloud cover heatmap
-				Plot.rect(cloudData, {
-					x1: 'x1',
-					x2: 'x2',
-					y1: 'y1',
-					y2: 'y2',
+				Plot.raster(cloudData, {
+					x: 'x1',
+					// x2: 'x2',
+					y: 'y1',
+					// y2: 'y2',
+					interpolate: 'nearest',
+					opacity: 0.9,
 					fill: 'value',
 					title: (d) => `Cloud Cover: ${d.value}%`,
-					opacity: 0.8
+					clip: true
 				}),
 				// Wind barbs
 				Plot.vector(windData, {
@@ -59,7 +87,7 @@
 				type: 'sequential',
 				domain: [0, 100],
 				range: ['white', 'gray'],
-				legend: true,
+				legend: false,
 				label: 'Cloud Cover (%)'
 			}
 		});
@@ -79,11 +107,11 @@
 	});
 </script>
 
-<div bind:this={chartContainer}></div>
+<div bind:this={chartContainer} class="chart-container"></div>
 
 <style>
-	div {
+	.chart-container {
 		width: 100%;
-		margin: 20px auto;
+		margin: 0 auto;
 	}
 </style>

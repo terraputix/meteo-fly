@@ -33,5 +33,16 @@ export function getCloudCoverData(weatherData: WeatherDataType) {
             });
         });
     });
+
+    // prepend an additional 0 value at a height below the first level for proper display of the first level
+    times.forEach((time, i) => {
+        data.push({
+            x1: time,
+            x2: times[i + 1] || new Date(time.getTime() + 3600000),
+            y1: levels[0].heightMeters - 250,
+            y2: levels[0].heightMeters,
+            value: 0,
+        });
+    });
     return data;
 }

@@ -6,3 +6,11 @@ if (!Date.prototype.addDays) {
         return date;
     };
 }
+
+if (!Date.prototype.addSeconds) {
+    Date.prototype.addSeconds = function (seconds: number): Date {
+        const date = new Date(this.valueOf());
+        date.setSeconds(date.getSeconds() + seconds);
+        return date;
+    };
+}
