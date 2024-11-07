@@ -20,6 +20,24 @@
 	let weatherData: WeatherDataType | null = null;
 	let error: string | null = null;
 
+	// Timer for debouncing
+	let updateTimer: number;
+	let isUpdating: boolean = false;
+
+	// Watch for changes in parameters
+	$: {
+		// just reference location,  selectedModel and selectedDay to trigger the watcher
+		if (location && selectedModel && selectedDay) {
+			isUpdating = true;
+			clearTimeout(updateTimer);
+			updateTimer = setTimeout(() => {
+				updateWeather().then(() => {
+					isUpdating = false;
+				});
+			}, 1500);
+		}
+	}
+
 	async function updateWeather() {
 		try {
 			error = null;
@@ -31,13 +49,15 @@
 	}
 
 	onMount(() => {
-		updateWeather().then();
+		updateWeather().then(() => {
+			isUpdating = false;
+		});
 	});
 </script>
 
 <div class="min-h-screen bg-gray-100 p-6">
 	<div class="mx-auto max-w-4xl rounded-lg bg-white p-6 shadow-md">
-		<h1 class="mb-6 text-center text-2xl font-bold">Wind Chart</h1>
+		<h1 class="mb-6 text-center text-2xl font-bold">Icon Wind Chart</h1>
 
 		<!-- Error Message -->
 		{#if error}
@@ -52,7 +72,7 @@
 		<!-- Input Form -->
 		<div class="space-y-6">
 			<!-- Location Inputs -->
-			<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 				<div>
 					<label for="latitude" class="block text-sm font-medium text-gray-700">Latitude</label>
 					<input
@@ -74,15 +94,6 @@
 						step="0.01"
 						class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
 					/>
-				</div>
-				<!-- Update Button -->
-				<div class="flex items-end">
-					<button
-						on:click={updateWeather}
-						class="w-full rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-					>
-						Update Chart
-					</button>
 				</div>
 			</div>
 
@@ -125,8 +136,42 @@
 
 		<!-- Wind Chart Display -->
 		{#if weatherData}
-			<div class="mt-8">
+			<div class="relative mt-8">
 				<WindChart {weatherData} />
+				<!-- if isUpdating is true display a spinner on top of the current chart -->
+				{#if isUpdating}
+					<div
+						class="pointer-events-none absolute inset-0 flex items-center justify-center bg-white bg-opacity-50"
+					>
+						<svg
+							class="h-8 w-8 animate-spin text-gray-500"
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 50 50"
+						>
+							<circle
+								class="opacity-25"
+								cx="25"
+								cy="25"
+								r="20"
+								stroke="currentColor"
+								stroke-width="5"
+								fill="none"
+							></circle>
+							<circle
+								class="opacity-75"
+								cx="25"
+								cy="25"
+								r="20"
+								stroke="currentColor"
+								stroke-width="5"
+								stroke-linecap="round"
+								fill="none"
+								stroke-dasharray="31.4 31.4"
+								transform="rotate(-90 25 25)"
+							></circle>
+						</svg>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
