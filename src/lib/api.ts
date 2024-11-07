@@ -10,6 +10,8 @@ export type WeatherModel = 'icon_d2' | 'icon_seamless' | 'icon_eu' | 'icon_globa
 export interface HourlyData {
     time: Date[];
     precipitation: Float32Array;
+    temperature_2m: Float32Array;
+    dewpoint_2m: Float32Array;
     cloudCover: Float32Array;
     cloudCoverLow: Float32Array;
     cloudCoverMid: Float32Array;
@@ -72,7 +74,7 @@ export interface WeatherDataType {
 }
 
 const paramsTemplate = {
-    "hourly": ["precipitation", "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "cloud_cover_1000hPa", "cloud_cover_975hPa", "cloud_cover_950hPa", "cloud_cover_925hPa", "cloud_cover_900hPa", "cloud_cover_850hPa", "cloud_cover_800hPa", "cloud_cover_700hPa", "cloud_cover_600hPa", "cloud_cover_500hPa", "cloud_cover_400hPa", "cloud_cover_300hPa", "cloud_cover_250hPa", "cloud_cover_200hPa", "cloud_cover_150hPa", "cloud_cover_100hPa", "cloud_cover_70hPa", "cloud_cover_50hPa", "cloud_cover_30hPa", "wind_speed_1000hPa", "wind_speed_975hPa", "wind_speed_950hPa", "wind_speed_925hPa", "wind_speed_900hPa", "wind_speed_850hPa", "wind_speed_800hPa", "wind_speed_700hPa", "wind_speed_600hPa", "wind_direction_1000hPa", "wind_direction_975hPa", "wind_direction_950hPa", "wind_direction_925hPa", "wind_direction_900hPa", "wind_direction_850hPa", "wind_direction_800hPa", "wind_direction_700hPa", "wind_direction_600hPa"]
+    "hourly": ["precipitation", "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m", "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m", "cloud_cover_1000hPa", "cloud_cover_975hPa", "cloud_cover_950hPa", "cloud_cover_925hPa", "cloud_cover_900hPa", "cloud_cover_850hPa", "cloud_cover_800hPa", "cloud_cover_700hPa", "cloud_cover_600hPa", "cloud_cover_500hPa", "cloud_cover_400hPa", "cloud_cover_300hPa", "cloud_cover_250hPa", "cloud_cover_200hPa", "cloud_cover_150hPa", "cloud_cover_100hPa", "cloud_cover_70hPa", "cloud_cover_50hPa", "cloud_cover_30hPa", "wind_speed_1000hPa", "wind_speed_975hPa", "wind_speed_950hPa", "wind_speed_925hPa", "wind_speed_900hPa", "wind_speed_850hPa", "wind_speed_800hPa", "wind_speed_700hPa", "wind_speed_600hPa", "wind_direction_1000hPa", "wind_direction_975hPa", "wind_direction_950hPa", "wind_direction_925hPa", "wind_direction_900hPa", "wind_direction_850hPa", "wind_direction_800hPa", "wind_direction_700hPa", "wind_direction_600hPa", "temperature_2m", "dew_point_2m"]
 };
 const url = "https://api.open-meteo.com/v1/forecast";
 
@@ -111,6 +113,8 @@ export async function fetchWeatherData(location: Location, model: WeatherModel =
                 (t) => new Date((t + utcOffsetSeconds) * 1000)
             ),
             precipitation: hourly.variables(0)!.valuesArray()!,
+            temperature_2m: hourly.variables(50)!.valuesArray()!,
+            dewpoint_2m: hourly.variables(51)!.valuesArray()!,
             cloudCover: hourly.variables(1)!.valuesArray()!,
             cloudCoverLow: hourly.variables(2)!.valuesArray()!,
             cloudCoverMid: hourly.variables(3)!.valuesArray()!,

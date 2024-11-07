@@ -6,6 +6,7 @@
 	import { getCloudCoverData } from '$lib/charts/clouds';
 	import { getWindFieldAllLevels } from '$lib/charts/wind';
 	import { colorScale, maxSpeed, strokeWidthScale } from '$lib/charts/scales';
+	import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
 
 	export let weatherData: WeatherDataType | null = null;
 	let chartContainer: HTMLDivElement;
@@ -28,6 +29,7 @@
 		// Process data for plotting
 		const cloudData = getCloudCoverData(weatherData);
 		const windData = getWindFieldAllLevels(weatherData);
+		const cloudBase = calculateCloudBaseWeather(weatherData);
 
 		let yTicks = d3.ticks(0, 4500, 9);
 		// Define y-axis domain
@@ -135,7 +137,14 @@
 						fill: '#7a6552',
 						opacity: 1.0
 					}
-				)
+				),
+				// Plot cloud base as a red line
+				Plot.line(cloudBase, {
+					x: 'x',
+					y: 'y',
+					stroke: 'red',
+					strokeWidth: 2
+				})
 			],
 			color: cloudCoverScaleOptions
 		});
