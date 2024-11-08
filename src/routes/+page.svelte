@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { loadStoredParameters, saveParameters } from '$lib/services/storage';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -26,9 +27,11 @@
 		{ id: 'cma_grapes_global', name: 'CMA GRAPES' }
 	];
 
-	let location: Location = { latitude: 44.52, longitude: 9.41 };
-	let selectedModel: WeatherModel = 'icon_seamless';
-	let selectedDay: number = 1;
+	const initialParameters = loadStoredParameters();
+
+	let location: Location = initialParameters?.location ?? { latitude: 44.52, longitude: 9.41 };
+	let selectedModel: WeatherModel = initialParameters?.selectedModel ?? 'icon_seamless';
+	let selectedDay: number = initialParameters?.selectedDay ?? 1;
 
 	$: startDate = new Date().addDays(selectedDay - 1);
 
@@ -59,33 +62,51 @@
 		const params = $page.url.searchParams;
 
 		location = {
-			latitude: Number(params.get('lat')) || 44.52,
-			longitude: Number(params.get('lon')) || 9.41
+			latitude: Number(params.get('lat')) || location.latitude,
+			longitude: Number(params.get('lon')) || location.longitude
 		};
-		selectedDay = Number(params.get('day')) || 1;
-		selectedModel = (params.get('model') as WeatherModel) || 'icon_seamless';
+		selectedDay = Number(params.get('day')) || selectedDay;
+		selectedModel = (params.get('model') as WeatherModel) || selectedModel;
 	}
 
-	// Initialize from URL parameters
 	onMount(() => {
-		readURLParams();
+		// Initialize from URL parameters or stored parameters
+		const stored = loadStoredParameters();
+		if (stored) {
+			location = stored.location;
+			selectedModel = stored.selectedModel;
+			selectedDay = stored.selectedDay;
+		} else {
+			readURLParams();
+		}
+
+		// Get data for correct location
 		updateWeather().then(() => {
 			isUpdating = false;
 		});
 	});
 
-	// Watch for parameter changes and update URL
+	// Watch for parameter changes and update URL and storage
 	$: {
-		if (location && selectedModel && selectedDay !== undefined && browser) {
-			updateURLParams();
-			isUpdating = true;
-			clearTimeout(updateTimer);
-			updateTimer = setTimeout(() => {
-				updateWeather().then(() => {
-					isUpdating = false;
-				});
-			}, 5);
-		}
+		// store in local storage
+		saveParameters({
+			location,
+			selectedDay,
+			selectedModel,
+			lastUpdated: new Date().toISOString()
+		});
+
+		// also update URL parameters
+		updateURLParams();
+
+		// load updated forecast data
+		isUpdating = true;
+		clearTimeout(updateTimer);
+		updateTimer = setTimeout(() => {
+			updateWeather().then(() => {
+				isUpdating = false;
+			});
+		}, 5);
 	}
 
 	async function updateWeather() {
