@@ -7,6 +7,7 @@
 	import { getWindFieldAllLevels } from '$lib/charts/wind';
 	import { colorScale, maxSpeed, strokeWidthScale } from '$lib/charts/scales';
 	import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
+	import { getRainSymbol } from '$lib/icons/RainIcons';
 
 	export let weatherData: WeatherDataType | null = null;
 	let chartContainer: HTMLDivElement;
@@ -33,7 +34,7 @@
 
 		let yTicks = d3.ticks(0, 4500, 9);
 		// Define y-axis domain
-		const yDomain: [number, number] = [0, 4500];
+		const yDomain: [number, number] = [0, 4350];
 
 		const xMin = (d3.min(windData, (d) => d.time) as Date).addSeconds(-1800);
 		const xMax = (d3.max(windData, (d) => d.time) as Date).addSeconds(1800);
@@ -54,14 +55,67 @@
 			label: 'Wind Speed (km/h)'
 		};
 
+		// Separate Plot box above the chart for rain indicators
+		const rainPlot = Plot.plot({
+			height: 90,
+			width: 850,
+			marginLeft: 70,
+			marginRight: 20,
+			marginBottom: 10,
+			x: { type: 'time', domain: xDomain, axis: null },
+			y: { domain: [0, 1], axis: 'left', ticks: 0, label: 'Precipitation' },
+			marks: [
+				// Info bar background
+				Plot.rect(
+					[
+						{
+							x1: xMin,
+							x2: xMax,
+							y1: 0,
+							y2: 1,
+							value: 100
+						}
+					],
+					{
+						x1: 'x1',
+						x2: 'x2',
+						y1: 'y1',
+						y2: 'y2',
+						fill: '#f0f0f0',
+						opacity: 1.0
+					}
+				),
+				Plot.dot(
+					weatherData.hourly.time
+						.map((time, i) => ({
+							time: time,
+							y: 0.2,
+							rain: weatherData.hourly.precipitation[i]
+						}))
+						.filter((d) => d.rain > 0),
+					{
+						x: 'time',
+						y: 'y',
+						fill: 'blue',
+						symbol: (d) => getRainSymbol(d.rain),
+						r: 6,
+						title: (d) => `Rain: ${d.rain.toFixed(1)} mm/h`
+					}
+				),
+				Plot.frame()
+			]
+		});
+
 		// Create the Plot
 		const plot = Plot.plot({
 			height: 600,
 			width: 850,
-			marginLeft: 60,
+			marginLeft: 70,
+			marginTop: 0,
 			x: { type: 'time', domain: xDomain },
 			y: { domain: yDomain },
 			marks: [
+				Plot.frame(),
 				Plot.axisY(yTicks, {
 					label: 'Height (m)',
 					// tickSize: 0,
@@ -164,8 +218,13 @@
 		legendContainer.appendChild(cloudLegend);
 		legendContainer.appendChild(windLegend);
 
+		// Combine plots
+		const plotContainer = document.createElement('div');
+		plotContainer.appendChild(rainPlot);
+		plotContainer.appendChild(plot);
+
 		// Append the plot to the container
-		chartContainer.appendChild(plot);
+		chartContainer.appendChild(plotContainer);
 		chartContainer.appendChild(legendContainer);
 	}
 
