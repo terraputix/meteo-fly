@@ -130,8 +130,8 @@
 	}
 </script>
 
-<div class="min-h-screen bg-gray-100 p-6">
-	<div class="mx-auto max-w-5xl rounded-lg bg-white p-20 shadow-md">
+<div class="min-h-screen bg-gray-100 p-2 sm:p-6">
+	<div class="mx-auto max-w-5xl rounded-lg bg-white p-4 shadow-md sm:p-20">
 		<h1 class="mb-6 text-center text-2xl font-bold">Wind Chart</h1>
 
 		<!-- Error Message -->
@@ -223,11 +223,32 @@
 				</div>
 
 				<!-- Chart container with navigation buttons -->
-				<div class="relative">
+				<div class="relative flex flex-col sm:block">
+					<div class="mb-4 flex justify-between gap-20 sm:hidden">
+						<button
+							on:click={previousDay}
+							disabled={selectedDay <= -14}
+							class="flex-1 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+							aria-label="Previous Day"
+						>
+							← Previous Day
+						</button>
+
+						<button
+							on:click={nextDay}
+							disabled={selectedDay >= 7}
+							class="flex-1 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+							aria-label="Next Day"
+						>
+							→ Next Day
+						</button>
+					</div>
+
+					<!-- Desktop navigation buttons -->
 					<button
 						on:click={previousDay}
 						disabled={selectedDay <= -14}
-						class="absolute left-0 top-1/2 -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+						class="absolute left-0 top-1/2 hidden -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
 						aria-label="Previous Day"
 					>
 						←
@@ -238,7 +259,7 @@
 					<button
 						on:click={nextDay}
 						disabled={selectedDay >= 7}
-						class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+						class="absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-12 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
 						aria-label="Next Day"
 					>
 						→
