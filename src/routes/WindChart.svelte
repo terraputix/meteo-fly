@@ -193,8 +193,16 @@
 
 	:global(.legend-container) {
 		display: flex;
-		gap: 2rem;
-		margin-top: 1rem;
+		flex-wrap: wrap;
+		gap: 1rem;
 		justify-content: center;
+		align-items: center;
+		margin-top: 1rem;
+	}
+
+	:global(.legend-container > *) {
+		flex: 1 1 auto;
+		min-width: 200px;
+		max-width: 100%;
 	}
 </style>

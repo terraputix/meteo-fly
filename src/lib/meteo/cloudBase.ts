@@ -16,7 +16,7 @@ function calculateCloudBase(temperature: number, dewpoint: number): number {
         console.log('Dewpoint cannot be higher than temperature');
         console.log('Dewpoint:', dewpoint);
         console.log('Temperature:', temperature);
-        return NaN;
+        return 0;
     }
 
     // Espy's equation: LCL ≈ 125 * (T - Td) meters
@@ -38,7 +38,7 @@ export function calculateCloudBaseWeather(data: WeatherDataType): { x: Date, y: 
         const dewpoint = dewpoints[i];
 
         const cloudBase = calculateCloudBase(temperature, dewpoint);
-        cloudBases.push({ x: times[i], y: cloudBase });
+        cloudBases.push({ x: times[i], y: cloudBase + data.elevation });
     }
 
     return cloudBases;
