@@ -61,26 +61,43 @@
 			label: 'Wind Speed (km/h)'
 		};
 
-		// Separate Plot box above the chart for rain indicators
+		// Separate Plot box above the chart for rain indicators and cloud layers
 		const rainPlot = Plot.plot({
 			height: 90,
 			width: 850,
 			marginLeft: 70,
-			marginRight: 20,
+			marginRight: 40,
 			marginBottom: 10,
 			x: { type: 'time', domain: xDomain, axis: null },
-			y: { domain: [0, 1], axis: 'left', ticks: 0, label: 'Precipitation' },
+			y: { domain: [0, 1], axis: 'left', ticks: 0, label: 'Rain' },
 			marks: [
-				// Info bar background
+				Plot.axisY([0, 1], {
+					anchor: 'right',
+					label: 'Cloud Cover (%)',
+					// tickSize: 0,
+					// ticks: 3,
+					dx: 100 // just move the label to the right
+				}),
+				// Labels for cloud layers
+				Plot.text(
+					[
+						{ x: xMax, y: 1 / 6, text: 'Low' },
+						{ x: xMax, y: 3 / 6, text: 'Mid' },
+						{ x: xMax, y: 5 / 6, text: 'High' }
+					],
+					{
+						x: 'x',
+						y: 'y',
+						text: 'text',
+						dx: 15
+					}
+				),
+				// Info bar background divided into three sections
 				Plot.rect(
 					[
-						{
-							x1: xMin,
-							x2: xMax,
-							y1: 0,
-							y2: 1,
-							value: 100
-						}
+						{ x1: xMin, x2: xMax, y1: 0, y2: 1 / 3, layer: 'low' },
+						{ x1: xMin, x2: xMax, y1: 1 / 3, y2: 2 / 3, layer: 'mid' },
+						{ x1: xMin, x2: xMax, y1: 2 / 3, y2: 1, layer: 'high' }
 					],
 					{
 						x1: 'x1',
@@ -91,10 +108,54 @@
 						opacity: 1.0
 					}
 				),
+				// Cloud cover indicators for each layer
+				Plot.dot(
+					weatherData.hourly.time.map((time, i) => ({
+						time,
+						y: 1 / 6,
+						cloudCover: weatherData.hourly.cloudCoverLow[i]
+					})),
+					{
+						x: 'time',
+						y: 'y',
+						fill: (d) => `rgba(128, 128, 128, ${d.cloudCover / 100})`,
+						r: 11,
+						symbol: 'square'
+					}
+				),
+				Plot.dot(
+					weatherData.hourly.time.map((time, i) => ({
+						time,
+						y: 3 / 6,
+						cloudCover: weatherData.hourly.cloudCoverMid[i]
+					})),
+					{
+						x: 'time',
+						y: 'y',
+						fill: (d) => `rgba(128, 128, 128, ${d.cloudCover / 100})`,
+						r: 11,
+						symbol: 'square'
+					}
+				),
+				Plot.dot(
+					weatherData.hourly.time.map((time, i) => ({
+						time,
+						y: 5 / 6,
+						cloudCover: weatherData.hourly.cloudCoverHigh[i]
+					})),
+					{
+						x: 'time',
+						y: 'y',
+						fill: (d) => `rgba(128, 128, 128, ${d.cloudCover / 100})`,
+						r: 11,
+						symbol: 'square'
+					}
+				),
+				// Rain indicators
 				Plot.dot(
 					weatherData.hourly.time
 						.map((time, i) => ({
-							time: time,
+							time,
 							y: 0.2,
 							rain: weatherData.hourly.precipitation[i]
 						}))
@@ -117,6 +178,7 @@
 			height: 600,
 			width: 850,
 			marginLeft: 70,
+			marginRight: 40,
 			marginTop: 0,
 			x: { type: 'time', domain: xDomain },
 			y: { domain: yDomain },
