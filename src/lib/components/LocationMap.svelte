@@ -19,6 +19,17 @@
 		}
 	}
 
+	// Watch for prop changes and update map
+	$: if (
+		map &&
+		marker &&
+		(latitude !== marker.getLatLng().lat || longitude !== marker.getLatLng().lng)
+	) {
+		const newPos = [latitude, longitude] as [number, number];
+		marker.setLatLng(newPos);
+		map.setView(newPos, map.getZoom());
+	}
+
 	onMount(() => {
 		// Initialize the map
 		map = L.map(mapContainer).setView([latitude, longitude], 8);

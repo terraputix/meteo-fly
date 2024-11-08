@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import LocationMap from '$lib/components/LocationMap.svelte';
 
 	import WindChart from './WindChart.svelte';
@@ -24,10 +27,45 @@
 	let updateTimer: number;
 	let isUpdating: boolean = false;
 
-	// Watch for changes in parameters
+	// URL parameter handling
+	function updateURLParams() {
+		if (!browser) return;
+
+		const params = new URLSearchParams({
+			lat: location.latitude.toString(),
+			lon: location.longitude.toString(),
+			day: selectedDay.toString(),
+			model: selectedModel
+		});
+
+		goto(`?${params.toString()}`, { replaceState: true, keepFocus: true });
+	}
+
+	function readURLParams() {
+		if (!browser) return;
+
+		const params = $page.url.searchParams;
+
+		location = {
+			latitude: Number(params.get('lat')) || 44.52,
+			longitude: Number(params.get('lon')) || 9.41
+		};
+		selectedDay = Number(params.get('day')) || 1;
+		selectedModel = (params.get('model') as WeatherModel) || 'icon_seamless';
+	}
+
+	// Initialize from URL parameters
+	onMount(() => {
+		readURLParams();
+		updateWeather().then(() => {
+			isUpdating = false;
+		});
+	});
+
+	// Watch for parameter changes and update URL
 	$: {
-		// just reference location,  selectedModel and selectedDay to trigger the watcher
-		if (location && selectedModel && selectedDay) {
+		if (location && selectedModel && selectedDay && browser) {
+			updateURLParams();
 			isUpdating = true;
 			clearTimeout(updateTimer);
 			updateTimer = setTimeout(() => {
@@ -47,12 +85,6 @@
 			error = 'Failed to fetch weather data. Please try again.';
 		}
 	}
-
-	onMount(() => {
-		updateWeather().then(() => {
-			isUpdating = false;
-		});
-	});
 
 	function nextDay() {
 		selectedDay += 1;
