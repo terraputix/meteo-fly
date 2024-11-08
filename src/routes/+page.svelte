@@ -53,7 +53,11 @@
 			model: selectedModel
 		});
 
-		goto(`?${params.toString()}`, { replaceState: true, keepFocus: true });
+		goto(`?${params.toString()}`, {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
 	}
 
 	function readURLParams() {
@@ -119,11 +123,13 @@
 		}
 	}
 
-	function nextDay() {
+	function handleNextDay(e: MouseEvent) {
+		e.preventDefault();
 		selectedDay += 1;
 	}
 
-	function previousDay() {
+	function handlePreviousDay(e: MouseEvent) {
+		e.preventDefault();
 		if (selectedDay > -14) {
 			selectedDay -= 1;
 		}
@@ -226,7 +232,7 @@
 				<div class="relative flex flex-col sm:block">
 					<div class="mb-4 flex justify-between gap-20 sm:hidden">
 						<button
-							on:click={previousDay}
+							on:click={handlePreviousDay}
 							disabled={selectedDay <= -14}
 							class="flex-1 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
 							aria-label="Previous Day"
@@ -235,18 +241,18 @@
 						</button>
 
 						<button
-							on:click={nextDay}
+							on:click={handleNextDay}
 							disabled={selectedDay >= 7}
 							class="flex-1 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
 							aria-label="Next Day"
 						>
-							→ Next Day
+							Next Day →
 						</button>
 					</div>
 
 					<!-- Desktop navigation buttons -->
 					<button
-						on:click={previousDay}
+						on:click={handlePreviousDay}
 						disabled={selectedDay <= -14}
 						class="absolute left-0 top-1/2 hidden -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
 						aria-label="Previous Day"
@@ -257,7 +263,7 @@
 					<WindChart {weatherData} />
 
 					<button
-						on:click={nextDay}
+						on:click={handleNextDay}
 						disabled={selectedDay >= 7}
 						class="absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-12 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
 						aria-label="Next Day"
