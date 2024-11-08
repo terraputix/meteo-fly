@@ -65,7 +65,7 @@
 		const rainPlot = Plot.plot({
 			height: 90,
 			width: 850,
-			marginLeft: 70,
+			marginLeft: 50,
 			marginRight: 40,
 			marginBottom: 10,
 			x: { type: 'time', domain: xDomain, axis: null },
@@ -104,51 +104,42 @@
 						x2: 'x2',
 						y1: 'y1',
 						y2: 'y2',
-						fill: '#f0f0f0',
+						fill: '#fafafa',
 						opacity: 1.0
 					}
 				),
 				// Cloud cover indicators for each layer
-				Plot.dot(
-					weatherData.hourly.time.map((time, i) => ({
-						time,
-						y: 1 / 6,
-						cloudCover: weatherData.hourly.cloudCoverLow[i]
-					})),
+				Plot.rect(
+					weatherData.hourly.time.flatMap((time, i) => [
+						{
+							x1: time.addSeconds(-1800),
+							x2: time.addSeconds(1800),
+							y1: 0,
+							y2: 1 / 3,
+							cloudCover: weatherData.hourly.cloudCoverLow[i]
+						},
+						{
+							x1: time.addSeconds(-1800),
+							x2: time.addSeconds(1800),
+							y1: 1 / 3,
+							y2: 2 / 3,
+							cloudCover: weatherData.hourly.cloudCoverMid[i]
+						},
+						{
+							x1: time.addSeconds(-1800),
+							x2: time.addSeconds(1800),
+							y1: 2 / 3,
+							y2: 1,
+							cloudCover: weatherData.hourly.cloudCoverHigh[i]
+						}
+					]),
 					{
-						x: 'time',
-						y: 'y',
+						x1: 'x1',
+						x2: 'x2',
+						y1: 'y1',
+						y2: 'y2',
 						fill: (d) => `rgba(128, 128, 128, ${d.cloudCover / 100})`,
-						r: 11,
-						symbol: 'square'
-					}
-				),
-				Plot.dot(
-					weatherData.hourly.time.map((time, i) => ({
-						time,
-						y: 3 / 6,
-						cloudCover: weatherData.hourly.cloudCoverMid[i]
-					})),
-					{
-						x: 'time',
-						y: 'y',
-						fill: (d) => `rgba(128, 128, 128, ${d.cloudCover / 100})`,
-						r: 11,
-						symbol: 'square'
-					}
-				),
-				Plot.dot(
-					weatherData.hourly.time.map((time, i) => ({
-						time,
-						y: 5 / 6,
-						cloudCover: weatherData.hourly.cloudCoverHigh[i]
-					})),
-					{
-						x: 'time',
-						y: 'y',
-						fill: (d) => `rgba(128, 128, 128, ${d.cloudCover / 100})`,
-						r: 11,
-						symbol: 'square'
+						title: (d) => `Cloud Cover: ${d.cloudCover}%`
 					}
 				),
 				// Rain indicators
@@ -166,7 +157,8 @@
 						fill: 'blue',
 						symbol: (d) => getRainSymbol(d.rain),
 						r: 6,
-						title: (d) => `Rain: ${d.rain.toFixed(1)} mm/h`
+						title: (d) => `Rain: ${d.rain.toFixed(1)} mm/h`,
+						opacity: 0.6
 					}
 				),
 				Plot.frame()
@@ -177,7 +169,7 @@
 		const plot = Plot.plot({
 			height: 600,
 			width: 850,
-			marginLeft: 70,
+			marginLeft: 50,
 			marginRight: 40,
 			marginTop: 0,
 			x: { type: 'time', domain: xDomain },
@@ -185,7 +177,7 @@
 			marks: [
 				Plot.frame(),
 				Plot.axisY(yTicks, {
-					label: 'Height (m)',
+					label: 'Height',
 					// tickSize: 0,
 					// dx: -7,
 					tickFormat: (d) => `${d} m`
