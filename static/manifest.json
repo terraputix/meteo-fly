@@ -2,7 +2,7 @@
     "name": "Meteo-Fly",
     "short_name": "Meteo-Fly",
     "description": "Weather visualization with wind and cloud data",
-    "start_url": "/",
+    "start_url": "/meteo-fly/",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#4f46e5",

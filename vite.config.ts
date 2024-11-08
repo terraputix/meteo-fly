@@ -8,6 +8,7 @@ export default defineConfig({
 		viteStaticCopy({
 			targets: [
 				{ src: 'node_modules/leaflet/dist/images/marker-icon.png', dest: '' },
+				{ src: 'node_modules/leaflet/dist/images/marker-icon-2x.png', dest: '' },
 				{ src: 'node_modules/leaflet/dist/images/marker-shadow.png', dest: '' }
 			]
 		})
