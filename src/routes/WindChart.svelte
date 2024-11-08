@@ -5,7 +5,13 @@
 	import type { WeatherDataType } from '$lib/api';
 	import { getCloudCoverData } from '$lib/charts/clouds';
 	import { getWindFieldAllLevels } from '$lib/charts/wind';
-	import { colorScale, maxSpeed, strokeWidthScale } from '$lib/charts/scales';
+	import {
+		windColorScale,
+		windMaxSpeed,
+		strokeWidthScale,
+		windDomains,
+		windColors
+	} from '$lib/charts/scales';
 	import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
 	import { getRainSymbol } from '$lib/icons/RainIcons';
 
@@ -49,9 +55,9 @@
 
 		// Define wind speed scale options
 		const windSpeedScaleOptions: Plot.ScaleOptions = {
-			domain: [0, maxSpeed],
-			range: ['#00FF00', '#FFA500', '#FF0000'],
-			type: 'sequential',
+			domain: windDomains,
+			range: windColors,
+			type: 'pow',
 			label: 'Wind Speed (km/h)'
 		};
 
@@ -152,7 +158,7 @@
 					length: 18,
 					strokeLinecap: 'round',
 					strokeWidth: (d) => strokeWidthScale(d.speed),
-					stroke: (d) => colorScale(d.speed),
+					stroke: (d) => windColorScale(d.speed),
 					title: (d) => {
 						// Format time for display
 						const timeFormat = d3.timeFormat('%H:%M');
