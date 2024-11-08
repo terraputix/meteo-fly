@@ -5,13 +5,7 @@
 	import type { WeatherDataType } from '$lib/api';
 	import { getCloudCoverData } from '$lib/charts/clouds';
 	import { getWindFieldAllLevels } from '$lib/charts/wind';
-	import {
-		windColorScale,
-		windMaxSpeed,
-		strokeWidthScale,
-		windDomains,
-		windColors
-	} from '$lib/charts/scales';
+	import { windColorScale, strokeWidthScale, windDomains, windColors } from '$lib/charts/scales';
 	import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
 	import { getRainSymbol } from '$lib/icons/RainIcons';
 

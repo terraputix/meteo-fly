@@ -34,7 +34,7 @@
 				updateWeather().then(() => {
 					isUpdating = false;
 				});
-			}, 1500);
+			}, 0);
 		}
 	}
 
@@ -53,10 +53,20 @@
 			isUpdating = false;
 		});
 	});
+
+	function nextDay() {
+		selectedDay += 1;
+	}
+
+	function previousDay() {
+		if (selectedDay > -14) {
+			selectedDay -= 1;
+		}
+	}
 </script>
 
 <div class="min-h-screen bg-gray-100 p-6">
-	<div class="mx-auto max-w-4xl rounded-lg bg-white p-6 shadow-md">
+	<div class="mx-auto max-w-5xl rounded-lg bg-white p-20 shadow-md">
 		<h1 class="mb-6 text-center text-2xl font-bold">Icon Wind Chart</h1>
 
 		<!-- Error Message -->
@@ -123,7 +133,8 @@
 						type="number"
 						bind:value={selectedDay}
 						class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-						max="16"
+						max="7"
+						min="-14"
 					/>
 				</div>
 			</div>
@@ -137,13 +148,46 @@
 		<!-- Wind Chart Display -->
 		{#if weatherData}
 			<div class="relative mt-8">
-				<WindChart {weatherData} />
+				<!-- Date display above chart -->
+				<div class="mb-4 text-center font-semibold text-gray-700">
+					{startDate.toLocaleDateString('en-US', {
+						weekday: 'long',
+						year: 'numeric',
+						month: 'long',
+						day: 'numeric'
+					})}
+				</div>
+
+				<!-- Chart container with navigation buttons -->
+				<div class="relative">
+					<button
+						on:click={previousDay}
+						disabled={selectedDay <= -14}
+						class="absolute left-0 top-1/2 -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+						aria-label="Previous Day"
+					>
+						←
+					</button>
+
+					<WindChart {weatherData} />
+
+					<button
+						on:click={nextDay}
+						disabled={selectedDay >= 7}
+						class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+						aria-label="Next Day"
+					>
+						→
+					</button>
+				</div>
+
 				<p class="mt-2 text-right text-sm text-gray-500">
 					<a href="https://open-meteo.com/" target="_blank" class="underline"
 						>Weather data by Open-Meteo.com</a
 					>.
 				</p>
-				<!-- if isUpdating is true display a spinner on top of the current chart -->
+
+				<!-- Loading spinner overlay -->
 				{#if isUpdating}
 					<div
 						class="pointer-events-none absolute inset-0 flex items-center justify-center bg-white bg-opacity-50"
