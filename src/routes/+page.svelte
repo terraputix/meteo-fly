@@ -14,6 +14,18 @@
 	} from '$lib/api';
 	import '../utils/dateExtensions';
 
+	const models: { id: WeatherModel; name: string }[] = [
+		{ id: 'icon_seamless', name: 'ICON Seamless' },
+		{ id: 'icon_d2', name: 'ICON D2' },
+		{ id: 'icon_eu', name: 'ICON EU' },
+		{ id: 'icon_global', name: 'ICON Global' },
+		{ id: 'gfs_seamless', name: 'GFS Seamless' },
+		{ id: 'meteofrance_seamless', name: 'MeteoFrance' },
+		{ id: 'ukmo_seamless', name: 'UKMO' },
+		{ id: 'gem_seamless', name: 'GEM' },
+		{ id: 'cma_grapes_global', name: 'CMA GRAPES' }
+	];
+
 	let location: Location = { latitude: 44.52, longitude: 9.41 };
 	let selectedModel: WeatherModel = 'icon_seamless';
 	let selectedDay: number = 1;
@@ -64,7 +76,7 @@
 
 	// Watch for parameter changes and update URL
 	$: {
-		if (location && selectedModel && selectedDay && browser) {
+		if (location && selectedModel && selectedDay !== undefined && browser) {
 			updateURLParams();
 			isUpdating = true;
 			clearTimeout(updateTimer);
@@ -72,7 +84,7 @@
 				updateWeather().then(() => {
 					isUpdating = false;
 				});
-			}, 0);
+			}, 5);
 		}
 	}
 
@@ -99,7 +111,7 @@
 
 <div class="min-h-screen bg-gray-100 p-6">
 	<div class="mx-auto max-w-5xl rounded-lg bg-white p-20 shadow-md">
-		<h1 class="mb-6 text-center text-2xl font-bold">Icon Wind Chart</h1>
+		<h1 class="mb-6 text-center text-2xl font-bold">Wind Chart</h1>
 
 		<!-- Error Message -->
 		{#if error}
@@ -148,10 +160,9 @@
 						bind:value={selectedModel}
 						class="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
 					>
-						<option value="icon_seamless">ICON Seamless</option>
-						<option value="icon_d2">ICON D2</option>
-						<option value="icon_eu">ICON EU</option>
-						<option value="icon_global">ICON Global</option>
+						{#each models as model}
+							<option value={model.id}>{model.name}</option>
+						{/each}
 					</select>
 				</div>
 

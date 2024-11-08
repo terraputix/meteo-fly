@@ -5,7 +5,7 @@ export interface Location {
     longitude: number;
 }
 
-export type WeatherModel = 'icon_d2' | 'icon_seamless' | 'icon_eu' | 'icon_global';
+export type WeatherModel = 'icon_d2' | 'icon_seamless' | 'icon_eu' | 'icon_global' | 'meteofrance_seamless' | 'gfs_seamless' | 'ukmo_seamless' | 'cma_grapes_global' | 'gem_seamless';
 
 export interface HourlyData {
     time: Date[];
