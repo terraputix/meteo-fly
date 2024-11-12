@@ -61,18 +61,6 @@
 	}
 
 	onMount(() => {
-		// Check if we have URL parameters
-		const hasURLParams = $page.url.searchParams.toString() !== '';
-
-		if (!hasURLParams) {
-			// If no URL parameters, check for last visited URL
-			const lastURL = getLastVisitedURL();
-			if (lastURL) {
-				goto(lastURL);
-				return;
-			}
-		}
-
 		// Get data for correct location
 		updateWeather().then(() => {
 			isUpdating = false;
@@ -81,8 +69,8 @@
 
 	// Watch for parameter changes and update URL
 	$: {
-		// console.log('Parameters changed:', parameters);
-		console.log('Parameters changed:');
+		// Make sure this page is already mounted, otherwise we will have racy behaviour between
+		// the URL parameters and the initial fetch
 		updateURLParams(parameters);
 
 		// load updated forecast data
