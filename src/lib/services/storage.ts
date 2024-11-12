@@ -1,15 +1,8 @@
-import type { Location, WeatherModel } from '$lib/api';
-
-interface StoredParameters {
-    location: Location;
-    selectedDay: number;
-    selectedModel: WeatherModel;
-    lastUpdated: string;
-}
+import type { PageParameters } from './types';
 
 const STORAGE_KEY = 'meteo-fly-params';
 
-export function loadStoredParameters(): StoredParameters | null {
+export function getParamsLocalStorage(): PageParameters | null {
     if (typeof localStorage === 'undefined') return null;
 
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -22,11 +15,10 @@ export function loadStoredParameters(): StoredParameters | null {
     }
 }
 
-export function saveParameters(params: StoredParameters): void {
+export function saveParamsLocalStorage(params: PageParameters): void {
     if (typeof localStorage === 'undefined') return;
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        ...params,
-        lastUpdated: new Date().toISOString()
+        ...params
     }));
 }

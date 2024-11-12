@@ -1,19 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { loadStoredParameters, saveParameters } from '$lib/services/storage';
+	import { saveParamsLocalStorage } from '$lib/services/storage';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import LocationMap from '$lib/components/LocationMap.svelte';
 
 	import WindChart from './WindChart.svelte';
-	import {
-		fetchWeatherData,
-		type Location,
-		type WeatherDataType,
-		type WeatherModel
-	} from '$lib/api';
+	import { fetchWeatherData, type WeatherDataType, type WeatherModel } from '$lib/api';
 	import '../utils/dateExtensions';
+	import { getInitialParameters } from '$lib/services/defaults';
 
 	const models: { id: WeatherModel; name: string }[] = [
 		{ id: 'icon_seamless', name: 'ICON Seamless' },
@@ -27,13 +23,13 @@
 		{ id: 'cma_grapes_global', name: 'CMA GRAPES' }
 	];
 
-	const initialParameters = loadStoredParameters();
+	const parameters = getInitialParameters($page.url.searchParams);
 
-	let location: Location = initialParameters?.location ?? { latitude: 44.52, longitude: 9.41 };
-	let selectedModel: WeatherModel = initialParameters?.selectedModel ?? 'icon_seamless';
-	let selectedDay: number = initialParameters?.selectedDay ?? 1;
+	// let location: Location = initialParameters.location;
+	// let selectedModel: WeatherModel = initialParameters.selectedModel;
+	// let selectedDay: number = initialParameters.selectedDay;
 
-	$: startDate = new Date().addDays(selectedDay - 1);
+	$: startDate = new Date().addDays(parameters.selectedDay - 1);
 
 	let weatherData: WeatherDataType | null = null;
 	let error: string | null = null;
@@ -47,10 +43,10 @@
 		if (!browser) return;
 
 		const params = new URLSearchParams({
-			lat: location.latitude.toString(),
-			lon: location.longitude.toString(),
-			day: selectedDay.toString(),
-			model: selectedModel
+			lat: parameters.location.latitude.toString(),
+			lon: parameters.location.longitude.toString(),
+			day: parameters.selectedDay.toString(),
+			model: parameters.selectedModel
 		});
 
 		goto(`?${params.toString()}`, {
@@ -60,30 +56,7 @@
 		});
 	}
 
-	function readURLParams() {
-		if (!browser) return;
-
-		const params = $page.url.searchParams;
-
-		location = {
-			latitude: Number(params.get('lat')) || location.latitude,
-			longitude: Number(params.get('lon')) || location.longitude
-		};
-		selectedDay = Number(params.get('day')) || selectedDay;
-		selectedModel = (params.get('model') as WeatherModel) || selectedModel;
-	}
-
 	onMount(() => {
-		// Initialize from URL parameters or stored parameters
-		const stored = loadStoredParameters();
-		if (stored) {
-			location = stored.location;
-			selectedModel = stored.selectedModel;
-			selectedDay = stored.selectedDay;
-		} else {
-			readURLParams();
-		}
-
 		// Get data for correct location
 		updateWeather().then(() => {
 			isUpdating = false;
@@ -93,12 +66,7 @@
 	// Watch for parameter changes and update URL and storage
 	$: {
 		// store in local storage
-		saveParameters({
-			location,
-			selectedDay,
-			selectedModel,
-			lastUpdated: new Date().toISOString()
-		});
+		saveParamsLocalStorage(parameters);
 
 		// also update URL parameters
 		updateURLParams();
@@ -116,7 +84,11 @@
 	async function updateWeather() {
 		try {
 			error = null;
-			weatherData = await fetchWeatherData(location, selectedModel, startDate);
+			weatherData = await fetchWeatherData(
+				parameters.location,
+				parameters.selectedModel,
+				startDate
+			);
 		} catch (err) {
 			console.error(err);
 			error = 'Failed to fetch weather data. Please try again.';
@@ -125,13 +97,13 @@
 
 	function handleNextDay(e: MouseEvent) {
 		e.preventDefault();
-		selectedDay += 1;
+		parameters.selectedDay += 1;
 	}
 
 	function handlePreviousDay(e: MouseEvent) {
 		e.preventDefault();
-		if (selectedDay > -14) {
-			selectedDay -= 1;
+		if (parameters.selectedDay > -14) {
+			parameters.selectedDay -= 1;
 		}
 	}
 </script>
@@ -159,7 +131,7 @@
 					<input
 						id="latitude"
 						type="number"
-						bind:value={location.latitude}
+						bind:value={parameters.location.latitude}
 						placeholder="e.g., 44.52"
 						step="0.01"
 						class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -170,7 +142,7 @@
 					<input
 						id="longitude"
 						type="number"
-						bind:value={location.longitude}
+						bind:value={parameters.location.longitude}
 						placeholder="e.g., 9.41"
 						step="0.01"
 						class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -184,7 +156,7 @@
 					<label for="model" class="block text-sm font-medium text-gray-700">Weather Model</label>
 					<select
 						id="model"
-						bind:value={selectedModel}
+						bind:value={parameters.selectedModel}
 						class="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
 					>
 						{#each models as model}
@@ -201,7 +173,7 @@
 					<input
 						id="forecast-day"
 						type="number"
-						bind:value={selectedDay}
+						bind:value={parameters.selectedDay}
 						class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
 						max="7"
 						min="-14"
@@ -212,7 +184,10 @@
 
 		<!-- Location Map Display -->
 		<div class="mt-4">
-			<LocationMap bind:latitude={location.latitude} bind:longitude={location.longitude} />
+			<LocationMap
+				bind:latitude={parameters.location.latitude}
+				bind:longitude={parameters.location.longitude}
+			/>
 		</div>
 
 		<!-- Wind Chart Display -->
@@ -233,7 +208,7 @@
 					<div class="mb-4 flex justify-between gap-20 sm:hidden">
 						<button
 							on:click={handlePreviousDay}
-							disabled={selectedDay <= -14}
+							disabled={parameters.selectedDay <= -14}
 							class="flex-1 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
 							aria-label="Previous Day"
 						>
@@ -242,7 +217,7 @@
 
 						<button
 							on:click={handleNextDay}
-							disabled={selectedDay >= 7}
+							disabled={parameters.selectedDay >= 7}
 							class="flex-1 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
 							aria-label="Next Day"
 						>
@@ -253,7 +228,7 @@
 					<!-- Desktop navigation buttons -->
 					<button
 						on:click={handlePreviousDay}
-						disabled={selectedDay <= -14}
+						disabled={parameters.selectedDay <= -14}
 						class="absolute left-0 top-1/2 hidden -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
 						aria-label="Previous Day"
 					>
@@ -264,7 +239,7 @@
 
 					<button
 						on:click={handleNextDay}
-						disabled={selectedDay >= 7}
+						disabled={parameters.selectedDay >= 7}
 						class="absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-12 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
 						aria-label="Next Day"
 					>
