@@ -1,9 +1,8 @@
 import type { Location, WeatherModel } from "$lib/api";
-import { getParamsLocalStorage } from "./storage";
 import type { PageParameters } from "./types";
 import { readURLParams } from "./url";
 
-export const defaultLocation: Location = { latitude: 51.5074, longitude: 0.1278 };
+export const defaultLocation: Location = { latitude: 46.41526, longitude: 8.10828 };
 export const defaultWeatherModel: WeatherModel = "icon_seamless";
 export const defaultDay = 1;
 
@@ -12,9 +11,6 @@ export const defaultDay = 1;
 export function getInitialParameters(urlParams: URLSearchParams): PageParameters {
     const parsedUrlParams = readURLParams(urlParams);
     if (parsedUrlParams) { return parsedUrlParams; }
-
-    const parsedLocalStorage = getParamsLocalStorage();
-    if (parsedLocalStorage) { return parsedLocalStorage; }
 
     return {
         location: defaultLocation,

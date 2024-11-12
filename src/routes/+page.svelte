@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { saveParamsLocalStorage } from '$lib/services/storage';
+	import { getLastVisitedURL, saveLastVisitedURL } from '$lib/services/storage';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -49,26 +49,38 @@
 			model: parameters.selectedModel
 		});
 
-		goto(`?${params.toString()}`, {
+		const newURL = `?${params.toString()}`;
+		goto(newURL, {
 			replaceState: true,
 			keepFocus: true,
 			noScroll: true
 		});
+
+		// Save the current URL to localStorage
+		saveLastVisitedURL(newURL);
 	}
 
 	onMount(() => {
+		// Check if we have URL parameters
+		const hasURLParams = $page.url.searchParams.toString() !== '';
+
+		if (!hasURLParams) {
+			// If no URL parameters, check for last visited URL
+			const lastURL = getLastVisitedURL();
+			if (lastURL) {
+				goto(lastURL);
+				return;
+			}
+		}
+
 		// Get data for correct location
 		updateWeather().then(() => {
 			isUpdating = false;
 		});
 	});
 
-	// Watch for parameter changes and update URL and storage
+	// Watch for parameter changes and update URL
 	$: {
-		// store in local storage
-		saveParamsLocalStorage(parameters);
-
-		// also update URL parameters
 		updateURLParams();
 
 		// load updated forecast data
