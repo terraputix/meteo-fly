@@ -10,6 +10,7 @@
 	import { fetchWeatherData, type WeatherDataType, type WeatherModel } from '$lib/api';
 	import '../utils/dateExtensions';
 	import { getInitialParameters } from '$lib/services/defaults';
+	import { type PageParameters } from '$lib/services/types';
 
 	const models: { id: WeatherModel; name: string }[] = [
 		{ id: 'icon_seamless', name: 'ICON Seamless' },
@@ -39,25 +40,24 @@
 	let isUpdating: boolean = false;
 
 	// URL parameter handling
-	function updateURLParams() {
+	function updateURLParams(pageParams: PageParameters) {
 		if (!browser) return;
 
 		const params = new URLSearchParams({
-			lat: parameters.location.latitude.toString(),
-			lon: parameters.location.longitude.toString(),
-			day: parameters.selectedDay.toString(),
-			model: parameters.selectedModel
+			lat: pageParams.location.latitude.toString(),
+			lon: pageParams.location.longitude.toString(),
+			day: pageParams.selectedDay.toString(),
+			model: pageParams.selectedModel
 		});
 
 		const newURL = `?${params.toString()}`;
+		// Save the current URL to localStorage
+		saveLastVisitedURL(newURL);
 		goto(newURL, {
 			replaceState: true,
 			keepFocus: true,
 			noScroll: true
 		});
-
-		// Save the current URL to localStorage
-		saveLastVisitedURL(newURL);
 	}
 
 	onMount(() => {
@@ -81,7 +81,9 @@
 
 	// Watch for parameter changes and update URL
 	$: {
-		updateURLParams();
+		// console.log('Parameters changed:', parameters);
+		console.log('Parameters changed:');
+		updateURLParams(parameters);
 
 		// load updated forecast data
 		isUpdating = true;
