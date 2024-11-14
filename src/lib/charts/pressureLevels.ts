@@ -1,4 +1,9 @@
+import type { VerticalProfile, VerticalProfileKey } from '$lib/api/types';
 import type { PressureLevel } from '$lib/meteo/types';
+
+export function getAtLevel(data: VerticalProfile, pressure: number): Float32Array {
+    return data[`_${pressure}hPa` as VerticalProfileKey];
+}
 
 export const pressureLevels: PressureLevel[] = [
     { hPa: 1000, heightMeters: 110 },

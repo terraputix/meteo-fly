@@ -1,4 +1,4 @@
-import type { Location, WeatherModel } from '$lib/api';
+import type { Location, WeatherModel } from '$lib/api/api';
 
 export interface PageParameters {
     location: Location;

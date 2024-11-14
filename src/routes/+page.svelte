@@ -1,16 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getLastVisitedURL, saveLastVisitedURL } from '$lib/services/storage';
+	import { saveLastVisitedURL } from '$lib/services/storage';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import LocationMap from '$lib/components/LocationMap.svelte';
 
 	import WindChart from './WindChart.svelte';
-	import { fetchWeatherData, type WeatherDataType, type WeatherModel } from '$lib/api';
+	import { type WeatherModel, type WeatherDataType } from '$lib/api/types';
 	import '../utils/dateExtensions';
 	import { getInitialParameters } from '$lib/services/defaults';
 	import { type PageParameters } from '$lib/services/types';
+	import { fetchWeatherData } from '$lib/api/api';
 
 	const models: { id: WeatherModel; name: string }[] = [
 		{ id: 'icon_seamless', name: 'ICON Seamless' },
@@ -25,10 +26,6 @@
 	];
 
 	const parameters = getInitialParameters($page.url.searchParams);
-
-	// let location: Location = initialParameters.location;
-	// let selectedModel: WeatherModel = initialParameters.selectedModel;
-	// let selectedDay: number = initialParameters.selectedDay;
 
 	$: startDate = new Date().addDays(parameters.selectedDay - 1);
 

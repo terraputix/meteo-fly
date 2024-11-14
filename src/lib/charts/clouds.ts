@@ -1,9 +1,5 @@
-import type { CloudCoverKey, WeatherDataType } from '$lib/api';
-import { pressureLevels } from './pressureLevels';
-
-function getCloudCover(data: WeatherDataType, pressure: number): Float32Array {
-    return data.hourly[`cloudCover${pressure}hPa` as CloudCoverKey];
-}
+import type { WeatherDataType } from '$lib/api/types';
+import { pressureLevels, getAtLevel } from './pressureLevels';
 
 export function getCloudCoverData(weatherData: WeatherDataType) {
     const data: { x1: Date; x2: Date; y1: number; y2: number; value: number; }[] = [];
@@ -11,7 +7,7 @@ export function getCloudCoverData(weatherData: WeatherDataType) {
     const times = weatherData.hourly.time;
 
     const cloudCoverData = levels.map(level =>
-        getCloudCover(weatherData, level.hPa)
+        getAtLevel(weatherData.hourly.cloudCoverProfile, level.hPa)
     );
 
     times.forEach((time, i) => {

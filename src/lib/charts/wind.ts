@@ -1,15 +1,6 @@
-import type { WeatherDataType, WindDirectionKey, WindSpeedKey } from '$lib/api';
+import type { WeatherDataType } from '$lib/api/types';
 import { interpolateWind } from '$lib/meteo/wind';
-import { parse } from 'svelte/compiler';
-import { allLevels, pressureLevels } from './pressureLevels';
-
-function getWindSpeed(data: WeatherDataType, pressure: number): Float32Array {
-    return data.hourly[`windSpeed${pressure}hPa` as WindSpeedKey];
-}
-
-function getWindDirection(data: WeatherDataType, pressure: number): Float32Array {
-    return data.hourly[`windDirection${pressure}hPa` as WindDirectionKey];
-}
+import { allLevels, pressureLevels, getAtLevel } from './pressureLevels';
 
 export function getWindFieldAllLevels(weatherData: WeatherDataType): Array<{ time: Date; height: number; speed: number; direction: number }> {
     const data: { time: Date; height: number; speed: number; direction: number; }[] = [];
@@ -28,10 +19,10 @@ export function getWindFieldAllLevels(weatherData: WeatherDataType): Array<{ tim
                 const upperLevel = pressureLevels.find((p) => p.heightMeters > level.heightMeters && p.hPa !== -1);
 
                 if (lowerLevel && upperLevel) {
-                    const lowerWindSpeedArray = getWindSpeed(weatherData, lowerLevel.hPa);
-                    const lowerWindDirectionArray = getWindDirection(weatherData, lowerLevel.hPa);
-                    const upperWindSpeedArray = getWindSpeed(weatherData, upperLevel.hPa);
-                    const upperWindDirectionArray = getWindDirection(weatherData, upperLevel.hPa);
+                    const lowerWindSpeedArray = getAtLevel(weatherData.hourly.windSpeedProfile, lowerLevel.hPa);
+                    const lowerWindDirectionArray = getAtLevel(weatherData.hourly.windDirectionProfile, lowerLevel.hPa);
+                    const upperWindSpeedArray = getAtLevel(weatherData.hourly.windSpeedProfile, upperLevel.hPa);
+                    const upperWindDirectionArray = getAtLevel(weatherData.hourly.windDirectionProfile, upperLevel.hPa);
 
                     if (
                         lowerWindSpeedArray &&
@@ -62,8 +53,8 @@ export function getWindFieldAllLevels(weatherData: WeatherDataType): Array<{ tim
                 }
             } else {
                 // Direct levels
-                const speedArray = weatherData.hourly[`windSpeed${level.hPa}hPa` as WindSpeedKey];
-                const directionArray = weatherData.hourly[`windDirection${level.hPa}hPa` as WindDirectionKey];
+                const speedArray = getAtLevel(weatherData.hourly.windSpeedProfile, level.hPa);
+                const directionArray = getAtLevel(weatherData.hourly.windDirectionProfile, level.hPa);
 
                 if (speedArray && directionArray) {
                     speed = speedArray[i];
