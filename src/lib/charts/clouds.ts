@@ -1,4 +1,4 @@
-import type { WeatherDataType } from '$lib/api/api';
+import type { WeatherDataType } from '$lib/api/types';
 import { pressureLevels, getAtLevel } from './pressureLevels';
 
 export function getCloudCoverData(weatherData: WeatherDataType) {

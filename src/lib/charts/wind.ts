@@ -1,4 +1,4 @@
-import type { WeatherDataType } from '$lib/api/api';
+import type { WeatherDataType } from '$lib/api/types';
 import { interpolateWind } from '$lib/meteo/wind';
 import { allLevels, pressureLevels, getAtLevel } from './pressureLevels';
 

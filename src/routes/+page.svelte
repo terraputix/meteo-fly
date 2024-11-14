@@ -7,8 +7,7 @@
 	import LocationMap from '$lib/components/LocationMap.svelte';
 
 	import WindChart from './WindChart.svelte';
-	import { fetchWeatherData, type WeatherDataType } from '$lib/api/api';
-	import { type WeatherModel } from '$lib/api/types';
+	import { type WeatherModel, type WeatherDataType } from '$lib/api/types';
 	import '../utils/dateExtensions';
 	import { getInitialParameters } from '$lib/services/defaults';
 	import { type PageParameters } from '$lib/services/types';

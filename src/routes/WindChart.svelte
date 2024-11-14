@@ -2,12 +2,12 @@
 	import { onDestroy, onMount } from 'svelte';
 	import * as Plot from '@observablehq/plot';
 	import * as d3 from 'd3';
-	import type { WeatherDataType } from '$lib/api/api';
 	import { getCloudCoverData } from '$lib/charts/clouds';
 	import { getWindFieldAllLevels } from '$lib/charts/wind';
 	import { windColorScale, strokeWidthScale, windDomains, windColors } from '$lib/charts/scales';
 	import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
 	import { getRainSymbol } from '$lib/icons/RainIcons';
+	import type { WeatherDataType } from '$lib/api/types';
 
 	export let weatherData: WeatherDataType | null = null;
 	let chartContainer: HTMLDivElement;

@@ -26,6 +26,11 @@ export interface VerticalProfile {
     _600hPa: Float32Array;
 }
 
+export interface WeatherDataType {
+    hourly: HourlyData;
+    elevation: number;
+}
+
 export interface HourlyData {
     time: Date[];
     cloudCoverProfile: VerticalProfile;
