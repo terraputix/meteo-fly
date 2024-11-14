@@ -1,27 +1,29 @@
 import { fetchWeatherApi } from 'openmeteo';
 import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
 import { type VerticalProfile, type WeatherModel, type Location, isFlat, isProfile, type ProfileVariables, type FlatVariable, type HourlyData, type WeatherDataType } from './types';
-import { variableMappings } from './variables';
+import { getVariablesForModel } from './variables';
 
-const paramsTemplate = {
-    hourly: variableMappings.flatMap((v) => {
-        if (isFlat(v)) {
-            return v.apiName;
-        } else if (isProfile(v)) {
-            return v.apiNames;
-        } else {
-            throw new Error("Unknown variable type");
-        }
-    })
-};
+export function createParams(variables: (ProfileVariables | FlatVariable)[]) {
+    return {
+        hourly: variables.flatMap((v) => {
+            if (isFlat(v)) {
+                return v.apiName;
+            } else if (isProfile(v)) {
+                return v.apiNames;
+            } else {
+                throw new Error("Unknown variable type");
+            }
+        })
+    };
+}
 
-function getVariableFromHourly(hourlyResponse: VariablesWithTime, variable: ProfileVariables | FlatVariable): Float32Array | VerticalProfile {
+function getVariableFromHourly(hourlyParams: string[], hourlyResponse: VariablesWithTime, variable: ProfileVariables | FlatVariable): Float32Array | VerticalProfile {
     if (isFlat(variable)) {
-        const position = paramsTemplate.hourly.findIndex((v) => v === variable.apiName);
+        const position = hourlyParams.findIndex((v) => v === variable.apiName);
         return hourlyResponse.variables(position)!.valuesArray()!;
     } else if (isProfile(variable)) {
         const values = variable.apiNames.map((apiName) => {
-            const position = paramsTemplate.hourly.findIndex((v) => v === apiName);
+            const position = hourlyParams.findIndex((v) => v === apiName);
             return hourlyResponse.variables(position)!.valuesArray()!;
         });
         return {
@@ -47,23 +49,17 @@ const range = (start: number, stop: number, step: number) =>
     Array.from({ length: (stop - start) / step }, (_, i) => start + i * step);
 
 export async function fetchWeatherData(location: Location, model: WeatherModel = "icon_d2", start: Date, numberOfDays: number = 1): Promise<WeatherDataType> {
-
-    // Format the start_date as 'YYYY-MM-DD'
-    const startDateStr = start.toISOString().split('T')[0];
-
-    // Calculate the end_date based on number_of_days
-    const endDate = new Date(start);
-    endDate.setDate(endDate.getDate() + numberOfDays - 1);
-    const endDateStr = endDate.toISOString().split('T')[0];
-
+    const modelVariables = getVariablesForModel(model);
+    const hourlyParams = createParams(modelVariables);
     const params = {
-        ...paramsTemplate,
+        ...hourlyParams,
         latitude: location.latitude,
         longitude: location.longitude,
-        start_date: startDateStr,
-        end_date: endDateStr,
+        start_date: start.toISOString().split('T')[0],
+        end_date: new Date(start.getTime() + (numberOfDays - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         models: model
     };
+
     const responses = await fetchWeatherApi(url, params);
     // Process first location. Add a for-loop for multiple locations or weather models
     const response = responses[0];
@@ -83,9 +79,9 @@ export async function fetchWeatherData(location: Location, model: WeatherModel =
             time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
                 (t) => new Date((t + utcOffsetSeconds) * 1000)
             ),
-            ...variableMappings.reduce((acc, v) => {
+            ...modelVariables.reduce((acc, v) => {
                 const key = v.key as keyof HourlyData;
-                const value = getVariableFromHourly(hourly, v)!;
+                const value = getVariableFromHourly(hourlyParams.hourly, hourly, v)!;
                 acc[key] = value as Date[] & VerticalProfile & Float32Array;
                 return acc;
             }, {} as Partial<HourlyData>)

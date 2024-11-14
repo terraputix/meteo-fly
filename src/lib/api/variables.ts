@@ -1,4 +1,4 @@
-import type { FlatVariable, ProfileVariables } from "./types";
+import type { FlatVariable, ProfileVariables, VariableConfig, WeatherModel } from "./types";
 
 // the key is the key in the hourly data object
 
@@ -50,22 +50,46 @@ export const windDirectionProfile: ProfileVariables = {
     ]
 }
 
-export const variableMappings: (ProfileVariables | FlatVariable)[] = [
-    { apiName: "precipitation", type: "Flat", key: "precipitation" },
-    { apiName: "temperature_2m", type: "Flat", key: "temperature_2m" },
-    { apiName: "dew_point_2m", type: "Flat", key: "dewpoint_2m" },
-    { apiName: "cloud_cover_low", type: "Flat", key: "cloudCoverLow" },
-    { apiName: "cloud_cover_mid", type: "Flat", key: "cloudCoverMid" },
-    { apiName: "cloud_cover_high", type: "Flat", key: "cloudCoverHigh" },
-    // { apiName: "wind_speed_10m", type: "Flat", key: "windSpeed10m" },
-    // { apiName: "wind_speed_80m", type: "Flat", key: "windSpeed80m" },
-    // { apiName: "wind_speed_120m", type: "Flat", key: "windSpeed120m" },
-    // { apiName: "wind_speed_180m", type: "Flat", key: "windSpeed180m" },
-    // { apiName: "wind_direction_10m", type: "Flat", key: "windDirection10m" },
-    // { apiName: "wind_direction_80m", type: "Flat", key: "windDirection80m" },
-    // { apiName: "wind_direction_120m", type: "Flat", key: "windDirection120m" },
-    // { apiName: "wind_direction_180m", type: "Flat", key: "windDirection180m" },
-    cloudProfile,
-    windSpeedProfile,
-    windDirectionProfile
-];
+export const verticalVelocityProfile: ProfileVariables = {
+    key: "verticalVelocityProfile",
+    type: "Profile",
+    apiNames: [
+        "vertical_velocity_1000hPa",
+        "vertical_velocity_975hPa",
+        "vertical_velocity_950hPa",
+        "vertical_velocity_925hPa",
+        "vertical_velocity_900hPa",
+        "vertical_velocity_850hPa",
+        "vertical_velocity_800hPa",
+        "vertical_velocity_700hPa",
+        "vertical_velocity_600hPa",
+    ]
+}
+
+export const variableConfig: VariableConfig = {
+    default: [
+        { apiName: "precipitation", type: "Flat", key: "precipitation" },
+        { apiName: "temperature_2m", type: "Flat", key: "temperature_2m" },
+        { apiName: "dew_point_2m", type: "Flat", key: "dewpoint_2m" },
+        { apiName: "cloud_cover_low", type: "Flat", key: "cloudCoverLow" },
+        { apiName: "cloud_cover_mid", type: "Flat", key: "cloudCoverMid" },
+        { apiName: "cloud_cover_high", type: "Flat", key: "cloudCoverHigh" },
+        cloudProfile,
+        windSpeedProfile,
+        windDirectionProfile
+    ],
+    modelSpecific: {
+        'icon_d2': [
+        ],
+        'icon_global': [
+        ],
+        'gfs_seamless': [
+            verticalVelocityProfile
+        ]
+    }
+};
+
+export function getVariablesForModel(model: WeatherModel): (ProfileVariables | FlatVariable)[] {
+    const modelSpecific = variableConfig.modelSpecific?.[model] || [];
+    return [...variableConfig.default, ...modelSpecific];
+}

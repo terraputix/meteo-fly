@@ -36,6 +36,7 @@ export interface HourlyData {
     cloudCoverProfile: VerticalProfile;
     windSpeedProfile: VerticalProfile;
     windDirectionProfile: VerticalProfile;
+    verticalVelocityProfile: VerticalProfile | undefined;
     precipitation: Float32Array;
     temperature_2m: Float32Array;
     dewpoint_2m: Float32Array;
@@ -64,3 +65,12 @@ export type FlatVariable = { apiName: string, type: string, key: string };
 export const isFlat = (variable: ProfileVariables | FlatVariable): variable is FlatVariable => {
     return variable.type === 'Flat';
 }
+
+export type ModelConfig = {
+    [key in WeatherModel]?: (ProfileVariables | FlatVariable)[];
+};
+
+export type VariableConfig = {
+    default: (ProfileVariables | FlatVariable)[];
+    modelSpecific?: ModelConfig;
+};
