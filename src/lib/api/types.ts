@@ -34,18 +34,17 @@ export interface HourlyData {
     precipitation: Float32Array;
     temperature_2m: Float32Array;
     dewpoint_2m: Float32Array;
-    cloudCover: Float32Array;
     cloudCoverLow: Float32Array;
     cloudCoverMid: Float32Array;
     cloudCoverHigh: Float32Array;
-    windSpeed10m: Float32Array;
-    windSpeed80m: Float32Array;
-    windSpeed120m: Float32Array;
-    windSpeed180m: Float32Array;
-    windDirection10m: Float32Array;
-    windDirection80m: Float32Array;
-    windDirection120m: Float32Array;
-    windDirection180m: Float32Array;
+    // windSpeed10m: Float32Array;
+    // windSpeed80m: Float32Array;
+    // windSpeed120m: Float32Array;
+    // windSpeed180m: Float32Array;
+    // windDirection10m: Float32Array;
+    // windDirection80m: Float32Array;
+    // windDirection120m: Float32Array;
+    // windDirection180m: Float32Array;
 }
 
 export type HourlyKeys = keyof HourlyData;
