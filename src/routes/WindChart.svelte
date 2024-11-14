@@ -2,7 +2,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import * as Plot from '@observablehq/plot';
 	import * as d3 from 'd3';
-	import type { WeatherDataType } from '$lib/api';
+	import type { WeatherDataType } from '$lib/api/api';
 	import { getCloudCoverData } from '$lib/charts/clouds';
 	import { getWindFieldAllLevels } from '$lib/charts/wind';
 	import { windColorScale, strokeWidthScale, windDomains, windColors } from '$lib/charts/scales';

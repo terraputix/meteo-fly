@@ -1,4 +1,4 @@
-import type { Location, WeatherModel } from "$lib/api";
+import type { Location, WeatherModel } from "$lib/api/api";
 import type { PageParameters } from "./types";
 import { readURLParams } from "./url";
 

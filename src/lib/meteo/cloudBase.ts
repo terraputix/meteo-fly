@@ -1,4 +1,4 @@
-import type { WeatherDataType } from "$lib/api";
+import type { WeatherDataType } from "$lib/api/api";
 
 /**
  * Calculates the Lifting Condensation Level (cloud base) height using Espy's equation

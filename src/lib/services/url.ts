@@ -1,6 +1,6 @@
 import type { PageParameters } from "./types";
 import { defaultDay, defaultLocation, defaultWeatherModel } from "./defaults";
-import type { WeatherModel, Location } from "$lib/api";
+import type { WeatherModel, Location } from "$lib/api/api";
 
 export function readURLParams(params: URLSearchParams): PageParameters | null {
     const lat = params.get('lat');

@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getLastVisitedURL, saveLastVisitedURL } from '$lib/services/storage';
+	import { saveLastVisitedURL } from '$lib/services/storage';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import LocationMap from '$lib/components/LocationMap.svelte';
 
 	import WindChart from './WindChart.svelte';
-	import { fetchWeatherData, type WeatherDataType, type WeatherModel } from '$lib/api';
+	import { fetchWeatherData, type WeatherDataType } from '$lib/api/api';
+	import { type WeatherModel } from '$lib/api/types';
 	import '../utils/dateExtensions';
 	import { getInitialParameters } from '$lib/services/defaults';
 	import { type PageParameters } from '$lib/services/types';

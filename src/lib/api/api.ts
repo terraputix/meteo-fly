@@ -1,7 +1,7 @@
 import { fetchWeatherApi } from 'openmeteo';
 import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
-import { type VerticalProfile, type WeatherModel, type Location, isFlat, isProfile, type ProfileVariables, type FlatVariable, type HourlyData } from './api/types';
-import { variableMappings } from './api/variables';
+import { type VerticalProfile, type WeatherModel, type Location, isFlat, isProfile, type ProfileVariables, type FlatVariable, type HourlyData } from './types';
+import { variableMappings } from './variables';
 
 export interface WeatherDataType {
     hourly: HourlyData;
