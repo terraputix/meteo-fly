@@ -29,6 +29,9 @@ export interface VerticalProfile {
 export interface WeatherDataType {
   hourly: HourlyData;
   elevation: number;
+  timezoneAbbr: string;
+  sunrise: Date;
+  sunset: Date;
 }
 
 export interface HourlyData {

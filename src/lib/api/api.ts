@@ -13,7 +13,7 @@ import {
 } from './types';
 import { getVariablesForModel } from './variables';
 
-export function createParams(variables: (ProfileVariables | FlatVariable)[]) {
+export function createHourlyParams(variables: (ProfileVariables | FlatVariable)[]) {
   return {
     hourly: variables.flatMap((v) => {
       if (isFlat(v)) {
@@ -68,15 +68,21 @@ export async function fetchWeatherData(
   start: Date,
   numberOfDays: number = 1
 ): Promise<WeatherDataType> {
+  // Get the user's local timezone from the browser
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  console.log('Using local timezone:', localTimezone);
+
   const modelVariables = getVariablesForModel(model);
-  const hourlyParams = createParams(modelVariables);
+  const hourlyParams = createHourlyParams(modelVariables);
   const params = {
     ...hourlyParams,
+    daily: ['sunrise', 'sunset'],
     latitude: location.latitude,
     longitude: location.longitude,
     start_date: start.toISOString().split('T')[0],
     end_date: new Date(start.getTime() + (numberOfDays - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     models: model,
+    timezone: localTimezone,
   };
 
   const responses = await fetchWeatherApi(url, params);
@@ -84,9 +90,14 @@ export async function fetchWeatherData(
   const response = responses[0];
 
   // Attributes for timezone and location
-  const utcOffsetSeconds = response.utcOffsetSeconds();
-  // const timezone = response.timezone();
-  // const timezoneAbbreviation = response.timezoneAbbreviation();
+  // const utcOffsetSeconds = response.utcOffsetSeconds();
+  const timezone = response.timezoneAbbreviation() ?? 'UTC';
+
+  const sunriseInt: number = Number(response.daily()!.variables(0)?.valuesInt64(0));
+  const sunsetInt: number = Number(response.daily()!.variables(1)?.valuesInt64(0));
+  const sunrise = new Date(sunriseInt * 1000);
+  const sunset = new Date(sunsetInt * 1000);
+
   // const latitude = response.latitude();
   // const longitude = response.longitude();
   const elevation = response.elevation();
@@ -95,9 +106,7 @@ export async function fetchWeatherData(
   const weatherData: WeatherDataType = {
     elevation: elevation,
     hourly: {
-      time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
-        (t) => new Date((t + utcOffsetSeconds) * 1000)
-      ),
+      time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map((t) => new Date(t * 1000)),
       ...modelVariables.reduce((acc, v) => {
         const key = v.key as keyof HourlyData;
         const value = getVariableFromHourly(hourlyParams.hourly, hourly, v)!;
@@ -105,6 +114,9 @@ export async function fetchWeatherData(
         return acc;
       }, {} as Partial<HourlyData>),
     } as HourlyData,
+    timezoneAbbr: timezone,
+    sunrise: sunrise,
+    sunset: sunset,
   };
 
   return weatherData;

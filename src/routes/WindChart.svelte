@@ -48,19 +48,55 @@
       tip: true,
     };
 
-    const temperaturePlot = Plot.plot({
-      height: 150,
+    const chartSettings = {
       width: 850,
       marginLeft: 50,
       marginRight: 40,
-      marginBottom: 10,
-      x: { type: 'time', domain: xDomain, axis: null },
+    };
+
+    const temperaturePlot = Plot.plot({
+      height: 150,
+      ...chartSettings,
+      marginBottom: 30,
+      x: {
+        type: 'time',
+        domain: xDomain,
+        // Add ticks but no label since it will be shared with wind plot
+        tickFormat: d3.timeFormat('%H:%M'),
+        // axis: null,
+      },
       y: {
         domain: [tempAxisMin, tempAxisMax],
         label: 'Temperature (°C)',
       },
       marks: [
         Plot.frame(),
+        // Add day/night shading first so it's behind everything else
+        Plot.rect(
+          [
+            {
+              x1: weatherData.sunrise,
+              x2: weatherData.sunset,
+              y1: tempAxisMin,
+              y2: tempAxisMax,
+            },
+          ],
+          {
+            x1: 'x1',
+            x2: 'x2',
+            y1: 'y1',
+            y2: 'y2',
+            fill: () => 'rgba(255, 255, 0, 0.15)',
+          }
+        ),
+        Plot.gridX({
+          stroke: '#ddd',
+          strokeOpacity: 0.5,
+        }),
+        Plot.gridY({
+          stroke: '#ddd',
+          strokeOpacity: 0.5,
+        }),
         Plot.axisY({
           label: 'Temperature (°C)',
         }),
@@ -131,9 +167,7 @@
     // Separate Plot box above the chart for rain indicators and cloud layers
     const rainPlot = Plot.plot({
       height: 90,
-      width: 850,
-      marginLeft: 50,
-      marginRight: 40,
+      ...chartSettings,
       marginBottom: 10,
       x: { type: 'time', domain: xDomain, axis: null },
       y: { domain: [0, 1], axis: 'left', ticks: 0, label: 'Rain' },
@@ -239,9 +273,7 @@
 
     const windPlot = Plot.plot({
       height: 600,
-      width: 850,
-      marginLeft: 50,
-      marginRight: 40,
+      ...chartSettings,
       marginTop: 0,
       x: { type: 'time', domain: xDomain },
       y: { domain: yDomain },
@@ -254,13 +286,15 @@
           tickFormat: (d) => `${d} m`,
         }),
         Plot.axisX({
-          label: 'Time',
+          label: `Time [${weatherData.timezoneAbbr}]`,
           // tickSize: 0,
           // dy: 3,
           tickFormat: d3.timeFormat('%H:%M'),
         }),
-        Plot.ruleY([0]),
-        Plot.ruleX([xMin]),
+        Plot.gridY({
+          stroke: '#ddd',
+          strokeOpacity: 0.5,
+        }),
         // Cloud cover heatmap
         Plot.raster(cloudData, {
           x: 'x1',
@@ -304,6 +338,7 @@
           tip: true,
         }),
         // Plot elevation as brown rectangle from 0 to elevation
+        Plot.ruleY([yDomain[0], weatherData.elevation, yDomain[1]]),
         Plot.rect(
           [
             {
@@ -328,7 +363,7 @@
           ...interpolatedLinePlotSettings,
           x: 'x',
           y: 'y',
-          stroke: 'red',
+          stroke: 'purple',
           title: (d) => `Potential Cloud Base: ${d.y.toFixed(0)}m`,
         }),
       ],

@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { getVariablesForModel } from './variables';
-import { createParams } from './api';
+import { createHourlyParams } from './api';
 
 describe('API Configuration', () => {
   it('should generate correct parameters for ICON-D2 model', () => {
     const variables = getVariablesForModel('icon_d2');
-    const params = createParams(variables);
+    const params = createHourlyParams(variables);
     expect(params.hourly).toContain('temperature_2m');
     expect(params.hourly).toContain('cloud_cover_1000hPa');
     expect(params.hourly).toContain('wind_speed_1000hPa');
