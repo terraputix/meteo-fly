@@ -25,6 +25,7 @@
       console.log('weatherData missing, cannot draw');
       return;
     }
+    console.log('Drawing chart');
     chartContainer.innerHTML = '';
 
     // Process data for plotting
@@ -32,13 +33,85 @@
     const windData = getWindFieldAllLevels(weatherData);
     const cloudBase = calculateCloudBaseWeather(weatherData);
 
-    let yTicks = d3.ticks(0, 4500, 9);
-    // Define y-axis domain
-    const yDomain: [number, number] = [0, 4350];
-
+    // Define X-axis domain
     const xMin = (d3.min(windData, (d) => d.time) as Date).addSeconds(-1800);
     const xMax = (d3.max(windData, (d) => d.time) as Date).addSeconds(1800);
     const xDomain: [Date, Date] = [xMin, xMax];
+
+    const tempAxisMin = (d3.min(weatherData.hourly.dewpoint_2m) ?? 0) - 5;
+    const tempAxisMax = (d3.max(weatherData.hourly.temperature_2m) ?? 0) + 5;
+    const humidityScale = d3.scaleLinear([0, 100], [tempAxisMin, tempAxisMax]);
+    const interpolatedLinePlotSettings: Plot.LineOptions = {
+      x: 'time',
+      curve: 'catmull-rom',
+      strokeWidth: 2,
+      tip: true,
+    };
+
+    const temperaturePlot = Plot.plot({
+      height: 150,
+      width: 850,
+      marginLeft: 50,
+      marginRight: 40,
+      marginBottom: 10,
+      x: { type: 'time', domain: xDomain, axis: null },
+      y: {
+        domain: [tempAxisMin, tempAxisMax],
+        label: 'Temperature (°C)',
+      },
+      marks: [
+        Plot.frame(),
+        Plot.axisY({
+          label: 'Temperature (°C)',
+        }),
+        Plot.axisY(humidityScale.ticks(4), {
+          anchor: 'right',
+          label: 'Humidity (%)',
+          y: humidityScale,
+          tickFormat: humidityScale.tickFormat(),
+        }),
+        // Temperature line
+        Plot.line(
+          weatherData.hourly.time.map((time, i) => ({
+            time,
+            value: weatherData.hourly.temperature_2m[i],
+          })),
+          {
+            y: 'value',
+            stroke: 'red',
+            title: (d) => `Temperature: ${d.value.toFixed(1)}°C`,
+            ...interpolatedLinePlotSettings,
+          }
+        ),
+        // Dewpoint line
+        Plot.line(
+          weatherData.hourly.time.map((time, i) => ({
+            time,
+            value: weatherData.hourly.dewpoint_2m[i],
+          })),
+          {
+            y: 'value',
+            stroke: 'green',
+            title: (d) => `Dewpoint: ${d.value.toFixed(1)}°C`,
+            ...interpolatedLinePlotSettings,
+          }
+        ),
+        // Relative humidity line (on secondary axis)
+        Plot.line(
+          weatherData.hourly.time.map((time, i) => ({
+            time,
+            value: weatherData.hourly.relativeHumidity_2m[i],
+          })),
+          // @ts-expect-error - TS doesn't know about the y property
+          Plot.mapY((D) => D.map(humidityScale), {
+            y: (d) => d.value,
+            stroke: 'blue',
+            title: (d) => `Humidity: ${d.value.toFixed(0)}%`,
+            ...interpolatedLinePlotSettings,
+          })
+        ),
+      ],
+    });
 
     let cloudCoverScaleOptions: Plot.ScaleOptions = {
       domain: [0, 100],
@@ -159,8 +232,12 @@
       ],
     });
 
-    // Create the Plot
-    const plot = Plot.plot({
+    // MARK: Wind Chart
+    // Define y-axis domain for wind chart plot
+    let yTicks = d3.ticks(0, 4500, 9);
+    const yDomain: [number, number] = [0, 4350];
+
+    const windPlot = Plot.plot({
       height: 600,
       width: 850,
       marginLeft: 50,
@@ -248,10 +325,11 @@
         ),
         // Plot cloud base as a red line
         Plot.line(cloudBase, {
+          ...interpolatedLinePlotSettings,
           x: 'x',
           y: 'y',
           stroke: 'red',
-          strokeWidth: 2,
+          title: (d) => `Potential Cloud Base: ${d.y.toFixed(0)}m`,
         }),
       ],
       color: cloudCoverScaleOptions,
@@ -274,8 +352,9 @@
 
     // Combine plots
     const plotContainer = document.createElement('div');
+    plotContainer.appendChild(temperaturePlot);
     plotContainer.appendChild(rainPlot);
-    plotContainer.appendChild(plot);
+    plotContainer.appendChild(windPlot);
 
     // Append the plot to the container
     chartContainer.appendChild(plotContainer);
