@@ -1,22 +1,22 @@
 {
-    "name": "Meteo-Fly",
-    "short_name": "Meteo-Fly",
-    "description": "Weather visualization with wind and cloud data",
-    "start_url": "/meteo-fly/",
-    "scope": "/meteo-fly/",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#4f46e5",
-    "icons": [
-      {
-        "src": "/meteo-fly/icons/icon-192x192.png",
-        "sizes": "192x192",
-        "type": "image/png"
-      },
-      {
-        "src": "/meteo-fly/icons/icon-512x512.png",
-        "sizes": "512x512",
-        "type": "image/png"
-      }
-    ]
-  }
+  "name": "Meteo-Fly",
+  "short_name": "Meteo-Fly",
+  "description": "Weather visualization with wind and cloud data",
+  "start_url": "/meteo-fly/",
+  "scope": "/meteo-fly/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/meteo-fly/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/meteo-fly/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
