@@ -18,6 +18,7 @@
     "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.22.2",
     "@sveltejs/vite-plugin-svelte": "^5.1.0",
+    "@tailwindcss/postcss": "^4.1.11",
     "@tailwindcss/vite": "^4.1.11",
     "@types/d3": "^7.4.3",
     "@types/eslint": "^9.6.1",
