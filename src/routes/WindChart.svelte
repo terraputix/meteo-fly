@@ -165,7 +165,6 @@
     chartSettings: object,
     cloudCoverScaleOptions: Plot.ScaleOptions
   ) {
-    const [xMin, xMax] = xDomain;
     const yDomain: [number, number] = [0, 4350];
     const cloudBase = calculateCloudBaseWeather(data);
 
@@ -212,13 +211,25 @@
           },
           tip: true,
         }),
-        Plot.rect([{ x1: xMin, x2: xMax, y1: 0, y2: data.elevation }], {
-          x1: 'x1',
-          x2: 'x2',
-          y1: 'y1',
-          y2: 'y2',
-          fill: '#7a6552',
+        Plot.ruleY([data.elevation], {
+          stroke: '#8B4513', // A clearer, saddle-brown color
+          strokeWidth: 2,
+          strokeDasharray: '5,5', // Dashed line to indicate it's a reference
         }),
+        Plot.text(
+          // The data is an array with a single point for our label
+          [{ y: data.elevation, text: `Surface Elevation (${data.elevation}m)` }],
+          {
+            x: xDomain[0], // Anchor the text to the left edge of the plot
+            y: 'y',
+            text: 'text',
+            dx: +10, // Nudge the text 10px to the right from the edge
+            dy: +10, // Nudge the text 10px down from the line to avoid overlap
+            fill: '#8B4513', // Use the same color as the line
+            fontWeight: 'bold',
+            textAnchor: 'start', // Align the start of the text to the (x,y) coordinate
+          }
+        ),
         Plot.line(cloudBase, {
           x: 'x',
           y: 'y',
