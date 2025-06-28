@@ -1,0 +1,59 @@
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+    open-pull-requests-limit: 10
+    reviewers:
+      - 'terraputix'
+    commit-message:
+      prefix: 'deps'
+    # Group minor and patch updates together to reduce PR noise
+    groups:
+      svelte:
+        patterns:
+          - 'vite'
+          - 'svelte'
+
+          - 'vite-*'
+          - 'rollup*'
+          - 'svelte-*'
+          - '@sveltejs/*'
+      eslint:
+        patterns:
+          - 'eslint'
+          - 'prettier'
+          - 'typescript'
+
+          - 'eslint-*'
+          - 'prettier-*'
+          - '@typescript-eslint/*'
+
+          - '@eslint/compat'
+          - 'globals'
+      tailwind:
+        patterns:
+          - 'tailwindcss'
+
+          - 'tailwind-*'
+          - '@tailwindcss*'
+      types:
+        patterns:
+          - '@types/*'
+      testing:
+        patterns:
+          - 'vitest'
+          - '*test*'
+      data-viz:
+        patterns:
+          - '@observablehq/*'
+          - 'd3'
+          - 'd3-*'
+      misc-dev:
+        dependency-type: 'development'
+        patterns:
+          - 'leaflet'
+          - 'openmeteo'
