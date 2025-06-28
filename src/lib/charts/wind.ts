@@ -2,9 +2,14 @@ import type { WeatherDataType } from '$lib/api/types';
 import { interpolateWind } from '$lib/meteo/wind';
 import { allLevels, pressureLevels, getAtLevel } from './pressureLevels';
 
-export function getWindFieldAllLevels(
-  weatherData: WeatherDataType
-): Array<{ time: Date; height: number; speed: number; direction: number }> {
+export interface WindFieldLevel {
+  time: Date;
+  height: number;
+  speed: number;
+  direction: number;
+}
+
+export function getWindFieldAllLevels(weatherData: WeatherDataType): Array<WindFieldLevel> {
   const data: { time: Date; height: number; speed: number; direction: number }[] = [];
 
   weatherData.hourly.time.forEach((time: Date, i: number) => {

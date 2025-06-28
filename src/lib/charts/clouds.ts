@@ -1,8 +1,16 @@
 import type { WeatherDataType } from '$lib/api/types';
 import { pressureLevels, getAtLevel } from './pressureLevels';
 
-export function getCloudCoverData(weatherData: WeatherDataType) {
-  const data: { x1: Date; x2: Date; y1: number; y2: number; value: number }[] = [];
+export interface CloudCoverData {
+  x1: Date;
+  x2: Date;
+  y1: number;
+  y2: number;
+  value: number;
+}
+
+export function getCloudCoverData(weatherData: WeatherDataType): Array<CloudCoverData> {
+  const data: CloudCoverData[] = [];
   const levels = pressureLevels;
   const times = weatherData.hourly.time;
 
