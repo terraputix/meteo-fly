@@ -18,26 +18,12 @@ describe('API Configuration', () => {
   });
 
   describe('createQueryParams date handling', () => {
-    // Store original Intl.DateTimeFormat to restore it after tests
-    let originalIntlDateTimeFormat: typeof Intl.DateTimeFormat;
-
     beforeEach(() => {
-      originalIntlDateTimeFormat = Intl.DateTimeFormat;
-
-      // Mock Intl.DateTimeFormat to return a fixed timezone for predictable testing
-      // The `start_date` and `end_date` are formatted using toISOString().split('T')[0],
-      // which is UTC-based, so the timezone primarily affects the `timezone` param itself.
-      vi.stubGlobal('Intl', {
-        DateTimeFormat: () => ({
-          resolvedOptions: () => ({ timeZone: 'Europe/Berlin' }),
-        }),
-      });
+      vi.stubEnv('TZ', 'Europe/Berlin');
     });
 
     afterEach(() => {
-      // Restore original globals after each test
-      vi.stubGlobal('Intl', originalIntlDateTimeFormat);
-      vi.restoreAllMocks();
+      vi.unstubAllEnvs();
     });
 
     it('should correctly format start_date and end_date and include local timezone', () => {
