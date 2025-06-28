@@ -13,7 +13,11 @@ import {
 } from './types';
 import { getVariablesForModel } from './variables';
 
-export function createHourlyParams(variables: (ProfileVariables | FlatVariable)[]) {
+export interface HourlyParams {
+  hourly: string[];
+}
+
+export function createHourlyParams(variables: (ProfileVariables | FlatVariable)[]): HourlyParams {
   return {
     hourly: variables.flatMap((v) => {
       if (isFlat(v)) {
@@ -62,28 +66,49 @@ const url = 'https://api.open-meteo.com/v1/forecast';
 const range = (start: number, stop: number, step: number) =>
   Array.from({ length: (stop - start) / step }, (_, i) => start + i * step);
 
+function formatDateToYYYYMMDD(date: Date): string {
+  const year = date.getFullYear();
+  // Month is 0-indexed, so add 1 and pad with '0' if less than 10
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  // Day of the month, pad with '0' if less than 10
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function createQueryParams(
+  location: Location,
+  hourlyParams: HourlyParams,
+  model: WeatherModel,
+  start: Date,
+  numberOfDays: number
+) {
+  // Get the user's local timezone from the browser
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  console.log('Using local timezone:', localTimezone);
+
+  const endDate = new Date(start.getTime() + (numberOfDays - 1) * 24 * 60 * 60 * 1000);
+
+  return {
+    ...hourlyParams,
+    daily: ['sunrise', 'sunset'],
+    latitude: location.latitude,
+    longitude: location.longitude,
+    start_date: formatDateToYYYYMMDD(start),
+    end_date: formatDateToYYYYMMDD(endDate),
+    models: model,
+    timezone: localTimezone,
+  };
+}
+
 export async function fetchWeatherData(
   location: Location,
   model: WeatherModel = 'icon_d2',
   start: Date,
   numberOfDays: number = 1
 ): Promise<WeatherDataType> {
-  // Get the user's local timezone from the browser
-  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  console.log('Using local timezone:', localTimezone);
-
   const modelVariables = getVariablesForModel(model);
   const hourlyParams = createHourlyParams(modelVariables);
-  const params = {
-    ...hourlyParams,
-    daily: ['sunrise', 'sunset'],
-    latitude: location.latitude,
-    longitude: location.longitude,
-    start_date: start.toISOString().split('T')[0],
-    end_date: new Date(start.getTime() + (numberOfDays - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    models: model,
-    timezone: localTimezone,
-  };
+  const params = createQueryParams(location, hourlyParams, model, start, numberOfDays);
 
   const responses = await fetchWeatherApi(url, params);
   // Process first location. Add a for-loop for multiple locations or weather models
