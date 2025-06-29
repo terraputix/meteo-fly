@@ -10,6 +10,7 @@
   import '../utils/dateExtensions';
   import { getInitialParameters } from '$lib/services/defaults';
   import { type PageParameters } from '$lib/services/types';
+  import { addDays } from '$lib/utils/date';
 
   const models: { id: WeatherModel; name: string }[] = [
     { id: 'icon_seamless', name: 'ICON Seamless' },
@@ -24,7 +25,7 @@
   ];
 
   const parameters = getInitialParameters($page.url.searchParams);
-  $: startDate = new Date().addDays(parameters.selectedDay - 1);
+  $: startDate = addDays(new Date(), parameters.selectedDay - 1);
 
   // URL parameter handling
   function updateURLParams(pageParams: PageParameters) {

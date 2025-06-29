@@ -1,7 +1,10 @@
+<svelte:options customElement="wind-chart-plugin" />
+
 <script lang="ts">
   import WindChart from './WindChart.svelte';
   import { fetchWeatherData } from '$lib/api/api';
   import type { WeatherDataType, WeatherModel } from '$lib/api/types';
+  import { addDays } from '$lib/utils/date';
 
   export let latitude: number;
   export let longitude: number;
@@ -11,7 +14,7 @@
   let weatherData: WeatherDataType | null = null;
   let loading = false;
 
-  $: startDate = new Date().addDays(day - 1);
+  $: startDate = addDays(new Date(), day - 1);
 
   async function updateWeather() {
     loading = true;

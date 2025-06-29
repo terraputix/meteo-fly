@@ -7,6 +7,7 @@
   import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
   import { getRainSymbol } from '$lib/icons/RainIcons';
   import type { WeatherDataType } from '$lib/api/types';
+  import { addSeconds } from '$lib/utils/date';
 
   let error: string | null = null;
   export let weatherData: WeatherDataType | null = null;
@@ -109,22 +110,22 @@
         Plot.rect(
           data.hourly.time.flatMap((time, i) => [
             {
-              x1: time.addSeconds(-1800),
-              x2: time.addSeconds(1800),
+              x1: addSeconds(time, -1800),
+              x2: addSeconds(time, 1800),
               y1: 0,
               y2: 1 / 3,
               cloudCover: data.hourly.cloudCoverLow[i],
             },
             {
-              x1: time.addSeconds(-1800),
-              x2: time.addSeconds(1800),
+              x1: addSeconds(time, -1800),
+              x2: addSeconds(time, 1800),
               y1: 1 / 3,
               y2: 2 / 3,
               cloudCover: data.hourly.cloudCoverMid[i],
             },
             {
-              x1: time.addSeconds(-1800),
-              x2: time.addSeconds(1800),
+              x1: addSeconds(time, -1800),
+              x2: addSeconds(time, 1800),
               y1: 2 / 3,
               y2: 1,
               cloudCover: data.hourly.cloudCoverHigh[i],
@@ -269,8 +270,8 @@
         const cloudData = getCloudCoverData(currentData);
         const windData = getWindFieldAllLevels(currentData);
 
-        const xMin = (d3.min(windData, (d) => d.time) as Date).addSeconds(-1800);
-        const xMax = (d3.max(windData, (d) => d.time) as Date).addSeconds(1800);
+        const xMin = addSeconds(d3.min(windData, (d) => d.time) as Date, -1800);
+        const xMax = addSeconds(d3.max(windData, (d) => d.time) as Date, 1800);
         const xDomain: [Date, Date] = [xMin, xMax];
 
         const chartSettings = { width: 850, marginLeft: 50, marginRight: 40 };
