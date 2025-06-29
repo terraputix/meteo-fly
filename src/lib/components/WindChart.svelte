@@ -7,7 +7,9 @@
   import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
   import { getRainSymbol } from '$lib/icons/RainIcons';
   import type { WeatherDataType } from '$lib/api/types';
+  import { addSeconds } from '$lib/utils/date';
 
+  let error: string | null = null;
   export let weatherData: WeatherDataType | null = null;
 
   // --- Plot Creation Helper Functions ---
@@ -108,22 +110,22 @@
         Plot.rect(
           data.hourly.time.flatMap((time, i) => [
             {
-              x1: time.addSeconds(-1800),
-              x2: time.addSeconds(1800),
+              x1: addSeconds(time, -1800),
+              x2: addSeconds(time, 1800),
               y1: 0,
               y2: 1 / 3,
               cloudCover: data.hourly.cloudCoverLow[i],
             },
             {
-              x1: time.addSeconds(-1800),
-              x2: time.addSeconds(1800),
+              x1: addSeconds(time, -1800),
+              x2: addSeconds(time, 1800),
               y1: 1 / 3,
               y2: 2 / 3,
               cloudCover: data.hourly.cloudCoverMid[i],
             },
             {
-              x1: time.addSeconds(-1800),
-              x2: time.addSeconds(1800),
+              x1: addSeconds(time, -1800),
+              x2: addSeconds(time, 1800),
               y1: 2 / 3,
               y2: 1,
               cloudCover: data.hourly.cloudCoverHigh[i],
@@ -259,44 +261,59 @@
    */
   function renderPlot(node: HTMLElement, data: WeatherDataType | null) {
     function draw(currentData: WeatherDataType) {
+      console.log('Drawing plot...');
       node.innerHTML = '';
+      error = null;
 
-      // 1. Process data and define shared configurations
-      const cloudData = getCloudCoverData(currentData);
-      const windData = getWindFieldAllLevels(currentData);
+      try {
+        // 1. Process data and define shared configurations
+        const cloudData = getCloudCoverData(currentData);
+        const windData = getWindFieldAllLevels(currentData);
 
-      const xMin = (d3.min(windData, (d) => d.time) as Date).addSeconds(-1800);
-      const xMax = (d3.max(windData, (d) => d.time) as Date).addSeconds(1800);
-      const xDomain: [Date, Date] = [xMin, xMax];
+        const xMin = addSeconds(d3.min(windData, (d) => d.time) as Date, -1800);
+        const xMax = addSeconds(d3.max(windData, (d) => d.time) as Date, 1800);
+        const xDomain: [Date, Date] = [xMin, xMax];
 
-      const chartSettings = { width: 850, marginLeft: 50, marginRight: 40 };
-      const cloudCoverScaleOptions: Plot.ScaleOptions = {
-        domain: [0, 100],
-        range: ['white', 'gray'],
-        type: 'sequential',
-        label: 'Cloud Cover (%)',
-      };
-      const windSpeedScaleOptions: Plot.ScaleOptions = {
-        domain: windDomains,
-        range: windColors,
-        type: 'pow',
-        label: 'Wind Speed (km/h)',
-      };
+        const chartSettings = { width: 850, marginLeft: 50, marginRight: 40 };
+        const cloudCoverScaleOptions: Plot.ScaleOptions = {
+          domain: [0, 100],
+          range: ['white', 'gray'],
+          type: 'sequential',
+          label: 'Cloud Cover (%)',
+        };
+        const windSpeedScaleOptions: Plot.ScaleOptions = {
+          domain: windDomains,
+          range: windColors,
+          type: 'pow',
+          label: 'Wind Speed (km/h)',
+        };
 
-      // 2. Create each plot element by calling the helper functions
-      const temperaturePlot = createTemperaturePlot(currentData, xDomain, chartSettings);
-      const rainPlot = createRainAndCloudPlot(currentData, xDomain, chartSettings);
-      const windPlot = createWindPlot(currentData, windData, cloudData, xDomain, chartSettings, cloudCoverScaleOptions);
-      const legendContainer = createLegends(cloudCoverScaleOptions, windSpeedScaleOptions);
+        // 2. Create each plot element by calling the helper functions
+        const temperaturePlot = createTemperaturePlot(currentData, xDomain, chartSettings);
+        const rainPlot = createRainAndCloudPlot(currentData, xDomain, chartSettings);
+        const windPlot = createWindPlot(
+          currentData,
+          windData,
+          cloudData,
+          xDomain,
+          chartSettings,
+          cloudCoverScaleOptions
+        );
+        const legendContainer = createLegends(cloudCoverScaleOptions, windSpeedScaleOptions);
 
-      // 3. Assemble the final DOM structure
-      const plotContainer = document.createElement('div');
-      plotContainer.appendChild(temperaturePlot);
-      plotContainer.appendChild(rainPlot);
-      plotContainer.appendChild(windPlot);
+        // 3. Assemble the final DOM structure
+        const plotContainer = document.createElement('div');
+        plotContainer.appendChild(temperaturePlot);
+        plotContainer.appendChild(rainPlot);
+        plotContainer.appendChild(windPlot);
 
-      node.appendChild(plotContainer);
-      node.appendChild(legendContainer);
+        node.appendChild(plotContainer);
+        node.appendChild(legendContainer);
+      } catch (err) {
+        // Catch any error from chart logic (including calculateCloudBaseWeather)
+        error = err instanceof Error ? err.message : String(err);
+        node.innerHTML = '';
+      }
     }
 
     if (data) {
@@ -318,6 +335,12 @@
   }
 </script>
 
+<!-- Error Message -->
+{#if error}
+  <div class="mb-6 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
+    <span class="block sm:inline">{error}</span>
+  </div>
+{/if}
 <div use:renderPlot={weatherData} class="chart-container"></div>
 
 <style>
