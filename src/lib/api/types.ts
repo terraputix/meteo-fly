@@ -8,6 +8,8 @@ export type WeatherModel =
   | 'icon_seamless'
   | 'icon_eu'
   | 'icon_global'
+  | 'meteoswiss_icon_ch1 '
+  | 'meteoswiss_icon_ch2'
   | 'meteofrance_seamless'
   | 'gfs_seamless'
   | 'ukmo_seamless'

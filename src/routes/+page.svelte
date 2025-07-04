@@ -18,6 +18,8 @@
     { id: 'icon_d2', name: 'ICON D2' },
     { id: 'icon_eu', name: 'ICON EU' },
     { id: 'icon_global', name: 'ICON Global' },
+    { id: 'meteoswiss_icon_ch1', name: 'ICON CH1' },
+    { id: 'meteoswiss_icon_ch2', name: 'ICON CH2' },
     { id: 'gfs_seamless', name: 'GFS Seamless' },
     { id: 'meteofrance_seamless', name: 'MeteoFrance' },
     { id: 'ukmo_seamless', name: 'UKMO' },
@@ -216,7 +218,7 @@
           <button
             on:click={handlePreviousDay}
             disabled={parameters.selectedDay <= -14}
-            class="absolute left-0 top-1/2 hidden -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
+            class="absolute top-1/2 left-0 hidden -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
             aria-label="Previous Day"
           >
             ←
@@ -227,7 +229,7 @@
           <button
             on:click={handleNextDay}
             disabled={parameters.selectedDay >= 7}
-            class="absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-12 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
+            class="absolute top-1/2 right-0 hidden translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
             aria-label="Next Day"
           >
             →
@@ -240,7 +242,7 @@
 
         <!-- Loading spinner overlay -->
         {#if isUpdating}
-          <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-white bg-opacity-50">
+          <div class="bg-opacity-50 pointer-events-none absolute inset-0 flex items-center justify-center bg-white">
             <svg class="h-8 w-8 animate-spin text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
               <circle class="opacity-25" cx="25" cy="25" r="20" stroke="currentColor" stroke-width="5" fill="none"
               ></circle>
