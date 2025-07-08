@@ -103,6 +103,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Meteo-Fly</title>
+</svelte:head>
+
 <div class="min-h-screen bg-gray-100 p-2 sm:p-6">
   <div class="mx-auto max-w-5xl rounded-lg bg-white p-4 shadow-md sm:p-20">
     <h1 class="mb-6 text-center text-2xl font-bold">Wind Chart</h1>
@@ -216,7 +220,7 @@
           <button
             on:click={handlePreviousDay}
             disabled={parameters.selectedDay <= -14}
-            class="absolute left-0 top-1/2 hidden -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
+            class="absolute top-1/2 left-0 hidden -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
             aria-label="Previous Day"
           >
             ←
@@ -227,7 +231,7 @@
           <button
             on:click={handleNextDay}
             disabled={parameters.selectedDay >= 7}
-            class="absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-12 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
+            class="absolute top-1/2 right-0 hidden translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
             aria-label="Next Day"
           >
             →
@@ -240,7 +244,7 @@
 
         <!-- Loading spinner overlay -->
         {#if isUpdating}
-          <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-white bg-opacity-50">
+          <div class="bg-opacity-50 pointer-events-none absolute inset-0 flex items-center justify-center bg-white">
             <svg class="h-8 w-8 animate-spin text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
               <circle class="opacity-25" cx="25" cy="25" r="20" stroke="currentColor" stroke-width="5" fill="none"
               ></circle>
