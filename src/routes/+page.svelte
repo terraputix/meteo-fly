@@ -107,7 +107,7 @@
   <title>Meteo-Fly</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-100 p-2 sm:p-6">
+<div class="bg-gray-100 p-2 sm:p-6">
   <div class="mx-auto max-w-5xl rounded-lg bg-white p-4 shadow-md sm:p-20">
     <h1 class="mb-6 text-center text-2xl font-bold">Wind Chart</h1>
 
