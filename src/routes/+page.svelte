@@ -107,77 +107,67 @@
   <title>Meteo-Fly</title>
 </svelte:head>
 
-<div class="bg-gray-100 p-2 sm:p-6">
-  <div class="mx-auto max-w-5xl rounded-lg bg-white p-4 shadow-md sm:p-20">
+<div class="bg-white p-2 sm:p-4">
+  <div class="mx-auto max-w-5xl p-2 sm:p-4">
     <h1 class="mb-6 text-center text-2xl font-bold">Wind Chart</h1>
 
     <!-- Error Message -->
     {#if error}
-      <div class="mb-6 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
+      <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
         <span class="block sm:inline">{error}</span>
       </div>
     {/if}
 
     <!-- Input Form -->
-    <div class="space-y-6">
-      <!-- Location Inputs -->
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label for="latitude" class="block text-sm font-medium text-gray-700">Latitude</label>
-          <input
-            id="latitude"
-            type="number"
-            bind:value={parameters.location.latitude}
-            placeholder="e.g., 44.52"
-            step="0.01"
-            class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label for="longitude" class="block text-sm font-medium text-gray-700">Longitude</label>
-          <input
-            id="longitude"
-            type="number"
-            bind:value={parameters.location.longitude}
-            placeholder="e.g., 9.41"
-            step="0.01"
-            class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-          />
-        </div>
-      </div>
-
-      <!-- Model Selection -->
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label for="model" class="block text-sm font-medium text-gray-700">Weather Model</label>
-          <select
-            id="model"
-            bind:value={parameters.selectedModel}
-            class="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-          >
-            {#each models as model}
-              <option value={model.id}>{model.name}</option>
-            {/each}
-          </select>
+    <div class="mb-4">
+      <!-- Compact Controls -->
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <!-- Location Display -->
+        <div class="flex items-center text-sm text-gray-700">
+          <svg xmlns="http://www.w3.org/2000/svg" class="mr-1 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <span>{parameters.location.latitude.toFixed(4)}°, {parameters.location.longitude.toFixed(4)}°</span>
         </div>
 
-        <!-- Forecast Day Selection -->
-        <div>
-          <label for="forecast-day" class="block text-sm font-medium text-gray-700">Forecast Day</label>
-          <input
-            id="forecast-day"
-            type="number"
-            bind:value={parameters.selectedDay}
-            class="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            max="7"
-            min="-14"
-          />
+        <!-- Model and Day Selection -->
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Model Selection -->
+          <div class="flex items-center">
+            <label for="model" class="mr-2 text-sm font-medium whitespace-nowrap text-gray-700">Model:</label>
+            <select
+              id="model"
+              bind:value={parameters.selectedModel}
+              class="rounded-sm bg-white px-2 py-1 text-sm focus:outline-indigo-500"
+            >
+              {#each models as model}
+                <option value={model.id}>{model.name}</option>
+              {/each}
+            </select>
+          </div>
+
+          <!-- Forecast Day Selection -->
+          <div class="flex items-center">
+            <label for="forecast-day" class="mr-2 text-sm font-medium whitespace-nowrap text-gray-700">Day:</label>
+            <input
+              id="forecast-day"
+              type="number"
+              bind:value={parameters.selectedDay}
+              class="w-16 rounded-sm px-2 py-1 text-sm focus:outline-indigo-500"
+              max="7"
+              min="-14"
+            />
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Location Map Display -->
-    <div class="mt-4">
+    <div>
       <LocationMap bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
     </div>
 
@@ -196,11 +186,11 @@
 
         <!-- Chart container with navigation buttons -->
         <div class="relative flex flex-col sm:block">
-          <div class="mb-4 flex justify-between gap-20 sm:hidden">
+          <div class="mb-3 flex justify-between gap-4 sm:hidden">
             <button
               on:click={handlePreviousDay}
               disabled={parameters.selectedDay <= -14}
-              class="flex-1 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+              class="flex-1 rounded bg-indigo-500 p-2 text-sm text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-300"
               aria-label="Previous Day"
             >
               ← Previous Day
@@ -209,7 +199,7 @@
             <button
               on:click={handleNextDay}
               disabled={parameters.selectedDay >= 7}
-              class="flex-1 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+              class="flex-1 rounded bg-indigo-500 p-2 text-sm text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-300"
               aria-label="Next Day"
             >
               Next Day →
@@ -220,7 +210,7 @@
           <button
             on:click={handlePreviousDay}
             disabled={parameters.selectedDay <= -14}
-            class="absolute top-1/2 left-0 hidden -translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
+            class="absolute top-1/2 left-0 hidden -translate-x-8 -translate-y-1/2 rounded bg-indigo-500 p-2 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-300 sm:block"
             aria-label="Previous Day"
           >
             ←
@@ -231,7 +221,7 @@
           <button
             on:click={handleNextDay}
             disabled={parameters.selectedDay >= 7}
-            class="absolute top-1/2 right-0 hidden translate-x-12 -translate-y-1/2 rounded bg-indigo-400 p-3 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-400 sm:block"
+            class="absolute top-1/2 right-0 hidden translate-x-8 -translate-y-1/2 rounded bg-indigo-500 p-2 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-300 sm:block"
             aria-label="Next Day"
           >
             →
@@ -239,30 +229,51 @@
         </div>
 
         <p class="mt-2 text-right text-sm text-gray-500">
-          <a href="https://open-meteo.com/" target="_blank" class="underline">Weather data by Open-Meteo.com</a>.
+          <a href="https://open-meteo.com/" target="_blank" class="underline">Weather data by Open-Meteo.com</a>
         </p>
 
         <!-- Loading spinner overlay -->
         {#if isUpdating}
           <div class="bg-opacity-50 pointer-events-none absolute inset-0 flex items-center justify-center bg-white">
-            <svg class="h-8 w-8 animate-spin text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
-              <circle class="opacity-25" cx="25" cy="25" r="20" stroke="currentColor" stroke-width="5" fill="none"
-              ></circle>
-              <circle
-                class="opacity-75"
-                cx="25"
-                cy="25"
-                r="20"
-                stroke="currentColor"
-                stroke-width="5"
-                stroke-linecap="round"
-                fill="none"
-                stroke-dasharray="31.4 31.4"
-                transform="rotate(-90 25 25)"
-              ></circle>
-            </svg>
+            <div class="flex flex-col items-center">
+              <svg class="h-8 w-8 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+                <circle class="opacity-25" cx="25" cy="25" r="20" stroke="currentColor" stroke-width="5" fill="none"
+                ></circle>
+                <circle
+                  class="opacity-75"
+                  cx="25"
+                  cy="25"
+                  r="20"
+                  stroke="currentColor"
+                  stroke-width="5"
+                  stroke-linecap="round"
+                  fill="none"
+                  stroke-dasharray="31.4 31.4"
+                  transform="rotate(-90 25 25)"
+                ></circle>
+              </svg>
+              <span class="mt-2 text-sm text-gray-600">Loading...</span>
+            </div>
           </div>
         {/if}
+      </div>
+    {:else if !isUpdating}
+      <div class="my-10 flex flex-col items-center justify-center text-center text-gray-500">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="mb-4 h-16 w-16"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1"
+            d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+          />
+        </svg>
+        <p>Select a location on the map to view weather data</p>
       </div>
     {/if}
   </div>
