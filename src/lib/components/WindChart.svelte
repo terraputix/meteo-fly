@@ -4,27 +4,17 @@
   import { ticks as d3Ticks } from 'd3-array';
   import { scaleLinear } from 'd3-scale';
   import { timeFormat } from 'd3-time-format';
-  import { getCloudCoverData, type CloudCoverData } from '$lib/charts/clouds';
-  import { getWindFieldAllLevels, type WindFieldLevel } from '$lib/charts/wind';
   import { windColorScale, strokeWidthScale, windDomains, windColors } from '$lib/charts/scales';
   import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
   import { getRainSymbol } from '$lib/icons/RainIcons';
   import type { WeatherDataType } from '$lib/api/types';
+  import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
+  import type { WindFieldLevel } from '$lib/charts/wind';
+  import type { CloudCoverData } from '$lib/charts/clouds';
 
   export let weatherData: WeatherDataType | null = null;
 
-  let chartContainer: HTMLElement;
   let isRendering = false;
-  let renderProgress = 0;
-
-  // Performance optimization: Use requestIdleCallback for non-blocking rendering
-  function scheduleWork(callback: () => void) {
-    if (typeof requestIdleCallback !== 'undefined') {
-      requestIdleCallback(callback, { timeout: 16 });
-    } else {
-      setTimeout(callback, 0);
-    }
-  }
 
   function createTemperaturePlot(data: WeatherDataType, xDomain: [Date, Date], chartSettings: object) {
     const tempAxisMin = (d3Min(data.hourly.dewpoint_2m) ?? 0) - 5;
@@ -265,117 +255,133 @@
   }
 
   function renderPlot(node: HTMLElement, data: WeatherDataType | null) {
-    let renderCancelled = false;
+    let currentWorker: Worker | null = null;
 
-    function drawProgressively(currentData: WeatherDataType) {
-      if (renderCancelled) return;
-
+    function draw(currentData: WeatherDataType) {
       isRendering = true;
-      renderProgress = 0;
       node.innerHTML = '';
 
-      const cloudData = getCloudCoverData(currentData);
-      const windData = getWindFieldAllLevels(currentData);
+      // Terminate any existing worker
+      if (currentWorker) {
+        currentWorker.terminate();
+      }
 
-      const xMin = (d3Min(windData, (d) => d.time) as Date).addSeconds(-1800);
-      const xMax = (d3Max(windData, (d) => d.time) as Date).addSeconds(1800);
-      const xDomain: [Date, Date] = [xMin, xMax];
+      // Create worker for heavy data processing
+      currentWorker = new Worker(new URL('$lib/workers/chartWorker.ts', import.meta.url), {
+        type: 'module',
+      });
 
-      const chartSettings = { width: 1000, marginLeft: 50, marginRight: 40 };
-      const cloudCoverScaleOptions: Plot.ScaleOptions = {
-        domain: [0, 100],
-        range: ['white', 'gray'],
-        type: 'sequential',
-        label: 'Cloud Cover (%)',
-      };
-      const windSpeedScaleOptions: Plot.ScaleOptions = {
-        domain: windDomains,
-        range: windColors,
-        type: 'pow',
-        label: 'Wind Speed (km/h)',
-      };
+      currentWorker.onmessage = function (e: MessageEvent<ChartWorkerOutput>) {
+        const response = e.data;
 
-      const plotContainer = document.createElement('div');
-      node.appendChild(plotContainer);
+        if (response.success) {
+          try {
+            // Type-safe access to processed data
+            const { cloudData, windData, weatherData } = response.data;
 
-      // Step 1: Temperature plot (lightweight, renders first for LCP)
-      scheduleWork(() => {
-        if (renderCancelled) return;
-        const temperaturePlot = createTemperaturePlot(currentData, xDomain, chartSettings);
-        plotContainer.appendChild(temperaturePlot);
-        renderProgress = 33;
+            const xMin = (d3Min(windData, (d) => d.time) as Date).addSeconds(-1800);
+            const xMax = (d3Max(windData, (d) => d.time) as Date).addSeconds(1800);
+            const xDomain: [Date, Date] = [xMin, xMax];
 
-        // Step 2: Rain and cloud plot
-        scheduleWork(() => {
-          if (renderCancelled) return;
-          const rainPlot = createRainAndCloudPlot(currentData, xDomain, chartSettings);
-          plotContainer.appendChild(rainPlot);
-          renderProgress = 66;
+            const chartSettings = { width: 1000, marginLeft: 50, marginRight: 40 };
+            const cloudCoverScaleOptions: Plot.ScaleOptions = {
+              domain: [0, 100],
+              range: ['white', 'gray'],
+              type: 'sequential',
+              label: 'Cloud Cover (%)',
+            };
+            const windSpeedScaleOptions: Plot.ScaleOptions = {
+              domain: windDomains,
+              range: windColors,
+              type: 'pow',
+              label: 'Wind Speed (km/h)',
+            };
 
-          // Step 3: Wind plot (heaviest, renders last)
-          scheduleWork(() => {
-            if (renderCancelled) return;
+            const temperaturePlot = createTemperaturePlot(weatherData, xDomain, chartSettings);
+            const rainPlot = createRainAndCloudPlot(weatherData, xDomain, chartSettings);
             const windPlot = createWindPlot(
-              currentData,
+              weatherData,
               windData,
               cloudData,
               xDomain,
               chartSettings,
               cloudCoverScaleOptions
             );
-            plotContainer.appendChild(windPlot);
-            renderProgress = 90;
+            const legendContainer = createLegends(cloudCoverScaleOptions, windSpeedScaleOptions);
 
-            // Step 4: Legends
-            scheduleWork(() => {
-              if (renderCancelled) return;
-              const legendContainer = createLegends(cloudCoverScaleOptions, windSpeedScaleOptions);
-              node.appendChild(legendContainer);
-              renderProgress = 100;
-              isRendering = false;
-            });
-          });
-        });
-      });
+            const plotContainer = document.createElement('div');
+            plotContainer.appendChild(temperaturePlot);
+            plotContainer.appendChild(rainPlot);
+            plotContainer.appendChild(windPlot);
+
+            node.appendChild(plotContainer);
+            node.appendChild(legendContainer);
+          } catch (plotError) {
+            console.error('Error creating plots:', plotError);
+          }
+        } else {
+          // TypeScript knows this is an error response
+          console.error('Chart worker error:', response.error);
+        }
+
+        isRendering = false;
+        currentWorker?.terminate();
+        currentWorker = null;
+      };
+
+      currentWorker.onerror = function (error: ErrorEvent) {
+        console.error('Worker error:', error);
+        isRendering = false;
+        currentWorker?.terminate();
+        currentWorker = null;
+      };
+
+      // Type-safe message to worker
+      const workerInput: ChartWorkerInput = {
+        weatherData: currentData,
+      };
+
+      currentWorker.postMessage(workerInput);
     }
 
     if (data) {
-      drawProgressively(data);
+      draw(data);
     }
 
     return {
       update(newData: WeatherDataType | null) {
-        renderCancelled = true;
-        scheduleWork(() => {
-          renderCancelled = false;
-          if (newData) {
-            drawProgressively(newData);
-          } else {
-            node.innerHTML = '';
-            isRendering = false;
-            renderProgress = 0;
+        if (newData) {
+          draw(newData);
+        } else {
+          // Terminate worker if no data
+          if (currentWorker) {
+            currentWorker.terminate();
+            currentWorker = null;
           }
-        });
+          node.innerHTML = '';
+          isRendering = false;
+        }
       },
       destroy() {
-        renderCancelled = true;
+        // Clean up worker on destroy
+        if (currentWorker) {
+          currentWorker.terminate();
+          currentWorker = null;
+        }
         node.innerHTML = '';
       },
     };
   }
 </script>
 
-<div bind:this={chartContainer} use:renderPlot={weatherData} class="chart-container">
+<div class="chart-container" style="min-height: 1000px;">
   {#if isRendering}
-    <div class="skeleton-loader">
-      <div class="skeleton-item" style="height: 160px; opacity: {renderProgress >= 33 ? 0 : 1}"></div>
-      <div class="skeleton-item" style="height: 110px; opacity: {renderProgress >= 66 ? 0 : 1}"></div>
-      <div class="skeleton-item main-chart" style="height: 700px; opacity: {renderProgress >= 90 ? 0 : 1}"></div>
-      <div class="progress-bar">
-        <div class="progress-fill" style="width: {renderProgress}%"></div>
-      </div>
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading weather charts...</p>
     </div>
   {/if}
+  <div use:renderPlot={weatherData} class="chart-content" style="opacity: {isRendering ? 0 : 1}"></div>
 </div>
 
 <style>
@@ -388,51 +394,40 @@
     position: relative;
   }
 
-  .skeleton-loader {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+  .chart-content {
+    width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 20px;
-  }
-
-  .skeleton-item {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-    background-size: 200% 100%;
-    animation: loading 1.5s infinite;
-    border-radius: 4px;
+    align-items: center;
     transition: opacity 0.3s ease;
   }
 
-  .skeleton-item.main-chart {
-    background: linear-gradient(90deg, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%);
-    background-size: 200% 100%;
+  .loading-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
   }
 
-  .progress-bar {
-    width: 100%;
-    height: 4px;
-    background: #e0e0e0;
-    border-radius: 2px;
-    overflow: hidden;
-    margin-top: 20px;
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #4f46e5;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
 
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #4f46e5, #7c3aed);
-    transition: width 0.3s ease;
-  }
-
-  @keyframes loading {
+  @keyframes spin {
     0% {
-      background-position: 200% 0;
+      transform: rotate(0deg);
     }
     100% {
-      background-position: -200% 0;
+      transform: rotate(360deg);
     }
   }
 
