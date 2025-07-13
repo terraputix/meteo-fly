@@ -2,14 +2,18 @@
   "name": "Meteo-Fly",
   "short_name": "Meteo-Fly",
   "description": "Weather visualization with wind and cloud data",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
   "lang": "en",
   "categories": ["weather", "utilities", "productivity"],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
