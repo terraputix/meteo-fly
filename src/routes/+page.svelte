@@ -108,7 +108,7 @@
 </svelte:head>
 
 <div class="bg-white p-2 sm:p-4">
-  <div class="mx-auto max-w-5xl p-2 sm:p-4">
+  <div class="p-2 sm:p-4">
     <h1 class="mb-6 text-center text-2xl font-bold">Wind Chart</h1>
 
     <!-- Error Message -->
