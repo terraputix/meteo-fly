@@ -4,8 +4,9 @@
   import 'leaflet/dist/leaflet.css';
   import 'leaflet/dist/images/marker-icon.png';
   import type { Location } from '$lib/api/types';
-  import { locationActions, locationStore } from '$lib/services/location/store';
+  import { locationStore } from '$lib/services/location/store';
 
+  import { LocationControlManager } from './LocationControl';
   export let latitude: number;
   export let longitude: number;
 
@@ -63,40 +64,16 @@
       updatePosition(lat, lng);
     });
 
-    // Add custom control for location detection
-    const locationControl = L.Control.extend({
-      options: {
-        position: 'topright',
-      },
-      onAdd: function () {
-        const container = L.DomUtil.create('div', 'leaflet-control-location');
-        const button = L.DomUtil.create('button', 'location-btn', container);
-        button.type = 'button';
-        button.title = 'Use My Location';
-        button.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2" fill="none"/>
-            <circle cx="12" cy="12" r="3" fill="currentColor"/>
-            <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        `;
-
-        L.DomEvent.on(button, 'click', () => {
-          locationActions.detectLocation();
-        });
-
-        L.DomEvent.disableClickPropagation(container);
-        return container;
-      },
+    const locationControlManager = new LocationControlManager({
+      position: 'topright',
     });
-
-    map.addControl(new locationControl());
+    const locationControl = locationControlManager.createControl();
+    map.addControl(locationControl);
 
     // Subscribe to location store changes
     unsubscribe = locationStore.subscribe((state) => {
+      locationControlManager.updateState(state);
+
       if (state.current) {
         handleLocationDetected(state.current);
       }
