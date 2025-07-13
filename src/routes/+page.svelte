@@ -6,7 +6,7 @@
   import { page } from '$app/stores';
   import LocationMap from '$lib/components/LocationMap.svelte';
 
-  import WindChart from './WindChart.svelte';
+  import WindChart from '$lib/components/WindChart.svelte';
   import { type WeatherModel, type WeatherDataType } from '$lib/api/types';
   import '../utils/dateExtensions';
   import { getInitialParameters } from '$lib/services/defaults';
