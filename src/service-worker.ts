@@ -20,20 +20,46 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function handleResponse(request, response) {
+  if (response.ok) {
+    const responseClone = response.clone();
+    caches.open(CACHE).then((cache) => {
+      cache.put(request, responseClone);
+    });
+  }
+  return response;
+}
+
+function isWeatherData(url: string) {
+  return url.includes('api.open-meteo.com/v1/forecast');
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networked = fetch(event.request)
-        .then((response) => {
-          const cache = caches.open(CACHE);
-          cache.then((cache) => cache.put(event.request, response.clone()));
-          return response;
-        })
-        .catch(() => cached);
+  const url = new URL(event.request.url);
 
-      return cached || networked;
-    })
-  );
+  // Network-first for weather data
+  if (isWeatherData(url.href)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => handleResponse(event.request, response))
+        .catch(() => caches.match(event.request))
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) {
+          return cached;
+        }
+
+        return fetch(event.request)
+          .then((response) => handleResponse(event.request, response))
+          .catch((error) => {
+            console.error('Network fetch failed:', error);
+            throw error;
+          });
+      })
+    );
+  }
 });
