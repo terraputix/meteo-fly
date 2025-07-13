@@ -12,6 +12,7 @@
   import { getInitialParameters } from '$lib/services/defaults';
   import { type PageParameters } from '$lib/services/types';
   import { fetchWeatherData } from '$lib/api/api';
+  import { addDays } from '../utils/dateExtensions';
 
   const models: { id: WeatherModel; name: string }[] = [
     { id: 'icon_seamless', name: 'ICON Seamless' },
@@ -27,7 +28,7 @@
 
   const parameters = getInitialParameters($page.url.searchParams);
 
-  $: startDate = new Date().addDays(parameters.selectedDay - 1);
+  $: startDate = addDays(new Date(), parameters.selectedDay - 1);
 
   let weatherData: WeatherDataType | null = null;
   let error: string | null = null;
