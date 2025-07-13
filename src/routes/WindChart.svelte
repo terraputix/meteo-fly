@@ -24,7 +24,7 @@
     };
 
     return Plot.plot({
-      height: 150,
+      height: 160,
       ...chartSettings,
       marginBottom: 30,
       x: { type: 'time', domain: xDomain, tickFormat: d3.timeFormat('%H:%M') },
@@ -82,7 +82,7 @@
   function createRainAndCloudPlot(data: WeatherDataType, xDomain: [Date, Date], chartSettings: object) {
     const [xMin, xMax] = xDomain;
     return Plot.plot({
-      height: 90,
+      height: 110,
       ...chartSettings,
       marginBottom: 10,
       x: { type: 'time', domain: xDomain, axis: null },
@@ -169,7 +169,7 @@
     const cloudBase = calculateCloudBaseWeather(data);
 
     return Plot.plot({
-      height: 600,
+      height: 700,
       ...chartSettings,
       marginTop: 0,
       x: { type: 'time', domain: xDomain },
@@ -269,7 +269,7 @@
       const xMax = (d3.max(windData, (d) => d.time) as Date).addSeconds(1800);
       const xDomain: [Date, Date] = [xMin, xMax];
 
-      const chartSettings = { width: 850, marginLeft: 50, marginRight: 40 };
+      const chartSettings = { width: 1000, marginLeft: 50, marginRight: 40 };
       const cloudCoverScaleOptions: Plot.ScaleOptions = {
         domain: [0, 100],
         range: ['white', 'gray'],
@@ -331,6 +331,7 @@
 
   :global(.legend-container) {
     display: flex;
+    margin: 1 rem;
     flex-wrap: wrap;
     gap: 1rem;
     justify-content: center;
@@ -341,6 +342,7 @@
   :global(.legend-container > *) {
     flex: 1 1 auto;
     min-width: 200px;
-    max-width: 100%;
+    max-width: 60%;
+    margin: 0 1rem;
   }
 </style>
