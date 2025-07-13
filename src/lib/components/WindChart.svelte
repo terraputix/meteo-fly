@@ -1,23 +1,5 @@
 <script lang="ts">
-  import {
-    plot,
-    frame,
-    rect,
-    gridX,
-    gridY,
-    axisX,
-    axisY,
-    line,
-    mapY,
-    text,
-    dot,
-    raster,
-    vector,
-    ruleY,
-    legend,
-    type LineOptions,
-    type ScaleOptions,
-  } from '@observablehq/plot';
+  import * as Plot from '@observablehq/plot';
   import { min as d3Min, max as d3Max } from 'd3-array';
   import { ticks as d3Ticks } from 'd3-array';
   import { scaleLinear } from 'd3-scale';
@@ -38,38 +20,38 @@
     const tempAxisMin = (d3Min(data.hourly.dewpoint_2m) ?? 0) - 5;
     const tempAxisMax = (d3Max(data.hourly.temperature_2m) ?? 0) + 5;
     const humidityScale = scaleLinear([0, 100], [tempAxisMin, tempAxisMax]);
-    const interpolatedLinePlotSettings: LineOptions = {
+    const interpolatedLinePlotSettings: Plot.LineOptions = {
       x: 'time',
       curve: 'catmull-rom',
       strokeWidth: 2,
       tip: true,
     };
 
-    return plot({
+    return Plot.plot({
       height: 160,
       ...chartSettings,
       marginBottom: 30,
       x: { type: 'time', domain: xDomain, tickFormat: timeFormat('%H:%M') },
       y: { domain: [tempAxisMin, tempAxisMax], label: 'Temperature (°C)' },
       marks: [
-        frame(),
-        rect([{ x1: data.sunrise, x2: data.sunset, y1: tempAxisMin, y2: tempAxisMax }], {
+        Plot.frame(),
+        Plot.rect([{ x1: data.sunrise, x2: data.sunset, y1: tempAxisMin, y2: tempAxisMax }], {
           x1: 'x1',
           x2: 'x2',
           y1: 'y1',
           y2: 'y2',
           fill: () => 'rgba(255, 255, 0, 0.15)',
         }),
-        gridX({ stroke: '#ddd', strokeOpacity: 0.5 }),
-        gridY({ stroke: '#ddd', strokeOpacity: 0.5 }),
-        axisY({ label: 'Temperature (°C)' }),
-        axisY(humidityScale.ticks(4), {
+        Plot.gridX({ stroke: '#ddd', strokeOpacity: 0.5 }),
+        Plot.gridY({ stroke: '#ddd', strokeOpacity: 0.5 }),
+        Plot.axisY({ label: 'Temperature (°C)' }),
+        Plot.axisY(humidityScale.ticks(4), {
           anchor: 'right',
           label: 'Humidity (%)',
           y: humidityScale,
           tickFormat: humidityScale.tickFormat(),
         }),
-        line(
+        Plot.line(
           data.hourly.time.map((time, i) => ({ time, value: data.hourly.temperature_2m[i] })),
           {
             y: 'value',
@@ -78,7 +60,7 @@
             ...interpolatedLinePlotSettings,
           }
         ),
-        line(
+        Plot.line(
           data.hourly.time.map((time, i) => ({ time, value: data.hourly.dewpoint_2m[i] })),
           {
             y: 'value',
@@ -87,10 +69,10 @@
             ...interpolatedLinePlotSettings,
           }
         ),
-        line(
+        Plot.line(
           data.hourly.time.map((time, i) => ({ time, value: data.hourly.relativeHumidity_2m[i] })),
           // @ts-expect-error - TS doesn't know about the y property
-          mapY((D) => D.map(humidityScale), {
+          Plot.mapY((D) => D.map(humidityScale), {
             y: (d) => d.value,
             stroke: 'blue',
             title: (d) => `Humidity: ${d.value.toFixed(0)}%`,
@@ -103,15 +85,15 @@
 
   function createRainAndCloudPlot(data: WeatherDataType, xDomain: [Date, Date], chartSettings: object) {
     const [xMin, xMax] = xDomain;
-    return plot({
+    return Plot.plot({
       height: 110,
       ...chartSettings,
       marginBottom: 10,
       x: { type: 'time', domain: xDomain, axis: null },
       y: { domain: [0, 1], axis: 'left', ticks: 0, label: 'Rain' },
       marks: [
-        axisY([0, 1], { anchor: 'right', label: 'Cloud Cover (%)', dx: 100 }),
-        text(
+        Plot.axisY([0, 1], { anchor: 'right', label: 'Cloud Cover (%)', dx: 100 }),
+        Plot.text(
           [
             { x: xMax, y: 1 / 6, text: 'Low' },
             { x: xMax, y: 3 / 6, text: 'Mid' },
@@ -119,7 +101,7 @@
           ],
           { x: 'x', y: 'y', text: 'text', dx: 15 }
         ),
-        rect(
+        Plot.rect(
           [
             { x1: xMin, x2: xMax, y1: 0, y2: 1 / 3 },
             { x1: xMin, x2: xMax, y1: 1 / 3, y2: 2 / 3 },
@@ -127,7 +109,7 @@
           ],
           { x1: 'x1', x2: 'x2', y1: 'y1', y2: 'y2', fill: '#fafafa' }
         ),
-        rect(
+        Plot.rect(
           data.hourly.time.flatMap((time, i) => [
             {
               x1: time.addSeconds(-1800),
@@ -160,7 +142,7 @@
             title: (d) => `Cloud Cover: ${d.cloudCover}%`,
           }
         ),
-        dot(
+        Plot.dot(
           data.hourly.time
             .map((time, i) => ({ time, y: 0.2, rain: data.hourly.precipitation[i] }))
             .filter((d) => d.rain > 0),
@@ -174,7 +156,7 @@
             opacity: 0.6,
           }
         ),
-        frame(),
+        Plot.frame(),
       ],
     });
   }
@@ -185,12 +167,12 @@
     cloudData: Array<CloudCoverData>,
     xDomain: [Date, Date],
     chartSettings: object,
-    cloudCoverScaleOptions: ScaleOptions
+    cloudCoverScaleOptions: Plot.ScaleOptions
   ) {
     const yDomain: [number, number] = [0, 4350];
     const cloudBase = calculateCloudBaseWeather(data);
 
-    return plot({
+    return Plot.plot({
       height: 700,
       ...chartSettings,
       marginTop: 0,
@@ -198,11 +180,11 @@
       y: { domain: yDomain },
       color: cloudCoverScaleOptions,
       marks: [
-        frame(),
-        axisY(d3Ticks(0, 4500, 9), { label: 'Height', tickFormat: (d) => `${d} m` }),
-        axisX({ label: `Time [${data.timezoneAbbr}]`, tickFormat: timeFormat('%H:%M') }),
-        gridY({ stroke: '#ddd', strokeOpacity: 0.5 }),
-        raster(cloudData, {
+        Plot.frame(),
+        Plot.axisY(d3Ticks(0, 4500, 9), { label: 'Height', tickFormat: (d) => `${d} m` }),
+        Plot.axisX({ label: `Time [${data.timezoneAbbr}]`, tickFormat: timeFormat('%H:%M') }),
+        Plot.gridY({ stroke: '#ddd', strokeOpacity: 0.5 }),
+        Plot.raster(cloudData, {
           x: 'x1',
           y: 'y1',
           interpolate: 'nearest',
@@ -211,7 +193,7 @@
           title: (d) => `Cloud Cover: ${d.value}%`,
           tip: false,
         }),
-        vector(windData, {
+        Plot.vector(windData, {
           x: 'time',
           y: 'height',
           shape: 'arrow',
@@ -233,12 +215,12 @@
           },
           tip: true,
         }),
-        ruleY([data.elevation], {
+        Plot.ruleY([data.elevation], {
           stroke: '#8B4513',
           strokeWidth: 2,
           strokeDasharray: '5,5',
         }),
-        text([{ y: data.elevation, text: `Surface Elevation (${data.elevation}m)` }], {
+        Plot.text([{ y: data.elevation, text: `Surface Elevation (${data.elevation}m)` }], {
           x: xDomain[0],
           y: 'y',
           text: 'text',
@@ -248,7 +230,7 @@
           fontWeight: 'bold',
           textAnchor: 'start',
         }),
-        line(cloudBase, {
+        Plot.line(cloudBase, {
           x: 'x',
           y: 'y',
           stroke: 'purple',
@@ -261,9 +243,9 @@
     });
   }
 
-  function createLegends(cloudCoverScaleOptions: ScaleOptions, windSpeedScaleOptions: ScaleOptions) {
-    const cloudLegend = legend({ color: cloudCoverScaleOptions });
-    const windLegend = legend({ color: windSpeedScaleOptions });
+  function createLegends(cloudCoverScaleOptions: Plot.ScaleOptions, windSpeedScaleOptions: Plot.ScaleOptions) {
+    const cloudLegend = Plot.legend({ color: cloudCoverScaleOptions });
+    const windLegend = Plot.legend({ color: windSpeedScaleOptions });
 
     const legendContainer = document.createElement('div');
     legendContainer.className = 'legend-container';
@@ -302,13 +284,13 @@
             const xDomain: [Date, Date] = [xMin, xMax];
 
             const chartSettings = { width: 1000, marginLeft: 50, marginRight: 40 };
-            const cloudCoverScaleOptions: ScaleOptions = {
+            const cloudCoverScaleOptions: Plot.ScaleOptions = {
               domain: [0, 100],
               range: ['white', 'gray'],
               type: 'sequential',
               label: 'Cloud Cover (%)',
             };
-            const windSpeedScaleOptions: ScaleOptions = {
+            const windSpeedScaleOptions: Plot.ScaleOptions = {
               domain: windDomains,
               range: windColors,
               type: 'pow',
