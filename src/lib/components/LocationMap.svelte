@@ -121,7 +121,7 @@
     transition: all 0.2s ease;
   }
 
-  :global(.location-btn:hover) {
+  :global(.location-btn:hover:not(:disabled)) {
     background: #f8fafc;
     color: #3b82f6;
     transform: translateY(-1px);
@@ -131,5 +131,46 @@
   :global(.location-btn:active) {
     transform: translateY(0);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  :global(.location-btn.loading) {
+    color: #3b82f6;
+    cursor: wait;
+  }
+
+  :global(.location-btn.error) {
+    color: #ef4444;
+  }
+
+  :global(.location-btn.error:hover) {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+
+  :global(.location-btn.success) {
+    color: #10b981;
+  }
+
+  :global(.location-btn.success:hover) {
+    background: #f0fdf4;
+    color: #059669;
+  }
+
+  :global(.location-btn:disabled) {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  :global(.location-spinner) {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>
