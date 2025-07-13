@@ -1,6 +1,6 @@
 <script lang="ts">
   import * as Plot from '@observablehq/plot';
-  import * as d3 from 'd3';
+  import { min, max, ticks, scaleLinear, timeFormat } from 'd3';
   import { getCloudCoverData, type CloudCoverData } from '$lib/charts/clouds';
   import { getWindFieldAllLevels, type WindFieldLevel } from '$lib/charts/wind';
   import { windColorScale, strokeWidthScale, windDomains, windColors } from '$lib/charts/scales';
@@ -13,9 +13,9 @@
   // --- Plot Creation Helper Functions ---
 
   function createTemperaturePlot(data: WeatherDataType, xDomain: [Date, Date], chartSettings: object) {
-    const tempAxisMin = (d3.min(data.hourly.dewpoint_2m) ?? 0) - 5;
-    const tempAxisMax = (d3.max(data.hourly.temperature_2m) ?? 0) + 5;
-    const humidityScale = d3.scaleLinear([0, 100], [tempAxisMin, tempAxisMax]);
+    const tempAxisMin = (min(data.hourly.dewpoint_2m) ?? 0) - 5;
+    const tempAxisMax = (max(data.hourly.temperature_2m) ?? 0) + 5;
+    const humidityScale = scaleLinear([0, 100], [tempAxisMin, tempAxisMax]);
     const interpolatedLinePlotSettings: Plot.LineOptions = {
       x: 'time',
       curve: 'catmull-rom',
@@ -27,7 +27,7 @@
       height: 160,
       ...chartSettings,
       marginBottom: 30,
-      x: { type: 'time', domain: xDomain, tickFormat: d3.timeFormat('%H:%M') },
+      x: { type: 'time', domain: xDomain, tickFormat: timeFormat('%H:%M') },
       y: { domain: [tempAxisMin, tempAxisMax], label: 'Temperature (°C)' },
       marks: [
         Plot.frame(),
@@ -177,8 +177,8 @@
       color: cloudCoverScaleOptions,
       marks: [
         Plot.frame(),
-        Plot.axisY(d3.ticks(0, 4500, 9), { label: 'Height', tickFormat: (d) => `${d} m` }),
-        Plot.axisX({ label: `Time [${data.timezoneAbbr}]`, tickFormat: d3.timeFormat('%H:%M') }),
+        Plot.axisY(ticks(0, 4500, 9), { label: 'Height', tickFormat: (d) => `${d} m` }),
+        Plot.axisX({ label: `Time [${data.timezoneAbbr}]`, tickFormat: timeFormat('%H:%M') }),
         Plot.gridY({ stroke: '#ddd', strokeOpacity: 0.5 }),
         Plot.raster(cloudData, {
           x: 'x1',
@@ -200,7 +200,7 @@
           strokeWidth: (d) => strokeWidthScale(d.speed),
           stroke: (d) => windColorScale(d.speed),
           title: (d) => {
-            const formattedTime = d3.timeFormat('%H:%M')(d.time);
+            const formattedTime = timeFormat('%H:%M')(d.time);
             const formattedHeight = `${Math.round(d.height)}m`;
             const cloudPoint = cloudData.find(
               (c) => c.x1.getTime() === d.time.getTime() && Math.abs(c.y1 - d.height) < 50
@@ -265,8 +265,8 @@
       const cloudData = getCloudCoverData(currentData);
       const windData = getWindFieldAllLevels(currentData);
 
-      const xMin = (d3.min(windData, (d) => d.time) as Date).addSeconds(-1800);
-      const xMax = (d3.max(windData, (d) => d.time) as Date).addSeconds(1800);
+      const xMin = (min(windData, (d) => d.time) as Date).addSeconds(-1800);
+      const xMax = (max(windData, (d) => d.time) as Date).addSeconds(1800);
       const xDomain: [Date, Date] = [xMin, xMax];
 
       const chartSettings = { width: 1000, marginLeft: 50, marginRight: 40 };
