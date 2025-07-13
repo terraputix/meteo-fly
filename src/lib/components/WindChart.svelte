@@ -1,6 +1,9 @@
 <script lang="ts">
   import * as Plot from '@observablehq/plot';
-  import { min, max, ticks, scaleLinear, timeFormat } from 'd3';
+  import { min as d3Min, max as d3Max } from 'd3-array';
+  import { ticks as d3Ticks } from 'd3-array';
+  import { scaleLinear } from 'd3-scale';
+  import { timeFormat } from 'd3-time-format';
   import { getCloudCoverData, type CloudCoverData } from '$lib/charts/clouds';
   import { getWindFieldAllLevels, type WindFieldLevel } from '$lib/charts/wind';
   import { windColorScale, strokeWidthScale, windDomains, windColors } from '$lib/charts/scales';
@@ -10,11 +13,22 @@
 
   export let weatherData: WeatherDataType | null = null;
 
-  // --- Plot Creation Helper Functions ---
+  let chartContainer: HTMLElement;
+  let isRendering = false;
+  let renderProgress = 0;
+
+  // Performance optimization: Use requestIdleCallback for non-blocking rendering
+  function scheduleWork(callback: () => void) {
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(callback, { timeout: 16 });
+    } else {
+      setTimeout(callback, 0);
+    }
+  }
 
   function createTemperaturePlot(data: WeatherDataType, xDomain: [Date, Date], chartSettings: object) {
-    const tempAxisMin = (min(data.hourly.dewpoint_2m) ?? 0) - 5;
-    const tempAxisMax = (max(data.hourly.temperature_2m) ?? 0) + 5;
+    const tempAxisMin = (d3Min(data.hourly.dewpoint_2m) ?? 0) - 5;
+    const tempAxisMax = (d3Max(data.hourly.temperature_2m) ?? 0) + 5;
     const humidityScale = scaleLinear([0, 100], [tempAxisMin, tempAxisMax]);
     const interpolatedLinePlotSettings: Plot.LineOptions = {
       x: 'time',
@@ -177,7 +191,7 @@
       color: cloudCoverScaleOptions,
       marks: [
         Plot.frame(),
-        Plot.axisY(ticks(0, 4500, 9), { label: 'Height', tickFormat: (d) => `${d} m` }),
+        Plot.axisY(d3Ticks(0, 4500, 9), { label: 'Height', tickFormat: (d) => `${d} m` }),
         Plot.axisX({ label: `Time [${data.timezoneAbbr}]`, tickFormat: timeFormat('%H:%M') }),
         Plot.gridY({ stroke: '#ddd', strokeOpacity: 0.5 }),
         Plot.raster(cloudData, {
@@ -212,24 +226,20 @@
           tip: true,
         }),
         Plot.ruleY([data.elevation], {
-          stroke: '#8B4513', // A clearer, saddle-brown color
+          stroke: '#8B4513',
           strokeWidth: 2,
-          strokeDasharray: '5,5', // Dashed line to indicate it's a reference
+          strokeDasharray: '5,5',
         }),
-        Plot.text(
-          // The data is an array with a single point for our label
-          [{ y: data.elevation, text: `Surface Elevation (${data.elevation}m)` }],
-          {
-            x: xDomain[0], // Anchor the text to the left edge of the plot
-            y: 'y',
-            text: 'text',
-            dx: +10, // Nudge the text 10px to the right from the edge
-            dy: +10, // Nudge the text 10px down from the line to avoid overlap
-            fill: '#8B4513', // Use the same color as the line
-            fontWeight: 'bold',
-            textAnchor: 'start', // Align the start of the text to the (x,y) coordinate
-          }
-        ),
+        Plot.text([{ y: data.elevation, text: `Surface Elevation (${data.elevation}m)` }], {
+          x: xDomain[0],
+          y: 'y',
+          text: 'text',
+          dx: +10,
+          dy: +10,
+          fill: '#8B4513',
+          fontWeight: 'bold',
+          textAnchor: 'start',
+        }),
         Plot.line(cloudBase, {
           x: 'x',
           y: 'y',
@@ -254,19 +264,21 @@
     return legendContainer;
   }
 
-  /**
-   * Svelte Action to render the Observable Plot.
-   */
   function renderPlot(node: HTMLElement, data: WeatherDataType | null) {
-    function draw(currentData: WeatherDataType) {
+    let renderCancelled = false;
+
+    function drawProgressively(currentData: WeatherDataType) {
+      if (renderCancelled) return;
+
+      isRendering = true;
+      renderProgress = 0;
       node.innerHTML = '';
 
-      // 1. Process data and define shared configurations
       const cloudData = getCloudCoverData(currentData);
       const windData = getWindFieldAllLevels(currentData);
 
-      const xMin = (min(windData, (d) => d.time) as Date).addSeconds(-1800);
-      const xMax = (max(windData, (d) => d.time) as Date).addSeconds(1800);
+      const xMin = (d3Min(windData, (d) => d.time) as Date).addSeconds(-1800);
+      const xMax = (d3Max(windData, (d) => d.time) as Date).addSeconds(1800);
       const xDomain: [Date, Date] = [xMin, xMax];
 
       const chartSettings = { width: 1000, marginLeft: 50, marginRight: 40 };
@@ -283,42 +295,88 @@
         label: 'Wind Speed (km/h)',
       };
 
-      // 2. Create each plot element by calling the helper functions
-      const temperaturePlot = createTemperaturePlot(currentData, xDomain, chartSettings);
-      const rainPlot = createRainAndCloudPlot(currentData, xDomain, chartSettings);
-      const windPlot = createWindPlot(currentData, windData, cloudData, xDomain, chartSettings, cloudCoverScaleOptions);
-      const legendContainer = createLegends(cloudCoverScaleOptions, windSpeedScaleOptions);
-
-      // 3. Assemble the final DOM structure
       const plotContainer = document.createElement('div');
-      plotContainer.appendChild(temperaturePlot);
-      plotContainer.appendChild(rainPlot);
-      plotContainer.appendChild(windPlot);
-
       node.appendChild(plotContainer);
-      node.appendChild(legendContainer);
+
+      // Step 1: Temperature plot (lightweight, renders first for LCP)
+      scheduleWork(() => {
+        if (renderCancelled) return;
+        const temperaturePlot = createTemperaturePlot(currentData, xDomain, chartSettings);
+        plotContainer.appendChild(temperaturePlot);
+        renderProgress = 33;
+
+        // Step 2: Rain and cloud plot
+        scheduleWork(() => {
+          if (renderCancelled) return;
+          const rainPlot = createRainAndCloudPlot(currentData, xDomain, chartSettings);
+          plotContainer.appendChild(rainPlot);
+          renderProgress = 66;
+
+          // Step 3: Wind plot (heaviest, renders last)
+          scheduleWork(() => {
+            if (renderCancelled) return;
+            const windPlot = createWindPlot(
+              currentData,
+              windData,
+              cloudData,
+              xDomain,
+              chartSettings,
+              cloudCoverScaleOptions
+            );
+            plotContainer.appendChild(windPlot);
+            renderProgress = 90;
+
+            // Step 4: Legends
+            scheduleWork(() => {
+              if (renderCancelled) return;
+              const legendContainer = createLegends(cloudCoverScaleOptions, windSpeedScaleOptions);
+              node.appendChild(legendContainer);
+              renderProgress = 100;
+              isRendering = false;
+            });
+          });
+        });
+      });
     }
 
     if (data) {
-      draw(data);
+      drawProgressively(data);
     }
 
     return {
       update(newData: WeatherDataType | null) {
-        if (newData) {
-          draw(newData);
-        } else {
-          node.innerHTML = '';
-        }
+        renderCancelled = true;
+        scheduleWork(() => {
+          renderCancelled = false;
+          if (newData) {
+            drawProgressively(newData);
+          } else {
+            node.innerHTML = '';
+            isRendering = false;
+            renderProgress = 0;
+          }
+        });
       },
       destroy() {
+        renderCancelled = true;
         node.innerHTML = '';
       },
     };
   }
 </script>
 
-<div use:renderPlot={weatherData} class="chart-container"></div>
+<div bind:this={chartContainer} use:renderPlot={weatherData} class="chart-container">
+  {#if isRendering}
+    <div class="skeleton-loader">
+      <div class="skeleton-item" style="height: 160px; opacity: {renderProgress >= 33 ? 0 : 1}"></div>
+      <div class="skeleton-item" style="height: 110px; opacity: {renderProgress >= 66 ? 0 : 1}"></div>
+      <div class="skeleton-item main-chart" style="height: 700px; opacity: {renderProgress >= 90 ? 0 : 1}"></div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: {renderProgress}%"></div>
+      </div>
+    </div>
+  {/if}
+</div>
 
 <style>
   .chart-container {
@@ -327,11 +385,60 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    position: relative;
+  }
+
+  .skeleton-loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px;
+  }
+
+  .skeleton-item {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+    border-radius: 4px;
+    transition: opacity 0.3s ease;
+  }
+
+  .skeleton-item.main-chart {
+    background: linear-gradient(90deg, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%);
+    background-size: 200% 100%;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 20px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4f46e5, #7c3aed);
+    transition: width 0.3s ease;
+  }
+
+  @keyframes loading {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 
   :global(.legend-container) {
     display: flex;
-    margin: 1 rem;
+    margin: 1rem;
     flex-wrap: wrap;
     gap: 1rem;
     justify-content: center;
