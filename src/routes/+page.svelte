@@ -71,22 +71,22 @@
     updateURLParams(parameters);
 
     // load updated forecast data
-    isUpdating = true;
     clearTimeout(updateTimer);
     updateTimer = setTimeout(() => {
-      updateWeather().then(() => {
-        isUpdating = false;
-      });
+      updateWeather();
     }, 5);
   }
 
   async function updateWeather() {
     try {
+      isUpdating = true;
       error = null;
       weatherData = await fetchWeatherData(parameters.location, parameters.selectedModel, startDate);
     } catch (err) {
       console.error(err);
       error = 'Failed to fetch weather data. Please try again.';
+    } finally {
+      isUpdating = false;
     }
   }
 
@@ -144,7 +144,7 @@
               bind:value={parameters.selectedModel}
               class="rounded-sm bg-white px-2 py-1 text-sm focus:outline-indigo-500"
             >
-              {#each models as model}
+              {#each models as model (model.id)}
                 <option value={model.id}>{model.name}</option>
               {/each}
             </select>
