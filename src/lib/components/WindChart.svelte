@@ -1,8 +1,9 @@
 <script lang="ts">
   import * as Plot from '@observablehq/plot';
   import { timeFormat } from 'd3-time-format';
-  import { windColorScale, strokeWidthScale, windDomains, windColors } from '$lib/charts/scales';
+  import { windColorScale, strokeWidthScale, cloudCoverScaleOptions } from '$lib/charts/scales';
   import { getRainSymbol } from '$lib/icons/RainIcons';
+  import Legend from './Legend.svelte';
   import type { WeatherDataType } from '$lib/api/types';
   import type {
     ChartWorkerInput,
@@ -220,17 +221,6 @@
     });
   }
 
-  function createLegends(cloudCoverScaleOptions: Plot.ScaleOptions, windSpeedScaleOptions: Plot.ScaleOptions): Element {
-    const cloudLegend = Plot.legend({ color: cloudCoverScaleOptions });
-    const windLegend = Plot.legend({ color: windSpeedScaleOptions });
-
-    const legendContainer = document.createElement('div');
-    legendContainer.className = 'legend-container';
-    legendContainer.appendChild(cloudLegend);
-    legendContainer.appendChild(windLegend);
-    return legendContainer;
-  }
-
   function renderPlot(node: HTMLElement, data: WeatherDataType | null) {
     let currentWorker: Worker | null = null;
 
@@ -258,18 +248,6 @@
               response.data;
 
             const chartSettings = { width: 1000, marginLeft: 50, marginRight: 40 };
-            const cloudCoverScaleOptions: Plot.ScaleOptions = {
-              domain: [0, 100],
-              range: ['white', 'gray'],
-              type: 'sequential',
-              label: 'Cloud Cover (%)',
-            };
-            const windSpeedScaleOptions: Plot.ScaleOptions = {
-              domain: windDomains,
-              range: windColors,
-              type: 'pow',
-              label: 'Wind Speed (km/h)',
-            };
 
             // Create plots using pre-processed data
             const temperaturePlot = createTemperaturePlot(temperatureChartData, xDomain, chartSettings);
@@ -283,15 +261,12 @@
               chartSettings,
               cloudCoverScaleOptions
             );
-            const legendContainer = createLegends(cloudCoverScaleOptions, windSpeedScaleOptions);
-
             const plotContainer = document.createElement('div');
             plotContainer.appendChild(temperaturePlot);
             plotContainer.appendChild(rainPlot);
             plotContainer.appendChild(windPlot);
 
             node.appendChild(plotContainer);
-            node.appendChild(legendContainer);
           } catch (plotError) {
             console.error('Error creating plots:', plotError);
           }
@@ -350,8 +325,7 @@
   }
 </script>
 
-<!-- Fixed height container prevents layout shifts -->
-<div class="chart-container" style="min-height: 1000px;">
+<div class="chart-container">
   {#if isRendering}
     <div class="loading-state">
       <div class="loading-spinner"></div>
@@ -361,22 +335,33 @@
   <div use:renderPlot={weatherData} class="chart-content" style="opacity: {isRendering ? 0 : 1}"></div>
 </div>
 
+<Legend />
+
 <style>
   .chart-container {
     width: 100%;
+    max-width: 1040px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     position: relative;
+    aspect-ratio: 900 / 850;
+    padding: 0 20px;
   }
 
   .chart-content {
     width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     transition: opacity 0.3s ease;
+  }
+
+  .chart-content :global(svg) {
+    width: 100%;
+    height: auto;
   }
 
   .loading-state {
@@ -408,20 +393,9 @@
     }
   }
 
-  :global(.legend-container) {
-    display: flex;
-    margin: 1rem;
-    flex-wrap: wrap;
-    gap: 1rem;
-    justify-content: center;
-    align-items: center;
-    margin-top: 1rem;
-  }
-
-  :global(.legend-container > *) {
-    flex: 1 1 auto;
-    min-width: 200px;
-    max-width: 60%;
-    margin: 0 1rem;
+  @media (max-width: 768px) {
+    .chart-container {
+      padding: 0 10px;
+    }
   }
 </style>
