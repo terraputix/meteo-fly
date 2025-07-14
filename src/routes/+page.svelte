@@ -35,7 +35,6 @@
 
   // Timer for debouncing
   let updateTimer: number;
-  let isUpdating: boolean = false;
 
   // URL parameter handling
   function updateURLParams(pageParams: PageParameters) {
@@ -60,9 +59,7 @@
 
   onMount(() => {
     // Get data for correct location
-    updateWeather().then(() => {
-      isUpdating = false;
-    });
+    updateWeather();
   });
 
   // Watch for parameter changes and update URL
@@ -80,14 +77,11 @@
 
   async function updateWeather() {
     try {
-      isUpdating = true;
       error = null;
       weatherData = await fetchWeatherData(parameters.location, parameters.selectedModel, startDate);
     } catch (err) {
       console.error(err);
       error = 'Failed to fetch weather data. Please try again.';
-    } finally {
-      isUpdating = false;
     }
   }
 
@@ -228,33 +222,8 @@
         <p class="mt-2 text-right text-sm text-gray-500">
           <a href="https://open-meteo.com/" target="_blank" class="underline">Weather data by Open-Meteo.com</a>
         </p>
-
-        <!-- Loading spinner overlay -->
-        {#if isUpdating}
-          <div class="bg-opacity-50 pointer-events-none absolute inset-0 flex items-center justify-center bg-white">
-            <div class="flex flex-col items-center">
-              <svg class="h-8 w-8 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
-                <circle class="opacity-25" cx="25" cy="25" r="20" stroke="currentColor" stroke-width="5" fill="none"
-                ></circle>
-                <circle
-                  class="opacity-75"
-                  cx="25"
-                  cy="25"
-                  r="20"
-                  stroke="currentColor"
-                  stroke-width="5"
-                  stroke-linecap="round"
-                  fill="none"
-                  stroke-dasharray="31.4 31.4"
-                  transform="rotate(-90 25 25)"
-                ></circle>
-              </svg>
-              <span class="mt-2 text-sm text-gray-600">Loading...</span>
-            </div>
-          </div>
-        {/if}
       </div>
-    {:else if !isUpdating}
+    {:else}
       <div class="my-10 flex flex-col items-center justify-center text-center text-gray-500">
         <svg
           xmlns="http://www.w3.org/2000/svg"
