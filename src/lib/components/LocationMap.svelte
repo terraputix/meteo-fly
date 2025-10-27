@@ -114,14 +114,9 @@
   });
 </script>
 
-<div bind:this={mapContainer} id="map" style="height: 300px; width: 100%;"></div>
+<div bind:this={mapContainer} id="map" class="h-full w-full"></div>
 
 <style>
-  #map {
-    margin-top: 1rem;
-    border-radius: 0.5rem;
-  }
-
   :global(.maplibregl-ctrl-group button) {
     background-color: white;
     border: none;
