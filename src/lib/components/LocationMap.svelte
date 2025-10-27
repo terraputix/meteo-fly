@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import maplibregl, { type Map, type Marker } from 'maplibre-gl';
+  import maplibregl, { type Map, type Marker, type RequestParameters } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
+  import { Protocol } from 'pmtiles';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
@@ -37,7 +38,15 @@
     map.setCenter(newPos);
   }
 
-  onMount(() => {
+  onMount(async () => {
+    const protocol = new Protocol();
+    maplibregl.addProtocol('mapterhorn', async (params: RequestParameters, abortController: AbortController) => {
+      const [z, x, y] = params.url.replace('mapterhorn://', '').split('/').map(Number);
+      const name = z <= 12 ? 'planet' : `6-${x >> (z - 6)}-${y >> (z - 6)}`;
+      const url = `pmtiles://https://mapterhorn.servert.ch/${name}.pmtiles/${z}/${x}/${y}.webp`;
+      return await protocol.tile({ ...params, url }, abortController);
+    });
+
     // Initialize the map
     map = new maplibregl.Map({
       container: mapContainer,
@@ -48,13 +57,10 @@
 
     // Add marker
     marker = new maplibregl.Marker({ draggable: true }).setLngLat([longitude, latitude]).addTo(map);
-
-    // Marker drag event
     marker.on('dragend', () => {
       const pos = marker.getLngLat();
       updatePosition(pos.lat, pos.lng);
     });
-
     // Map click event
     map.on('click', (e: maplibregl.MapMouseEvent) => {
       const { lat, lng } = e.lngLat;
@@ -71,6 +77,30 @@
       if (state.current) {
         handleLocationDetected(state.current);
       }
+    });
+
+    map.on('load', () => {
+      map.addSource('terrainSource', {
+        type: 'raster-dem',
+        tiles: ['mapterhorn://{z}/{x}/{y}'],
+        encoding: 'terrarium',
+        tileSize: 512,
+        attribution: '<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>',
+      });
+      map.addLayer({
+        source: 'terrainSource',
+        id: 'hillshadeLayer',
+        type: 'hillshade',
+        paint: {
+          'hillshade-method': 'igor',
+          'hillshade-shadow-color': 'rgba(0,0,0,0.4)',
+          'hillshade-highlight-color': 'rgba(255,255,255,0.35)',
+        },
+      });
+      map.setTerrain({
+        source: 'terrainSource',
+        exaggeration: 1.0,
+      });
     });
   });
 
