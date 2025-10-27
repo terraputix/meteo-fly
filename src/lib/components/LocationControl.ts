@@ -1,40 +1,38 @@
-import L from 'leaflet';
+import type { IControl } from 'maplibre-gl';
 import { locationActions } from '$lib/services/location/store';
 import type { LocationState } from '$lib/services/location/store';
 import type { Location } from '$lib/api/types';
 
 interface LocationControlOptions {
-  position?: 'topright' | 'topleft' | 'bottomright' | 'bottomleft';
   onLocationDetected?: (location: Location) => void;
 }
 
-export class LocationControlManager {
+export class LocationControlManager implements IControl {
   private button!: HTMLButtonElement;
   private container!: HTMLDivElement;
 
   constructor(private options: LocationControlOptions = {}) {}
 
-  createControl() {
-    const LocationControl = L.Control.extend({
-      options: {
-        position: this.options.position || 'topright',
-      },
-      onAdd: () => {
-        this.container = L.DomUtil.create('div', 'leaflet-control-location');
-        this.button = L.DomUtil.create('button', 'location-btn', this.container);
+  onAdd() {
+    this.container = document.createElement('div');
+    this.container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
 
-        this.button.type = 'button';
-        this.button.title = 'Use My Location';
-        this.setButtonState('idle');
+    this.button = document.createElement('button');
+    this.button.className = 'maplibregl-ctrl-icon maplibregl-ctrl-geolocate';
+    this.button.type = 'button';
+    this.button.title = 'Use My Location';
+    this.setButtonState('idle');
 
-        L.DomEvent.on(this.button, 'click', this.handleClick.bind(this));
-        L.DomEvent.disableClickPropagation(this.container);
+    this.button.addEventListener('click', this.handleClick.bind(this));
+    this.container.appendChild(this.button);
 
-        return this.container;
-      },
-    });
+    return this.container;
+  }
 
-    return new LocationControl();
+  onRemove() {
+    if (this.container.parentNode) {
+      this.container.parentNode.removeChild(this.container);
+    }
   }
 
   private async handleClick() {
@@ -60,26 +58,22 @@ export class LocationControlManager {
   }
 
   private setButtonState(state: 'idle' | 'loading' | 'error' | 'success', error?: string, accuracy?: number) {
-    this.button.className = 'location-btn';
     this.button.disabled = false;
 
     switch (state) {
       case 'loading':
         this.button.innerHTML = this.getLoadingIcon();
-        this.button.classList.add('loading');
         this.button.disabled = true;
         this.button.title = 'Detecting location...';
         break;
 
       case 'error':
         this.button.innerHTML = this.getErrorIcon();
-        this.button.classList.add('error');
         this.button.title = `Error: ${error}. Click to retry.`;
         break;
 
       case 'success':
         this.button.innerHTML = this.getSuccessIcon();
-        this.button.classList.add('success');
         this.button.title = `Location detected (±${Math.round(accuracy || 0)}m). Click to refresh.`;
         break;
 
