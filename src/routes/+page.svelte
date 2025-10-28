@@ -80,30 +80,39 @@
   }
 </script>
 
-<div class="flex h-screen flex-col-reverse sm:hidden">
-  <!-- Map container -->
-  <div class="relative h-full w-full">
-    <LocationMap bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
-  </div>
-
-  <!-- Chart and controls container -->
-  {#if showChart && weatherData}
-    <div class="flex flex-col overflow-y-auto">
-      <div class="flex-grow bg-white p-2 sm:p-4">
-        {#if error}
-          <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
-            <span class="block sm:inline">{error}</span>
-          </div>
-        {/if}
-
-        <ChartContainer {weatherData} {startDate} bind:selectedDay={parameters.selectedDay} on:close={handleClose} />
-      </div>
-    </div>
-  {/if}
-  <!-- Controls above chart for mobile -->
+<div class="h-screen sm:hidden">
   <div class="z-10 block w-full bg-white/80 p-4">
     <Controls bind:parameters on:openChart={() => handleOpenChart()} />
   </div>
+  <ResizablePaneGroup direction="vertical" class="flex-col-reverse">
+    <ResizablePane defaultSize={showChart ? 15 : 100}>
+      <div class="relative h-full w-full">
+        <LocationMap bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
+      </div>
+    </ResizablePane>
+    {#if showChart}
+      <ResizableHandle withHandle />
+      <ResizablePane defaultSize={50}>
+        {#if weatherData}
+          <div class="flex h-full flex-col overflow-y-auto">
+            <div class="flex-grow bg-white p-2 sm:p-4">
+              {#if error}
+                <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
+                  <span class="block sm:inline">{error}</span>
+                </div>
+              {/if}
+              <ChartContainer
+                {weatherData}
+                {startDate}
+                bind:selectedDay={parameters.selectedDay}
+                on:close={handleClose}
+              />
+            </div>
+          </div>
+        {/if}
+      </ResizablePane>
+    {/if}
+  </ResizablePaneGroup>
 </div>
 
 <div class="hidden h-screen w-full sm:block">
