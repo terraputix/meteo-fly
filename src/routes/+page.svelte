@@ -12,6 +12,7 @@
   import type { WeatherDataType } from '$lib/api/types';
   import { type PageParameters } from '$lib/services/types';
   import { fetchWeatherData } from '$lib/api/api';
+  import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
 
   let parameters = getInitialParameters($page.url.searchParams);
 
@@ -79,20 +80,15 @@
   }
 </script>
 
-<div class="flex h-screen flex-col-reverse sm:grid {showChart ? 'sm:grid-cols-2' : 'sm:grid-cols-1'}">
+<div class="flex h-screen flex-col-reverse sm:hidden">
   <!-- Map container -->
   <div class="relative h-full w-full">
     <LocationMap bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
-
-    <!-- Controls overlay for desktop -->
-    <div class="absolute top-0 right-0 left-0 hidden bg-white/80 p-4 sm:block">
-      <Controls bind:parameters on:openChart={() => handleOpenChart()} />
-    </div>
   </div>
 
   <!-- Chart and controls container -->
   {#if showChart && weatherData}
-    <div class="flex flex-col sm:overflow-y-auto">
+    <div class="flex flex-col overflow-y-auto">
       <div class="flex-grow bg-white p-2 sm:p-4">
         {#if error}
           <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
@@ -105,7 +101,42 @@
     </div>
   {/if}
   <!-- Controls above chart for mobile -->
-  <div class="z-10 block w-full bg-white/80 p-4 sm:hidden">
+  <div class="z-10 block w-full bg-white/80 p-4">
     <Controls bind:parameters on:openChart={() => handleOpenChart()} />
   </div>
+</div>
+
+<div class="hidden h-screen w-full sm:block">
+  <ResizablePaneGroup direction="horizontal">
+    <ResizablePane defaultSize={showChart ? 50 : 100} minSize={30}>
+      <div class="relative h-full w-full">
+        <LocationMap bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
+        <div class="absolute top-0 right-0 left-0 bg-white/80 p-4">
+          <Controls bind:parameters on:openChart={() => handleOpenChart()} />
+        </div>
+      </div>
+    </ResizablePane>
+    {#if showChart}
+      <ResizableHandle withHandle />
+      <ResizablePane defaultSize={50} minSize={30}>
+        {#if weatherData}
+          <div class="flex h-full flex-col overflow-y-auto">
+            <div class="flex-grow bg-white p-2 sm:p-4">
+              {#if error}
+                <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
+                  <span class="block sm:inline">{error}</span>
+                </div>
+              {/if}
+              <ChartContainer
+                {weatherData}
+                {startDate}
+                bind:selectedDay={parameters.selectedDay}
+                on:close={handleClose}
+              />
+            </div>
+          </div>
+        {/if}
+      </ResizablePane>
+    {/if}
+  </ResizablePaneGroup>
 </div>
