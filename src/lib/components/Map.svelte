@@ -2,11 +2,11 @@
   import { onMount, onDestroy } from 'svelte';
   import maplibregl, { type Map, type Marker, type RequestParameters } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { defaultOmProtocolSettings, GridFactory, omProtocol } from '@openmeteo/mapbox-layer';
+  import { defaultOmProtocolSettings, GridFactory, omProtocol, type Domain } from '@openmeteo/mapbox-layer';
   import { Protocol } from 'pmtiles';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
-  import { weatherMapStore, buildOpenMeteoUrl, type WeatherMapState } from '$lib/services/weatherMap/store';
+  import { weatherMapStore, buildOpenMeteoUrl } from '$lib/services/weatherMap/store';
   import { LocationControlManager } from './LocationControl';
 
   export let latitude: number;
@@ -16,23 +16,6 @@
   let map: Map;
   let marker: Marker;
   let locationUnsubscribe: () => void;
-  let currentWeatherMapState: WeatherMapState = $weatherMapStore;
-
-  // Subscribe to weather map store changes
-  const weatherMap$ = weatherMapStore;
-
-  $: {
-    if (currentWeatherMapState && $weatherMap$) {
-      if (
-        currentWeatherMapState.domain !== $weatherMap$.domain ||
-        currentWeatherMapState.variable !== $weatherMap$.variable ||
-        currentWeatherMapState.datetime !== $weatherMap$.datetime
-      ) {
-        updateWeatherLayer();
-      }
-    }
-    currentWeatherMapState = $weatherMap$;
-  }
   let omFileSource: maplibregl.RasterTileSource | undefined;
 
   function updatePosition(lat: number, lng: number) {
@@ -55,8 +38,7 @@
     if (!map || !omFileSource) return;
 
     // Update layer
-    updatePaddedBounds();
-    const omUrl = buildOpenMeteoUrl(currentWeatherMapState);
+    const omUrl = buildOpenMeteoUrl($weatherMapStore);
     omFileSource.setUrl('om://' + omUrl);
   }
 
@@ -64,6 +46,24 @@
   $: if (map && marker && (latitude !== marker.getLngLat().lat || longitude !== marker.getLngLat().lng)) {
     const newPos = { lat: latitude, lng: longitude };
     marker.setLngLat(newPos);
+  }
+
+  $: triggeredUpdate(
+    $weatherMapStore.variable,
+    $weatherMapStore.domain,
+    $weatherMapStore.datetime,
+    $weatherMapStore.paddedBounds
+  );
+
+  function triggeredUpdate(
+    _variable: string,
+    _domain: Domain,
+    _datetime: string,
+    _paddedBounds: maplibregl.LngLatBounds | null
+  ) {
+    if (map && omFileSource) {
+      updateWeatherLayer();
+    }
   }
 
   onMount(async () => {
@@ -143,7 +143,7 @@
 
       updatePaddedBounds();
 
-      const omUrl = buildOpenMeteoUrl(currentWeatherMapState);
+      const omUrl = buildOpenMeteoUrl($weatherMapStore);
       map.addSource('omFileSource', {
         url: 'om://' + omUrl,
         type: 'raster',
@@ -173,9 +173,9 @@
   const padding = 25;
 
   const checkBounds = () => {
-    const domain = currentWeatherMapState.domain;
+    const domain = $weatherMapStore.domain;
     const mapBounds = map.getBounds();
-    const paddedBounds = currentWeatherMapState.paddedBounds;
+    const paddedBounds = $weatherMapStore.paddedBounds;
 
     if (paddedBounds) {
       let exceededPadding = false;
@@ -196,13 +196,13 @@
       }
 
       if (exceededPadding) {
-        updateWeatherLayer();
+        updatePaddedBounds();
       }
     }
   };
 
   const updatePaddedBounds = () => {
-    const domain = currentWeatherMapState.domain;
+    const domain = $weatherMapStore.domain;
     const mapBounds = map.getBounds();
 
     const gridBounds = GridFactory.create(domain.grid).getBounds();
@@ -225,7 +225,6 @@
 
     // Update the store with the new padded bounds
     weatherMapStore.setPaddedBounds(newPaddedBounds);
-    currentWeatherMapState.paddedBounds = newPaddedBounds;
   };
 </script>
 
