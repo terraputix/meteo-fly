@@ -6,6 +6,7 @@
   import Map from '$lib/components/Map.svelte';
   import Controls from '$lib/components/Controls.svelte';
   import MapControls from '$lib/components/MapControls.svelte';
+  import TimeSlider from '$lib/components/TimeSlider.svelte';
 
   import ChartContainer from '../lib/components/ChartContainer.svelte';
   import { getInitialParameters } from '$lib/services/defaults';
@@ -130,6 +131,7 @@
             <Controls bind:parameters on:openChart={() => handleOpenChart()} />
           </div>
         </div>
+        <TimeSlider />
       </div>
     </ResizablePane>
     {#if showChart}
