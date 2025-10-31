@@ -16,8 +16,23 @@
   let map: Map;
   let marker: Marker;
   let locationUnsubscribe: () => void;
-  let weatherMapUnsubscribe: () => void;
-  let currentWeatherMapState: WeatherMapState;
+  let currentWeatherMapState: WeatherMapState = $weatherMapStore;
+
+  // Subscribe to weather map store changes
+  const weatherMap$ = weatherMapStore;
+
+  $: {
+    if (currentWeatherMapState && $weatherMap$) {
+      if (
+        currentWeatherMapState.domain !== $weatherMap$.domain ||
+        currentWeatherMapState.variable !== $weatherMap$.variable ||
+        currentWeatherMapState.datetime !== $weatherMap$.datetime
+      ) {
+        updateWeatherLayer();
+      }
+    }
+    currentWeatherMapState = $weatherMap$;
+  }
   let omFileSource: maplibregl.RasterTileSource | undefined;
 
   function updatePosition(lat: number, lng: number) {
@@ -64,7 +79,7 @@
 
     // Add OpenMeteo Protocol for weather maps
     const omProtocolOptions = defaultOmProtocolSettings;
-    omProtocolOptions.resolutionFactor = 0.5;
+    omProtocolOptions.resolutionFactor = 1;
     omProtocolOptions.useSAB = true;
     maplibregl.addProtocol('om', (params) => omProtocol(params, undefined, omProtocolOptions));
 
@@ -101,11 +116,6 @@
       if (state.current) {
         handleLocationDetected(state.current);
       }
-    });
-
-    // Subscribe to weather map store changes
-    weatherMapUnsubscribe = weatherMapStore.subscribe((state: WeatherMapState) => {
-      currentWeatherMapState = state;
     });
 
     map.on('load', () => {
@@ -154,21 +164,18 @@
     if (locationUnsubscribe) {
       locationUnsubscribe();
     }
-    if (weatherMapUnsubscribe) {
-      weatherMapUnsubscribe();
-    }
+
     if (map) {
       map.remove();
     }
   });
 
   const padding = 25;
+
   const checkBounds = () => {
-    console.log('checkBounds');
     const domain = currentWeatherMapState.domain;
     const mapBounds = map.getBounds();
     const paddedBounds = currentWeatherMapState.paddedBounds;
-    console.log(paddedBounds);
 
     if (paddedBounds) {
       let exceededPadding = false;
@@ -188,7 +195,6 @@
         exceededPadding = true;
       }
 
-      console.log('exceededPadding:', exceededPadding);
       if (exceededPadding) {
         updateWeatherLayer();
       }
@@ -196,7 +202,6 @@
   };
 
   const updatePaddedBounds = () => {
-    console.log('updatePaddedBounds');
     const domain = currentWeatherMapState.domain;
     const mapBounds = map.getBounds();
 
@@ -217,8 +222,6 @@
 
     // Create a new LngLatBounds object
     const newPaddedBounds = new maplibregl.LngLatBounds(newBounds);
-
-    console.log('newPaddedBounds', newPaddedBounds);
 
     // Update the store with the new padded bounds
     weatherMapStore.setPaddedBounds(newPaddedBounds);
