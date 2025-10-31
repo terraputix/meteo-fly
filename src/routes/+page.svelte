@@ -89,6 +89,7 @@
   </div>
   <ResizablePaneGroup direction="vertical" class="flex-col-reverse">
     <ResizablePane defaultSize={showChart ? 15 : 100}>
+      <TimeSlider />
       <div class="relative h-full w-full">
         <Map bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
       </div>

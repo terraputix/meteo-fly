@@ -192,4 +192,17 @@
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
   }
+
+  @media (max-width: 640px) {
+    .time-slider-container {
+      flex-direction: column;
+      padding: 0.5rem;
+      gap: 0.5rem;
+    }
+
+    .time-label {
+      font-size: 0.75rem;
+      min-width: unset;
+    }
+  }
 </style>
