@@ -1,6 +1,33 @@
 <script lang="ts">
   import '../app.css';
   let { children } = $props();
+  import { weatherMapStore } from '$lib/services/weatherMap/store';
+  import { page } from '$app/stores';
+  import { browser } from '$app/environment';
+
+  $effect(() => {
+    const state = $weatherMapStore;
+    if (browser) {
+      const url = new URL($page.url);
+      if (state.domain) {
+        url.searchParams.set('map_domain', state.domain.value);
+      }
+      if (state.baseVariable) {
+        url.searchParams.set('map_variable', state.baseVariable);
+      }
+      if (state.level) {
+        url.searchParams.set('map_level', state.level);
+      } else {
+        url.searchParams.delete('map_level');
+      }
+      if (state.datetime) {
+        url.searchParams.set('map_datetime', state.datetime);
+      }
+      if (url.search !== $page.url.search) {
+        history.replaceState({}, '', url);
+      }
+    }
+  });
 </script>
 
 <svelte:head>
