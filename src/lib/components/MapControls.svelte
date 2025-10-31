@@ -25,18 +25,6 @@
     const selectedVariable = (event.target as HTMLSelectElement).value;
     weatherMapStore.setVariable(selectedVariable);
   }
-
-  function handleTimeChange(event: Event) {
-    const selectedTime = (event.target as HTMLInputElement).value;
-    if (weatherMapState.domainInfo) {
-      const referenceTime = weatherMapState.domainInfo.reference_time;
-      console.log(referenceTime);
-      const datetime = weatherMapState.domainInfo.valid_times[parseInt(selectedTime, 10)];
-      weatherMapStore.setDatetime(datetime);
-    }
-  }
-
-  $: timeIndex = weatherMapState.domainInfo?.valid_times.indexOf(weatherMapState.datetime) ?? 0;
 </script>
 
 <div class="map-controls">
@@ -59,22 +47,6 @@
       {/each}
     </select>
   </div>
-
-  {#if weatherMapState.domainInfo}
-    <div class="control-group time-slider">
-      <label for="time-slider">Time</label>
-      <input
-        type="range"
-        id="time-slider"
-        min="0"
-        max={weatherMapState.domainInfo.valid_times.length - 1}
-        step="1"
-        value={timeIndex}
-        on:input={handleTimeChange}
-      />
-      <span>{new Date(weatherMapState.datetime).toLocaleString()}</span>
-    </div>
-  {/if}
 </div>
 
 <style>
