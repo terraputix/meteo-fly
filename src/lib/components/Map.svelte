@@ -2,10 +2,11 @@
   import { onMount, onDestroy } from 'svelte';
   import maplibregl, { type Map, type Marker, type RequestParameters } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { omProtocol } from '@openmeteo/mapbox-layer';
+  import { defaultOmProtocolSettings, GridFactory, omProtocol } from '@openmeteo/mapbox-layer';
   import { Protocol } from 'pmtiles';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
+  import { weatherMapStore, buildOpenMeteoUrl, type WeatherMapState } from '$lib/services/weatherMap/store';
   import { LocationControlManager } from './LocationControl';
 
   export let latitude: number;
@@ -14,7 +15,10 @@
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
-  let unsubscribe: () => void;
+  let locationUnsubscribe: () => void;
+  let weatherMapUnsubscribe: () => void;
+  let currentWeatherMapState: WeatherMapState;
+  let omFileSource: maplibregl.RasterTileSource | undefined;
 
   function updatePosition(lat: number, lng: number) {
     latitude = parseFloat(lat.toFixed(5));
@@ -32,11 +36,19 @@
     }
   }
 
+  function updateWeatherLayer() {
+    if (!map || !omFileSource) return;
+
+    // Update layer
+    updatePaddedBounds();
+    const omUrl = buildOpenMeteoUrl(currentWeatherMapState);
+    omFileSource.setUrl('om://' + omUrl);
+  }
+
   // Watch for prop changes and update map
   $: if (map && marker && (latitude !== marker.getLngLat().lat || longitude !== marker.getLngLat().lng)) {
     const newPos = { lat: latitude, lng: longitude };
     marker.setLngLat(newPos);
-    map.setCenter(newPos);
   }
 
   onMount(async () => {
@@ -51,7 +63,10 @@
     });
 
     // Add OpenMeteo Protocol for weather maps
-    maplibregl.addProtocol('om', omProtocol);
+    const omProtocolOptions = defaultOmProtocolSettings;
+    omProtocolOptions.resolutionFactor = 0.5;
+    omProtocolOptions.useSAB = true;
+    maplibregl.addProtocol('om', (params) => omProtocol(params, undefined, omProtocolOptions));
 
     // Initialize the map
     map = new maplibregl.Map({
@@ -73,16 +88,24 @@
       updatePosition(lat, lng);
     });
 
+    // Update bounds when map moves
+    map.on('moveend', checkBounds);
+    map.on('zoomend', checkBounds);
+
     const locationControlManager = new LocationControlManager({});
     map.addControl(locationControlManager, 'top-right');
 
     // Subscribe to location store changes
-    unsubscribe = locationStore.subscribe((state: LocationState) => {
+    locationUnsubscribe = locationStore.subscribe((state: LocationState) => {
       locationControlManager.updateState(state);
-
       if (state.current) {
         handleLocationDetected(state.current);
       }
+    });
+
+    // Subscribe to weather map store changes
+    weatherMapUnsubscribe = weatherMapStore.subscribe((state: WeatherMapState) => {
+      currentWeatherMapState = state;
     });
 
     map.on('load', () => {
@@ -108,15 +131,16 @@
         exaggeration: 1.0,
       });
 
-      const mapBounds = map.getBounds();
+      updatePaddedBounds();
 
-      const omUrl = `https://map-tiles.open-meteo.com/data_spatial/dwd_icon/2025/10/29/1200Z/2025-10-29T1400.om?variable=temperature_2m&bounds=${mapBounds.getSouth()},${mapBounds.getWest()},${mapBounds.getNorth()},${mapBounds.getEast()}&partial=true`;
+      const omUrl = buildOpenMeteoUrl(currentWeatherMapState);
       map.addSource('omFileSource', {
         url: 'om://' + omUrl,
         type: 'raster',
         tileSize: 256,
-        maxzoom: 12, // tiles look pretty much the same below zoom-level 12, even on the high res models
+        maxzoom: 12,
       });
+      omFileSource = map.getSource('omFileSource');
 
       map.addLayer({
         id: 'omFileLayer',
@@ -127,13 +151,79 @@
   });
 
   onDestroy(() => {
-    if (unsubscribe) {
-      unsubscribe();
+    if (locationUnsubscribe) {
+      locationUnsubscribe();
+    }
+    if (weatherMapUnsubscribe) {
+      weatherMapUnsubscribe();
     }
     if (map) {
       map.remove();
     }
   });
+
+  const padding = 25;
+  const checkBounds = () => {
+    console.log('checkBounds');
+    const domain = currentWeatherMapState.domain;
+    const mapBounds = map.getBounds();
+    const paddedBounds = currentWeatherMapState.paddedBounds;
+    console.log(paddedBounds);
+
+    if (paddedBounds) {
+      let exceededPadding = false;
+
+      const gridBounds = GridFactory.create(domain.grid).getBounds();
+
+      if (mapBounds.getSouth() < paddedBounds.getSouth() && paddedBounds.getSouth() > gridBounds[1]) {
+        exceededPadding = true;
+      }
+      if (mapBounds.getWest() < paddedBounds.getWest() && paddedBounds.getWest() > gridBounds[0]) {
+        exceededPadding = true;
+      }
+      if (mapBounds.getNorth() > paddedBounds.getNorth() && paddedBounds.getNorth() < gridBounds[3]) {
+        exceededPadding = true;
+      }
+      if (mapBounds.getEast() > paddedBounds.getEast() && paddedBounds.getEast() < gridBounds[2]) {
+        exceededPadding = true;
+      }
+
+      console.log('exceededPadding:', exceededPadding);
+      if (exceededPadding) {
+        updateWeatherLayer();
+      }
+    }
+  };
+
+  const updatePaddedBounds = () => {
+    console.log('updatePaddedBounds');
+    const domain = currentWeatherMapState.domain;
+    const mapBounds = map.getBounds();
+
+    const gridBounds = GridFactory.create(domain.grid).getBounds();
+
+    const mapBoundsSW = mapBounds.getSouthWest();
+    const mapBoundsNE = mapBounds.getNorthEast();
+    const dLat = mapBoundsNE.lat - mapBoundsSW.lat;
+    const dLon = mapBoundsNE.lng - mapBoundsSW.lng;
+
+    // Calculate the new padded bounds
+    const newBounds: [number, number, number, number] = [
+      Math.max(Math.max(mapBoundsSW.lng - (dLon * padding) / 100, gridBounds[0]), -180),
+      Math.max(Math.max(mapBoundsSW.lat - (dLat * padding) / 100, gridBounds[1]), -90),
+      Math.min(Math.min(mapBoundsNE.lng + (dLon * padding) / 100, gridBounds[2]), 180),
+      Math.min(Math.min(mapBoundsNE.lat + (dLat * padding) / 100, gridBounds[3]), 90),
+    ];
+
+    // Create a new LngLatBounds object
+    const newPaddedBounds = new maplibregl.LngLatBounds(newBounds);
+
+    console.log('newPaddedBounds', newPaddedBounds);
+
+    // Update the store with the new padded bounds
+    weatherMapStore.setPaddedBounds(newPaddedBounds);
+    currentWeatherMapState.paddedBounds = newPaddedBounds;
+  };
 </script>
 
 <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
