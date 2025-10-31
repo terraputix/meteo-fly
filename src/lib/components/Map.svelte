@@ -2,11 +2,12 @@
   import { onMount, onDestroy } from 'svelte';
   import maplibregl, { type Map, type Marker, type RequestParameters } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
+  import { omProtocol } from '@openmeteo/mapbox-layer';
   import { Protocol } from 'pmtiles';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
-
   import { LocationControlManager } from './LocationControl';
+
   export let latitude: number;
   export let longitude: number;
 
@@ -40,12 +41,17 @@
 
   onMount(async () => {
     const protocol = new Protocol();
+
+    // Terrain Sources via mapterhorn protocol
     maplibregl.addProtocol('mapterhorn', async (params: RequestParameters, abortController: AbortController) => {
       const [z, x, y] = params.url.replace('mapterhorn://', '').split('/').map(Number);
       const name = z <= 12 ? 'planet' : `6-${x >> (z - 6)}-${y >> (z - 6)}`;
       const url = `pmtiles://https://mapterhorn.servert.ch/${name}.pmtiles/${z}/${x}/${y}.webp`;
       return await protocol.tile({ ...params, url }, abortController);
     });
+
+    // Add OpenMeteo Protocol for weather maps
+    maplibregl.addProtocol('om', omProtocol);
 
     // Initialize the map
     map = new maplibregl.Map({
@@ -100,6 +106,22 @@
       map.setTerrain({
         source: 'terrainSource',
         exaggeration: 1.0,
+      });
+
+      const mapBounds = map.getBounds();
+
+      const omUrl = `https://map-tiles.open-meteo.com/data_spatial/dwd_icon/2025/10/29/1200Z/2025-10-29T1400.om?variable=temperature_2m&bounds=${mapBounds.getSouth()},${mapBounds.getWest()},${mapBounds.getNorth()},${mapBounds.getEast()}&partial=true`;
+      map.addSource('omFileSource', {
+        url: 'om://' + omUrl,
+        type: 'raster',
+        tileSize: 256,
+        maxzoom: 12, // tiles look pretty much the same below zoom-level 12, even on the high res models
+      });
+
+      map.addLayer({
+        id: 'omFileLayer',
+        type: 'raster',
+        source: 'omFileSource',
       });
     });
   });
