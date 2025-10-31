@@ -173,6 +173,8 @@ function createWeatherMapStore() {
         const variable = constructVariableName(state.baseVariable, level);
         return { ...state, level, variable };
       }),
+    setInitialState: (initialState: Partial<WeatherMapState>) =>
+      update((state) => ({ ...state, ...initialState })),
     reset: () => set(initialState),
     fetchDomainInfo,
   };
