@@ -3,7 +3,7 @@
   import { saveLastVisitedURL } from '$lib/services/storage';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
-  import LocationMap from '$lib/components/LocationMap.svelte';
+  import Map from '$lib/components/Map.svelte';
   import Controls from '$lib/components/Controls.svelte';
 
   import ChartContainer from '../lib/components/ChartContainer.svelte';
@@ -87,7 +87,7 @@
   <ResizablePaneGroup direction="vertical" class="flex-col-reverse">
     <ResizablePane defaultSize={showChart ? 15 : 100}>
       <div class="relative h-full w-full">
-        <LocationMap bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
+        <Map bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
       </div>
     </ResizablePane>
     {#if showChart}
@@ -119,7 +119,7 @@
   <ResizablePaneGroup direction="horizontal">
     <ResizablePane defaultSize={showChart ? 50 : 100} minSize={30}>
       <div class="relative h-full w-full">
-        <LocationMap bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
+        <Map bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
         <div class="absolute top-0 right-0 left-0 bg-white/80 p-4">
           <Controls bind:parameters on:openChart={() => handleOpenChart()} />
         </div>
