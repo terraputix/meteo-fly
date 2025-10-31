@@ -5,6 +5,7 @@
   import { page } from '$app/stores';
   import Map from '$lib/components/Map.svelte';
   import Controls from '$lib/components/Controls.svelte';
+  import MapControls from '$lib/components/MapControls.svelte';
 
   import ChartContainer from '../lib/components/ChartContainer.svelte';
   import { getInitialParameters } from '$lib/services/defaults';
@@ -82,6 +83,7 @@
 
 <div class="h-screen sm:hidden">
   <div class="z-10 block w-full bg-white/80 p-4">
+    <MapControls />
     <Controls bind:parameters on:openChart={() => handleOpenChart()} />
   </div>
   <ResizablePaneGroup direction="vertical" class="flex-col-reverse">
@@ -120,8 +122,13 @@
     <ResizablePane defaultSize={showChart ? 50 : 100} minSize={30}>
       <div class="relative h-full w-full">
         <Map bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
-        <div class="absolute top-0 right-0 left-0 bg-white/80 p-4">
-          <Controls bind:parameters on:openChart={() => handleOpenChart()} />
+        <div class="absolute top-0 right-0 left-0 flex w-full justify-between p-4">
+          <div class="rounded-md bg-white/80 p-2">
+            <MapControls />
+          </div>
+          <div class="rounded-md bg-white/80 p-2">
+            <Controls bind:parameters on:openChart={() => handleOpenChart()} />
+          </div>
         </div>
       </div>
     </ResizablePane>
