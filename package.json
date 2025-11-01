@@ -25,6 +25,7 @@
     "@types/d3": "^7.4.3",
     "@types/eslint": "^9.6.1",
     "@types/maplibre-gl": "^1.14.0",
+    "@types/node": "^24.9.2",
     "clsx": "^2.1.1",
     "d3": "^7.9.0",
     "eslint": "^10.0.1",
