@@ -4,7 +4,7 @@
 
   let timeIndex = 0;
   let isPlaying = false;
-  let interval: number;
+  let interval: ReturnType<typeof globalThis.setInterval>;
 
   $: if ($weatherMapStore.domainInfo) {
     timeIndex = $weatherMapStore.domainInfo.valid_times.indexOf($weatherMapStore.datetime);
@@ -19,14 +19,14 @@
 
   function play() {
     isPlaying = true;
-    interval = setInterval(() => {
+    interval = globalThis.setInterval(() => {
       stepForward();
     }, 1000);
   }
 
   function pause() {
     isPlaying = false;
-    clearInterval(interval);
+    globalThis.clearInterval(interval);
   }
 
   function togglePlay() {
@@ -39,6 +39,7 @@
 
   function stepForward() {
     if ($weatherMapStore.domainInfo) {
+      console.log('blub');
       const nextIndex = timeIndex + 1;
       if (nextIndex < $weatherMapStore.domainInfo.valid_times.length) {
         weatherMapManager.setDatetime($weatherMapStore.domainInfo.valid_times[nextIndex]);
@@ -62,6 +63,14 @@
     }
   }
 
+  function stepDayForward() {
+    weatherMapManager.jumpToNextDay();
+  }
+
+  function stepDayBackward() {
+    weatherMapManager.jumpToPreviousDay();
+  }
+
   onDestroy(() => {
     clearInterval(interval);
   });
@@ -70,9 +79,11 @@
 {#if $weatherMapStore.domainInfo}
   <div class="time-slider-container">
     <div class="controls">
+      <button on:click={stepDayBackward}>&lt;&lt; Day</button>
       <button on:click={stepBackward}>&lt;&lt;</button>
       <button on:click={togglePlay}>{isPlaying ? 'Pause' : 'Play'}</button>
       <button on:click={stepForward}>&gt;&gt;</button>
+      <button on:click={stepDayForward}>Day &gt;&gt;</button>
     </div>
     <div class="slider">
       <input

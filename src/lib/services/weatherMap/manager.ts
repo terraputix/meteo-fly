@@ -1,9 +1,10 @@
 import { writable, get } from 'svelte/store';
 import type { Writable } from 'svelte/store';
 import { domainOptions, type Domain } from '@openmeteo/mapbox-layer';
-import type maplibregl from 'maplibre-gl';
+import maplibregl from 'maplibre-gl';
 import { fetchDomainInfo } from './url';
 import type { DomainInfo } from './om_url';
+import type { Location, WeatherModel } from '$lib/api/types';
 
 // --- Constants ---
 export const weatherMapVariables = [
@@ -55,6 +56,27 @@ export const convectiveCloudLevels: { label: string; value: string }[] = [
   { label: 'Top', value: '_top' },
 ];
 
+export const defaultLocation: Location = { latitude: 46.41526, longitude: 8.10828 };
+export const defaultWeatherModel: WeatherModel = 'icon_seamless';
+export const defaultDay = 1;
+
+// --- URL Parsing ---
+function readURLParams(urlParams: URLSearchParams) {
+  const lat = urlParams.get('lat');
+  const lon = urlParams.get('lon');
+  const day = urlParams.get('day');
+  const model = urlParams.get('model');
+
+  if (lat && lon && day && model) {
+    return {
+      location: { latitude: parseFloat(lat), longitude: parseFloat(lon) },
+      selectedDay: parseInt(day, 10),
+      selectedModel: model as WeatherModel,
+    };
+  }
+  return null;
+}
+
 // --- State Interface ---
 export interface WeatherMapState {
   domain: Domain;
@@ -65,25 +87,31 @@ export interface WeatherMapState {
   domainInfo: DomainInfo | null;
   paddedBounds: maplibregl.LngLatBounds | null;
   availableLevels: { label: string; value: string }[];
+  location: Location;
+  selectedDay: number;
+  selectedModel: WeatherModel;
 }
 
 // Helper to get initial state
-function getInitialState(): WeatherMapState {
-  const initialDomain = domainOptions.find((option) => option.value === 'dwd_icon')!;
-  const now = new Date();
-  now.setMinutes(0, 0, 0);
-  const initialDatetime = now.toISOString().slice(0, 16);
-
-  return {
-    domain: initialDomain,
+function getInitialState(urlParams: URLSearchParams): WeatherMapState {
+  const initialMapState = {
+    domain: domainOptions.find((option) => option.value === 'dwd_icon')!,
     variable: 'temperature_2m',
     baseVariable: 'temperature',
     level: '_2m',
-    datetime: initialDatetime,
+    datetime: new Date(new Date().setMinutes(0, 0, 0)).toISOString().slice(0, 16),
     domainInfo: null,
     paddedBounds: null,
     availableLevels: [],
   };
+
+  const initialPageParams = readURLParams(urlParams) || {
+    location: defaultLocation,
+    selectedModel: defaultWeatherModel,
+    selectedDay: defaultDay,
+  };
+
+  return { ...initialMapState, ...initialPageParams };
 }
 
 class WeatherMapManager {
@@ -91,26 +119,31 @@ class WeatherMapManager {
   public readonly subscribe;
 
   constructor() {
-    this.store = writable(getInitialState());
+    this.store = writable(getInitialState(new URLSearchParams())); // Initialize with empty params, will be updated by init
     this.subscribe = this.store.subscribe;
-    this.initialize();
   }
 
-  async initialize() {
-    const initialDomain = get(this.store).domain;
-    await this.setDomain(initialDomain);
+  async init(urlParams: URLSearchParams) {
+    const initialState = getInitialState(urlParams);
+    this.store.set(initialState);
+    await this.initializeDomainInfo(); // Fetch domain info after initial state is set
+  }
+
+  private async initializeDomainInfo() {
+    const currentDomain = get(this.store).domain;
+    await this.setDomain(currentDomain);
   }
 
   // --- Private helpers for state transition logic ---
 
-  private _constructVariableName(baseVariable: string, level: string | null): string {
+  private constructVariableName(baseVariable: string, level: string | null): string {
     if (level) {
       return `${baseVariable}${level}`;
     }
     return baseVariable;
   }
 
-  private _findDefaultLevel(baseVariable: string, availableVariables: string[]): string | null {
+  private findDefaultLevel(baseVariable: string, availableVariables: string[]): string | null {
     if (baseVariable === 'cloud_cover') {
       for (const level of cloudLevels) {
         if (availableVariables.includes(`${baseVariable}${level.value}`)) {
@@ -139,7 +172,7 @@ class WeatherMapManager {
     return null;
   }
 
-  private _getAvailableLevels(baseVariable: string, domainInfo: DomainInfo | null): { label: string; value: string }[] {
+  private getAvailableLevels(baseVariable: string, domainInfo: DomainInfo | null): { label: string; value: string }[] {
     if (!domainInfo) return [];
 
     let levels: { label: string; value: string }[] = [];
@@ -164,11 +197,11 @@ class WeatherMapManager {
       const currentBaseVariable = state.baseVariable;
       let newLevel = state.level;
 
-      const currentVariable = this._constructVariableName(currentBaseVariable, newLevel);
+      const currentVariable = this.constructVariableName(currentBaseVariable, newLevel);
       if (domInfo && !domInfo.variables.includes(currentVariable)) {
-        newLevel = this._findDefaultLevel(currentBaseVariable, domInfo.variables);
+        newLevel = this.findDefaultLevel(currentBaseVariable, domInfo.variables);
       }
-      const newVariable = this._constructVariableName(currentBaseVariable, newLevel);
+      const newVariable = this.constructVariableName(currentBaseVariable, newLevel);
 
       return {
         ...state,
@@ -176,7 +209,7 @@ class WeatherMapManager {
         domainInfo: domInfo,
         level: newLevel,
         variable: newVariable,
-        availableLevels: this._getAvailableLevels(currentBaseVariable, domInfo),
+        availableLevels: this.getAvailableLevels(currentBaseVariable, domInfo),
       };
     });
   }
@@ -186,25 +219,25 @@ class WeatherMapManager {
       const { domainInfo } = state;
       let newLevel = state.level;
 
-      const currentVariable = this._constructVariableName(newBaseVariable, newLevel);
+      const currentVariable = this.constructVariableName(newBaseVariable, newLevel);
       if (domainInfo && !domainInfo.variables.includes(currentVariable)) {
-        newLevel = this._findDefaultLevel(newBaseVariable, domainInfo.variables);
+        newLevel = this.findDefaultLevel(newBaseVariable, domainInfo.variables);
       }
-      const newVariable = this._constructVariableName(newBaseVariable, newLevel);
+      const newVariable = this.constructVariableName(newBaseVariable, newLevel);
 
       return {
         ...state,
         baseVariable: newBaseVariable,
         level: newLevel,
         variable: newVariable,
-        availableLevels: this._getAvailableLevels(newBaseVariable, domainInfo),
+        availableLevels: this.getAvailableLevels(newBaseVariable, domainInfo),
       };
     });
   }
 
   setLevel(newLevel: string | null) {
     this.store.update((state) => {
-      const newVariable = this._constructVariableName(state.baseVariable, newLevel);
+      const newVariable = this.constructVariableName(state.baseVariable, newLevel);
       return {
         ...state,
         level: newLevel,
@@ -219,6 +252,76 @@ class WeatherMapManager {
 
   setPaddedBounds(newPaddedBounds: maplibregl.LngLatBounds) {
     this.store.update((state) => ({ ...state, paddedBounds: newPaddedBounds }));
+  }
+
+  setLocation(location: Location) {
+    this.store.update((state) => ({ ...state, location }));
+  }
+
+  setSelectedDay(day: number) {
+    this.store.update((state) => ({ ...state, selectedDay: day }));
+  }
+
+  setSelectedModel(model: WeatherModel) {
+    this.store.update((state) => ({ ...state, selectedModel: model }));
+  }
+
+  jumpToNextDay() {
+    this.store.update((state) => {
+      if (!state.domainInfo) return state;
+
+      const currentDatetime = new Date(state.datetime);
+      const nextDay = new Date(currentDatetime);
+      nextDay.setDate(currentDatetime.getDate() + 1);
+
+      let closestValidTime = state.datetime;
+      let minDiff = Infinity;
+
+      for (const validTimeStr of state.domainInfo.valid_times) {
+        const validTime = new Date(validTimeStr);
+        if (
+          validTime.getDate() === nextDay.getDate() &&
+          validTime.getMonth() === nextDay.getMonth() &&
+          validTime.getFullYear() === nextDay.getFullYear()
+        ) {
+          const diff = Math.abs(validTime.getTime() - nextDay.getTime());
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestValidTime = validTimeStr;
+          }
+        }
+      }
+      return { ...state, datetime: closestValidTime };
+    });
+  }
+
+  jumpToPreviousDay() {
+    this.store.update((state) => {
+      if (!state.domainInfo) return state;
+
+      const currentDatetime = new Date(state.datetime);
+      const previousDay = new Date(currentDatetime);
+      previousDay.setDate(currentDatetime.getDate() - 1);
+
+      let closestValidTime = state.datetime;
+      let minDiff = Infinity;
+
+      for (const validTimeStr of state.domainInfo.valid_times) {
+        const validTime = new Date(validTimeStr);
+        if (
+          validTime.getDate() === previousDay.getDate() &&
+          validTime.getMonth() === previousDay.getMonth() &&
+          validTime.getFullYear() === previousDay.getFullYear()
+        ) {
+          const diff = Math.abs(validTime.getTime() - previousDay.getTime());
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestValidTime = validTimeStr;
+          }
+        }
+      }
+      return { ...state, datetime: closestValidTime };
+    });
   }
 }
 
