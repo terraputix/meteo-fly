@@ -1,28 +1,22 @@
-import { domainOptions } from '@openmeteo/mapbox-layer';
-import type { WeatherMapState } from './store';
+import type { Domain } from '@openmeteo/mapbox-layer';
+import type { DomainInfo } from './om_url';
 
-export function getInitialWeatherMapState(searchParams: URLSearchParams): Partial<WeatherMapState> {
-  const domain = searchParams.get('map_domain');
-  const baseVariable = searchParams.get('map_variable');
-  const level = searchParams.get('map_level');
-  const datetime = searchParams.get('map_datetime');
-
-  const state: Partial<WeatherMapState> = {};
-
-  const domainOption = domainOptions.find((d) => d.value === domain);
-  if (domainOption) {
-    state.domain = domainOption;
+export const fetchDomainInfo = async (targetDomain: Domain): Promise<DomainInfo> => {
+  const response = await fetch(`https://openmeteo.s3.amazonaws.com/data_spatial/${targetDomain.value}/latest.json`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch domain info');
   }
+  const data = await response.json();
+  return {
+    variables: data.variables.map((v: string) => v),
+    valid_times: data.valid_times,
+    reference_time: data.reference_time,
+  };
+};
 
-  if (baseVariable) {
-    state.baseVariable = baseVariable;
-    state.level = level;
-    state.variable = level ? `${baseVariable}${level}` : baseVariable;
-  }
+export const updateWeatherLayer = (rasterTileSource: maplibregl.RasterTileSource, omUrl: string) => {
+  if (!rasterTileSource) return;
 
-  if (datetime) {
-    state.datetime = datetime;
-  }
-
-  return state;
-}
+  console.log('omUrl:', omUrl);
+  rasterTileSource.setUrl('om://' + omUrl);
+};

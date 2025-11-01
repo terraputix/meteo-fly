@@ -1,11 +1,8 @@
 import { domainOptions, type Domain } from '@openmeteo/mapbox-layer';
-import { writable } from 'svelte/store';
-
-export interface DomainInfo {
-  variables: string[];
-  valid_times: string[];
-  reference_time: string;
-}
+import { writable, derived, get } from 'svelte/store';
+import type maplibregl from 'maplibre-gl';
+import type { DomainInfo } from './om_url';
+import { fetchDomainInfo } from './url';
 
 export interface WeatherMapState {
   bounds: maplibregl.LngLatBounds | null;
@@ -25,16 +22,65 @@ function getCurrentDatetime(): string {
   return now.toISOString().slice(0, 16); // Returns YYYY-MM-DDTHH:MM format
 }
 
-const initialState: WeatherMapState = {
-  bounds: null,
-  paddedBounds: null,
-  domain: domainOptions.find((option) => option.value === 'dwd_icon')!,
-  variable: 'temperature_2m',
-  baseVariable: 'temperature',
-  level: '_2m',
-  datetime: getCurrentDatetime(),
-  domainInfo: null,
-};
+// Initial values
+const initialDomain = domainOptions.find((option) => option.value === 'dwd_icon')!;
+const initialVariable = 'temperature_2m';
+const initialBaseVariable = 'temperature';
+const initialLevel = '_2m';
+const initialDatetime = getCurrentDatetime();
+
+// Separate stores for different concerns
+export const domain = writable<Domain>(initialDomain);
+export const variableStore = writable<string>(initialVariable);
+export const baseVariable = writable<string>(initialBaseVariable);
+export const level = writable<string | null>(initialLevel);
+export const datetime = writable<string>(initialDatetime);
+
+// Map-related stores (separate from weather data)
+export const bounds = writable<maplibregl.LngLatBounds | null>(null);
+export const paddedBounds = writable<maplibregl.LngLatBounds | null>(null);
+
+// Domain info store (only updates when domain changes)
+export const domainInfo = writable<DomainInfo | null>(null);
+
+// Derived store for weather config changes
+export const weatherConfig = derived([domain, variableStore, datetime], ([$domain, $variableStore, $datetime]) => ({
+  domain: $domain,
+  variable: $variableStore,
+  datetime: $datetime,
+}));
+
+// Combined store for URL building
+export const weatherMapStore = derived(
+  [domain, variableStore, baseVariable, level, datetime, bounds, paddedBounds, domainInfo],
+  ([$domain, $variableStore, $baseVariable, $level, $datetime, $bounds, $paddedBounds, $domainInfo]) => ({
+    domain: $domain,
+    variable: $variableStore,
+    baseVariable: $baseVariable,
+    level: $level,
+    datetime: $datetime,
+    bounds: $bounds,
+    paddedBounds: $paddedBounds,
+    domainInfo: $domainInfo,
+  })
+);
+
+// Derived store for available levels
+export const availableLevels = derived([baseVariable, domainInfo], ([$baseVariable, $domainInfo]) => {
+  if (!$domainInfo) return [];
+
+  let levels: { label: string; value: string }[] = [];
+
+  if ($baseVariable === 'cloud_cover') {
+    levels = cloudLevels;
+  } else if ($baseVariable === 'convective_cloud') {
+    levels = convectiveCloudLevels;
+  } else {
+    levels = [...surfaceLevels, ...pressureLevels];
+  }
+
+  return levels.filter((level) => $domainInfo.variables.includes(`${$baseVariable}${level.value}`));
+});
 
 export const weatherMapVariables = [
   { value: 'temperature', label: 'Temperature' },
@@ -85,131 +131,165 @@ export const convectiveCloudLevels: { label: string; value: string }[] = [
   { label: 'Top', value: '_top' },
 ];
 
-function createWeatherMapStore() {
-  const { subscribe, set, update } = writable<WeatherMapState>(initialState);
+// Utility functions
+const constructVariableName = (baseVariable: string, level: string | null): string => {
+  if (level) {
+    return `${baseVariable}${level}`;
+  }
+  return baseVariable;
+};
 
-  function constructVariableName(baseVariable: string, level: string | null): string {
-    if (level) {
-      return `${baseVariable}${level}`;
+const findDefaultLevel = (baseVariable: string, availableVariables: string[]): string | null => {
+  if (baseVariable === 'cloud_cover') {
+    for (const level of cloudLevels) {
+      if (availableVariables.includes(`${baseVariable}${level.value}`)) {
+        return level.value;
+      }
     }
-    return baseVariable;
+  } else if (baseVariable === 'convective_cloud') {
+    for (const level of convectiveCloudLevels) {
+      if (availableVariables.includes(`${baseVariable}${level.value}`)) {
+        return level.value;
+      }
+    }
+  } else {
+    const preferredLevels = [...surfaceLevels, ...pressureLevels];
+    for (const level of preferredLevels) {
+      if (availableVariables.includes(`${baseVariable}${level.value}`)) {
+        return level.value;
+      }
+    }
   }
 
-  function findDefaultLevel(baseVariable: string, availableVariables: string[]): string | null {
-    if (baseVariable === 'cloud_cover') {
-      for (const level of cloudLevels) {
-        if (availableVariables.includes(`${baseVariable}${level.value}`)) {
-          return level.value;
-        }
-      }
-    } else if (baseVariable === 'convective_cloud') {
-      for (const level of convectiveCloudLevels) {
-        if (availableVariables.includes(`${baseVariable}${level.value}`)) {
-          return level.value;
-        }
-      }
-    } else {
-      const preferredLevels = [...surfaceLevels, ...pressureLevels];
-      for (const level of preferredLevels) {
-        if (availableVariables.includes(`${baseVariable}${level.value}`)) {
-          return level.value;
-        }
-      }
-    }
-
-    if (availableVariables.includes(baseVariable)) {
-      return null;
-    }
-
+  if (availableVariables.includes(baseVariable)) {
     return null;
   }
 
-  async function fetchDomainInfo(domain: Domain) {
-    try {
-      const response = await fetch(`https://openmeteo.s3.amazonaws.com/data_spatial/${domain.value}/latest.json`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch domain info');
-      }
-      const data = await response.json();
-      update((state) => ({
-        ...state,
-        domainInfo: {
-          variables: data.variables.map((v: string) => v),
-          valid_times: data.valid_times,
-          reference_time: data.reference_time,
-        },
-      }));
-    } catch (error) {
-      console.error('Error fetching domain info:', error);
-      update((state) => ({ ...state, domainInfo: null }));
+  return null;
+};
+
+// Pure functions for business logic
+export const setBaseVariableLogic = (
+  newBaseVariable: string,
+  currentLevel: string | null,
+  currentDomainInfo: DomainInfo | null
+) => {
+  let finalLevel = currentLevel;
+  if (currentDomainInfo) {
+    const availableVariables = currentDomainInfo.variables;
+    const currentVariable = constructVariableName(newBaseVariable, currentLevel);
+    if (!availableVariables.includes(currentVariable)) {
+      finalLevel = findDefaultLevel(newBaseVariable, availableVariables);
     }
   }
 
+  const finalVariable = constructVariableName(newBaseVariable, finalLevel);
+
   return {
-    subscribe,
-    setBounds: (bounds: maplibregl.LngLatBounds) => update((state) => ({ ...state, bounds })),
-    setPaddedBounds: (paddedBounds: maplibregl.LngLatBounds) => update((state) => ({ ...state, paddedBounds })),
-    setDomain: (domain: Domain) => {
-      update((state) => ({ ...state, domain }));
-      fetchDomainInfo(domain);
-    },
-    setVariable: (variable: string) => update((state) => ({ ...state, variable })),
-    setDatetime: (datetime: string) => update((state) => ({ ...state, datetime })),
-    setBaseVariable: (baseVariable: string) =>
-      update((state) => {
-        let level = state.level;
-        if (state.domainInfo) {
-          const availableVariables = state.domainInfo.variables;
-          const currentVariable = constructVariableName(baseVariable, level);
-          if (!availableVariables.includes(currentVariable)) {
-            level = findDefaultLevel(baseVariable, availableVariables);
-          }
-        }
-        const variable = constructVariableName(baseVariable, level);
-        return { ...state, baseVariable, level, variable };
-      }),
-    setLevel: (level: string | null) =>
-      update((state) => {
-        const variable = constructVariableName(state.baseVariable, level);
-        return { ...state, level, variable };
-      }),
-    setInitialState: (initialState: Partial<WeatherMapState>) =>
-      update((state) => ({ ...state, ...initialState })),
-    reset: () => set(initialState),
-    fetchDomainInfo,
+    baseVariable: newBaseVariable,
+    level: finalLevel,
+    variable: finalVariable,
   };
-}
+};
 
-export const weatherMapStore = createWeatherMapStore();
+export const setLevelLogic = (newLevel: string | null, currentBaseVariable: string) => {
+  const finalVariable = constructVariableName(currentBaseVariable, newLevel);
 
-// Helper function to build the Open-Meteo URL
-export function buildOpenMeteoUrl(state: WeatherMapState): string {
-  const { paddedBounds, domain, variable, datetime, domainInfo } = state;
+  return {
+    level: newLevel,
+    variable: finalVariable,
+  };
+};
 
-  // Parse the reference time from domain info
-  const referenceTimeObj = new Date(domainInfo!.reference_time);
-  const refYear = referenceTimeObj.getUTCFullYear();
-  const refMonth = String(referenceTimeObj.getUTCMonth() + 1).padStart(2, '0');
-  const refDay = String(referenceTimeObj.getUTCDate()).padStart(2, '0');
-  const refHour = String(referenceTimeObj.getUTCHours()).padStart(2, '0');
-  const refMinute = String(referenceTimeObj.getUTCMinutes()).padStart(2, '0');
+// Store update functions
+export const updateBaseVariable = (newBaseVariable: string) => {
+  const currentLevel = get(level);
+  const currentDomainInfo = get(domainInfo);
 
-  // Format reference time for URL path (HHMMZ)
-  const formattedReferenceTime = `${refYear}/${refMonth}/${refDay}/${refHour}${refMinute}Z`;
+  const result = setBaseVariableLogic(newBaseVariable, currentLevel, currentDomainInfo);
 
-  // Parse the valid time (datetime from store)
-  const validTimeObj = new Date(datetime);
-  const validYear = validTimeObj.getUTCFullYear();
-  const validMonth = String(validTimeObj.getUTCMonth() + 1).padStart(2, '0');
-  const validDay = String(validTimeObj.getUTCDate()).padStart(2, '0');
-  const validHour = String(validTimeObj.getUTCHours()).padStart(2, '0');
-  const validMinute = String(validTimeObj.getUTCMinutes()).padStart(2, '0');
-  // Format valid time for the filename (YYYY-MM-DDTHHMM)
-  const formattedValidTime = `${validYear}-${validMonth}-${validDay}T${validHour}${validMinute}`;
+  baseVariable.set(result.baseVariable);
+  level.set(result.level);
+  variableStore.set(result.variable);
+};
 
-  if (!paddedBounds) {
-    return `https://map-tiles.open-meteo.com/data_spatial/${domain.value}/${formattedReferenceTime}/${formattedValidTime}.om?variable=${variable}`;
-  } else {
-    return `https://map-tiles.open-meteo.com/data_spatial/${domain.value}/${formattedReferenceTime}/${formattedValidTime}.om?variable=${variable}&bounds=${paddedBounds.getSouth()},${paddedBounds.getWest()},${paddedBounds.getNorth()},${paddedBounds.getEast()}&partial=true`;
+export const updateLevel = (newLevel: string | null) => {
+  const currentBaseVariable = get(baseVariable);
+
+  const result = setLevelLogic(newLevel, currentBaseVariable);
+
+  level.set(result.level);
+  variableStore.set(result.variable);
+};
+
+export const updateDomain = async (newDomain: Domain) => {
+  const domInfo = await fetchDomainInfo(newDomain);
+  domainInfo.set(domInfo);
+  domain.set(newDomain);
+
+  // Validate and potentially update the current variable
+  const currentVariable = get(variableStore);
+  const currentBaseVariable = get(baseVariable);
+  const currentLevel = get(level);
+
+  if (!domInfo.variables.includes(currentVariable)) {
+    const result = setBaseVariableLogic(currentBaseVariable, currentLevel, domInfo);
+    baseVariable.set(result.baseVariable);
+    level.set(result.level);
+    variableStore.set(result.variable);
   }
-}
+};
+
+export const assertVariableExistsOrDefault = (variableName: string) => {
+  const currentDomainInfo = get(domainInfo);
+  if (!currentDomainInfo) {
+    throw new Error('No domain info available');
+  }
+
+  const availableVariables = currentDomainInfo.variables;
+  if (availableVariables.includes(variableName)) {
+    return variableName;
+  }
+  // else parse the weatherMapVariables and return the first matching variable
+  for (const variable of weatherMapVariables) {
+    if (variableName.startsWith(variable.value)) {
+      // find default value for this variable
+      const defaultValue = findDefaultLevel(variable.value, availableVariables);
+      return defaultValue;
+    }
+  }
+};
+
+export const setLevel = (newLevel: string | null) => {
+  const currentBaseVariable = get(baseVariable);
+  const finalVariable = constructVariableName(currentBaseVariable, newLevel);
+
+  level.set(newLevel);
+  variableStore.set(finalVariable);
+};
+
+// Store actions
+export const weatherMapActions = {
+  setBounds: (newBounds: maplibregl.LngLatBounds) => {
+    bounds.set(newBounds);
+  },
+
+  setPaddedBounds: (newPaddedBounds: maplibregl.LngLatBounds) => {
+    paddedBounds.set(newPaddedBounds);
+  },
+
+  setDatetime: (newDatetime: string) => {
+    datetime.set(newDatetime);
+  },
+
+  reset: () => {
+    domain.set(initialDomain);
+    variableStore.set(initialVariable);
+    baseVariable.set(initialBaseVariable);
+    level.set(initialLevel);
+    datetime.set(initialDatetime);
+    bounds.set(null);
+    paddedBounds.set(null);
+    domainInfo.set(null);
+  },
+};
