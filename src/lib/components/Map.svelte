@@ -135,6 +135,8 @@
 
       updatePaddedBounds();
 
+      console.log('initial OmUrl', initialOmUrl);
+
       map.addSource('omFileSource', {
         url: 'om://' + initialOmUrl,
         type: 'raster',
@@ -148,6 +150,7 @@
         type: 'raster',
         source: 'omFileSource',
       });
+      console.log('added weather layer');
     });
   });
 

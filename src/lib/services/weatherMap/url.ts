@@ -3,9 +3,7 @@ import type { DomainInfo } from './om_url';
 
 export const fetchDomainInfo = async (targetDomain: Domain): Promise<DomainInfo | null> => {
   try {
-    const response = await fetch(
-      `https://openmeteo.s3.amazonaws.com/data_spatial/${targetDomain.value}/latest.json`,
-    );
+    const response = await fetch(`https://openmeteo.s3.amazonaws.com/data_spatial/${targetDomain.value}/latest.json`);
     if (!response.ok) {
       throw new Error('Failed to fetch domain info');
     }
@@ -22,6 +20,7 @@ export const fetchDomainInfo = async (targetDomain: Domain): Promise<DomainInfo 
 };
 
 export const updateWeatherLayer = (rasterTileSource: maplibregl.RasterTileSource, omUrl: string) => {
+  console.log('Updating weather layer with omUrl:', omUrl);
   if (!rasterTileSource) return;
 
   console.log('omUrl:', omUrl);
