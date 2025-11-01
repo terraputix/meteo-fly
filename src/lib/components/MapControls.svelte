@@ -6,7 +6,7 @@
     surfaceLevels,
     cloudLevels,
     convectiveCloudLevels,
-  } from '$lib/services/weatherMap/store';
+  } from '$lib/services/weatherMap/manager'; // Constants are now in manager.ts
   import type { DomainInfo } from '$lib/services/weatherMap/om_url';
 
   interface Props {
@@ -15,7 +15,7 @@
     currentLevel: string | null;
     domainInfo: DomainInfo | null;
     availableLevels: { label: string; value: string }[];
-    onDomainChange: (domainValue: string) => Promise<void>;
+    onDomainChange: (domainValue: string) => void; // Changed to void as manager handles async
     onBaseVariableChange: (baseVariable: string) => void;
     onLevelChange: (level: string) => void;
   }
@@ -31,9 +31,9 @@
     onLevelChange,
   }: Props = $props();
 
-  async function handleDomainChange(event: Event) {
+  function handleDomainChange(event: Event) {
     const selectedDomainValue = (event.target as HTMLSelectElement).value;
-    await onDomainChange(selectedDomainValue);
+    onDomainChange(selectedDomainValue);
   }
 
   function handleBaseVariableChange(event: Event) {

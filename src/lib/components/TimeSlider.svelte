@@ -1,19 +1,19 @@
 <script lang="ts">
-  import { datetime, domainInfo, weatherMapActions } from '$lib/services/weatherMap/store';
+  import { weatherMapStore, weatherMapManager } from '$lib/services/weatherMap/store';
   import { onDestroy } from 'svelte';
 
   let timeIndex = 0;
   let isPlaying = false;
   let interval: number;
 
-  $: if ($domainInfo) {
-    timeIndex = $domainInfo.valid_times.indexOf($datetime);
+  $: if ($weatherMapStore.domainInfo) {
+    timeIndex = $weatherMapStore.domainInfo.valid_times.indexOf($weatherMapStore.datetime);
   }
 
   function handleTimeChange(event: Event) {
     const newIndex = parseInt((event.target as HTMLInputElement).value, 10);
-    if ($domainInfo) {
-      weatherMapActions.setDatetime($domainInfo.valid_times[newIndex]);
+    if ($weatherMapStore.domainInfo) {
+      weatherMapManager.setDatetime($weatherMapStore.domainInfo.valid_times[newIndex]);
     }
   }
 
@@ -38,26 +38,26 @@
   }
 
   function stepForward() {
-    if ($domainInfo) {
+    if ($weatherMapStore.domainInfo) {
       const nextIndex = timeIndex + 1;
-      if (nextIndex < $domainInfo.valid_times.length) {
-        weatherMapActions.setDatetime($domainInfo.valid_times[nextIndex]);
+      if (nextIndex < $weatherMapStore.domainInfo.valid_times.length) {
+        weatherMapManager.setDatetime($weatherMapStore.domainInfo.valid_times[nextIndex]);
       } else {
         // Loop back to start
-        weatherMapActions.setDatetime($domainInfo.valid_times[0]);
+        weatherMapManager.setDatetime($weatherMapStore.domainInfo.valid_times[0]);
       }
     }
   }
 
   function stepBackward() {
-    if ($domainInfo) {
+    if ($weatherMapStore.domainInfo) {
       const prevIndex = timeIndex - 1;
       if (prevIndex >= 0) {
-        weatherMapActions.setDatetime($domainInfo.valid_times[prevIndex]);
+        weatherMapManager.setDatetime($weatherMapStore.domainInfo.valid_times[prevIndex]);
       } else {
         // Loop to end
-        const lastIndex = $domainInfo.valid_times.length - 1;
-        weatherMapActions.setDatetime($domainInfo.valid_times[lastIndex]);
+        const lastIndex = $weatherMapStore.domainInfo.valid_times.length - 1;
+        weatherMapManager.setDatetime($weatherMapStore.domainInfo.valid_times[lastIndex]);
       }
     }
   }
@@ -67,7 +67,7 @@
   });
 </script>
 
-{#if $domainInfo}
+{#if $weatherMapStore.domainInfo}
   <div class="time-slider-container">
     <div class="controls">
       <button on:click={stepBackward}>&lt;&lt;</button>
@@ -78,14 +78,14 @@
       <input
         type="range"
         min="0"
-        max={$domainInfo.valid_times.length - 1}
+        max={$weatherMapStore.domainInfo.valid_times.length - 1}
         step="1"
         bind:value={timeIndex}
         on:input={handleTimeChange}
       />
     </div>
     <div class="time-label">
-      <span>{new Date($datetime).toLocaleString()}</span>
+      <span>{new Date($weatherMapStore.datetime).toLocaleString()}</span>
     </div>
   </div>
 {/if}

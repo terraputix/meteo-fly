@@ -19,22 +19,7 @@
   import { fetchWeatherData } from '$lib/api/api';
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
 
-  // Weather map store imports
-  import {
-    domain,
-    baseVariable,
-    level,
-    datetime,
-    paddedBounds,
-    domainInfo,
-    availableLevels,
-    updateDomain,
-    updateBaseVariable,
-    updateLevel,
-    weatherMapActions,
-    variableStore,
-  } from '$lib/services/weatherMap/store';
-  import { fetchDomainInfo } from '$lib/services/weatherMap/url';
+  import { weatherMapStore, weatherMapManager } from '$lib/services/weatherMap/store';
 
   let parameters = getInitialParameters($page.url.searchParams);
 
@@ -48,7 +33,17 @@
   // Timer for debouncing
   let updateTimer: number;
 
-  let initialOmUrl: string;
+  // Centralized reactive statement for all map updates
+  $: if (rasterTileSource && $weatherMapStore.domainInfo) {
+    const omUrl = buildOpenMeteoUrl({
+      paddedBounds: $weatherMapStore.paddedBounds,
+      domain: $weatherMapStore.domain,
+      variable: $weatherMapStore.variable,
+      datetime: $weatherMapStore.datetime,
+      domainInfo: $weatherMapStore.domainInfo,
+    });
+    updateWeatherLayer(rasterTileSource, omUrl);
+  }
 
   // URL parameter handling
   function updateURLParams(pageParams: PageParameters) {
@@ -62,111 +57,34 @@
     });
 
     const newURL = `?${params.toString()}`;
-    // Save the current URL to localStorage
     saveLastVisitedURL(newURL);
     history.replaceState({}, '', newURL);
   }
 
-  // Weather map control handlers
-  async function handleDomainChange(domainValue: string) {
+  // Simplified handlers that call the manager
+  function handleDomainChange(domainValue: string) {
     const selectedDomain = domainOptions.find((d) => d.value === domainValue);
     if (selectedDomain) {
-      await updateDomain(selectedDomain);
-
-      // Update weather layer
-      if (rasterTileSource && $domainInfo) {
-        const omUrl = buildOpenMeteoUrl({
-          paddedBounds: $paddedBounds,
-          domain: $domain,
-          variable: $variableStore,
-          datetime: $datetime,
-          domainInfo: $domainInfo,
-        });
-        updateWeatherLayer(rasterTileSource, omUrl);
-      }
+      weatherMapManager.setDomain(selectedDomain);
     }
   }
 
   function handleBaseVariableChange(baseVariable: string) {
-    updateBaseVariable(baseVariable);
-
-    // Update weather layer
-    if (rasterTileSource && $domainInfo) {
-      const omUrl = buildOpenMeteoUrl({
-        paddedBounds: $paddedBounds,
-        domain: $domain,
-        variable: $variableStore,
-        datetime: $datetime,
-        domainInfo: $domainInfo,
-      });
-      updateWeatherLayer(rasterTileSource, omUrl);
-    }
+    weatherMapManager.setBaseVariable(baseVariable);
   }
 
   function handleLevelChange(level: string) {
-    updateLevel(level);
-
-    // Update weather layer
-    if (rasterTileSource && $domainInfo) {
-      const omUrl = buildOpenMeteoUrl({
-        paddedBounds: $paddedBounds,
-        domain: $domain,
-        variable: $variableStore,
-        datetime: $datetime,
-        domainInfo: $domainInfo,
-      });
-      updateWeatherLayer(rasterTileSource, omUrl);
-    }
+    weatherMapManager.setLevel(level);
   }
 
   function handleBoundsChange(bounds: maplibregl.LngLatBounds) {
-    weatherMapActions.setPaddedBounds(bounds);
-
-    // Update weather layer with new bounds
-    if (rasterTileSource && $domainInfo) {
-      const omUrl = buildOpenMeteoUrl({
-        paddedBounds: bounds, // Use the new bounds directly
-        domain: $domain,
-        variable: $variableStore,
-        datetime: $datetime,
-        domainInfo: $domainInfo,
-      });
-      updateWeatherLayer(rasterTileSource, omUrl);
-    }
+    weatherMapManager.setPaddedBounds(bounds);
   }
 
   function handleLocationChange(lat: number, lng: number) {
     parameters.location.latitude = lat;
     parameters.location.longitude = lng;
     parameters = { ...parameters }; // Trigger reactivity
-  }
-
-  onMount(async () => {
-    // Initialize domain info for weather map
-    const domInfo = await fetchDomainInfo($domain);
-    console.log(domInfo);
-    domainInfo.set(domInfo);
-
-    initialOmUrl = buildOpenMeteoUrl({
-      paddedBounds: $paddedBounds,
-      domain: $domain,
-      variable: $variableStore,
-      datetime: $datetime,
-      domainInfo: $domainInfo,
-    });
-  });
-
-  // Watch for parameter changes and update URL
-  $: {
-    // Make sure this page is already mounted, otherwise we will have racy behaviour between
-    // the URL parameters and the initial fetch
-    updateURLParams(parameters);
-
-    // load updated forecast data
-    clearTimeout(updateTimer);
-    updateTimer = setTimeout(() => {
-      updateWeather();
-    }, 5);
   }
 
   async function updateWeather() {
@@ -189,114 +107,123 @@
   }
 </script>
 
-<div class="h-screen sm:hidden">
-  <div class="z-10 block w-full bg-white/80 p-4">
-    <MapControls
-      currentDomain={$domain}
-      currentBaseVariable={$baseVariable}
-      currentLevel={$level}
-      domainInfo={$domainInfo}
-      availableLevels={$availableLevels}
-      onDomainChange={handleDomainChange}
-      onBaseVariableChange={handleBaseVariableChange}
-      onLevelChange={handleLevelChange}
-    />
-    <Controls bind:parameters on:openChart={() => handleOpenChart()} />
-  </div>
-  <ResizablePaneGroup direction="vertical" class="flex-col-reverse">
-    <ResizablePane defaultSize={showChart ? 15 : 100}>
-      <TimeSlider />
-      <div class="relative h-full w-full">
-        <Map
-          bind:latitude={parameters.location.latitude}
-          bind:longitude={parameters.location.longitude}
-          domain={$domain}
-          {initialOmUrl}
-          onLocationChange={handleLocationChange}
-          onPaddingExceeded={handleBoundsChange}
-          bind:rasterTileSource
-        />
-      </div>
-    </ResizablePane>
-    {#if showChart}
-      <ResizableHandle withHandle />
-      <ResizablePane defaultSize={50}>
-        {#if weatherData}
-          <div class="flex h-full flex-col overflow-y-auto">
-            <div class="grow bg-white p-2 sm:p-4">
-              {#if error}
-                <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
-                  <span class="block sm:inline">{error}</span>
-                </div>
-              {/if}
-              <ChartContainer
-                {weatherData}
-                {startDate}
-                bind:selectedDay={parameters.selectedDay}
-                on:close={handleClose}
-              />
-            </div>
-          </div>
-        {/if}
-      </ResizablePane>
-    {/if}
-  </ResizablePaneGroup>
-</div>
-
-<div class="hidden h-screen w-full sm:block">
-  <ResizablePaneGroup direction="horizontal">
-    <ResizablePane defaultSize={showChart ? 50 : 100} minSize={30}>
-      <div class="relative h-full w-full">
-        <Map
-          bind:latitude={parameters.location.latitude}
-          bind:longitude={parameters.location.longitude}
-          domain={$domain}
-          {initialOmUrl}
-          onLocationChange={handleLocationChange}
-          onPaddingExceeded={handleBoundsChange}
-          bind:rasterTileSource
-        />
-        <div class="absolute top-0 right-0 left-0 flex w-full justify-between p-4">
-          <div class="rounded-md bg-white/80 p-2">
-            <MapControls
-              currentDomain={$domain}
-              currentBaseVariable={$baseVariable}
-              currentLevel={$level}
-              domainInfo={$domainInfo}
-              availableLevels={$availableLevels}
-              onDomainChange={handleDomainChange}
-              onBaseVariableChange={handleBaseVariableChange}
-              onLevelChange={handleLevelChange}
-            />
-          </div>
-          <div class="rounded-md bg-white/80 p-2">
-            <Controls bind:parameters on:openChart={() => handleOpenChart()} />
-          </div>
-        </div>
+{#if $weatherMapStore.domainInfo}
+  {@const initialOmUrl = buildOpenMeteoUrl({
+    paddedBounds: $weatherMapStore.paddedBounds,
+    domain: $weatherMapStore.domain,
+    variable: $weatherMapStore.variable,
+    datetime: $weatherMapStore.datetime,
+    domainInfo: $weatherMapStore.domainInfo,
+  })}
+  <div class="h-screen sm:hidden">
+    <div class="z-10 block w-full bg-white/80 p-4">
+      <MapControls
+        currentDomain={$weatherMapStore.domain}
+        currentBaseVariable={$weatherMapStore.baseVariable}
+        currentLevel={$weatherMapStore.level}
+        domainInfo={$weatherMapStore.domainInfo}
+        availableLevels={$weatherMapStore.availableLevels}
+        onDomainChange={handleDomainChange}
+        onBaseVariableChange={handleBaseVariableChange}
+        onLevelChange={handleLevelChange}
+      />
+      <Controls bind:parameters on:openChart={() => handleOpenChart()} />
+    </div>
+    <ResizablePaneGroup direction="vertical" class="flex-col-reverse">
+      <ResizablePane defaultSize={showChart ? 15 : 100}>
         <TimeSlider />
-      </div>
-    </ResizablePane>
-    {#if showChart}
-      <ResizableHandle withHandle />
-      <ResizablePane defaultSize={50} minSize={30}>
-        {#if weatherData}
-          <div class="flex h-full flex-col overflow-y-auto">
-            <div class="grow bg-white p-2 sm:p-4">
-              {#if error}
-                <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
-                  <span class="block sm:inline">{error}</span>
-                </div>
-              {/if}
-              <ChartContainer
-                {weatherData}
-                {startDate}
-                bind:selectedDay={parameters.selectedDay}
-                on:close={handleClose}
+        <div class="relative h-full w-full">
+          <Map
+            bind:latitude={parameters.location.latitude}
+            bind:longitude={parameters.location.longitude}
+            domain={$weatherMapStore.domain}
+            {initialOmUrl}
+            onLocationChange={handleLocationChange}
+            onPaddingExceeded={handleBoundsChange}
+            bind:rasterTileSource
+          />
+        </div>
+      </ResizablePane>
+      {#if showChart}
+        <ResizableHandle withHandle />
+        <ResizablePane defaultSize={50}>
+          {#if weatherData}
+            <div class="flex h-full flex-col overflow-y-auto">
+              <div class="grow bg-white p-2 sm:p-4">
+                {#if error}
+                  <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
+                    <span class="block sm:inline">{error}</span>
+                  </div>
+                {/if}
+                <ChartContainer
+                  {weatherData}
+                  {startDate}
+                  bind:selectedDay={parameters.selectedDay}
+                  on:close={handleClose}
+                />
+              </div>
+            </div>
+          {/if}
+        </ResizablePane>
+      {/if}
+    </ResizablePaneGroup>
+  </div>
+
+  <div class="hidden h-screen w-full sm:block">
+    <ResizablePaneGroup direction="horizontal">
+      <ResizablePane defaultSize={showChart ? 50 : 100} minSize={30}>
+        <div class="relative h-full w-full">
+          <Map
+            bind:latitude={parameters.location.latitude}
+            bind:longitude={parameters.location.longitude}
+            domain={$weatherMapStore.domain}
+            {initialOmUrl}
+            onLocationChange={handleLocationChange}
+            onPaddingExceeded={handleBoundsChange}
+            bind:rasterTileSource
+          />
+          <div class="absolute top-0 right-0 left-0 flex w-full justify-between p-4">
+            <div class="rounded-md bg-white/80 p-2">
+              <MapControls
+                currentDomain={$weatherMapStore.domain}
+                currentBaseVariable={$weatherMapStore.baseVariable}
+                currentLevel={$weatherMapStore.level}
+                domainInfo={$weatherMapStore.domainInfo}
+                availableLevels={$weatherMapStore.availableLevels}
+                onDomainChange={handleDomainChange}
+                onBaseVariableChange={handleBaseVariableChange}
+                onLevelChange={handleLevelChange}
               />
             </div>
+            <div class="rounded-md bg-white/80 p-2">
+              <Controls bind:parameters on:openChart={() => handleOpenChart()} />
+            </div>
           </div>
-        {/if}
+          <TimeSlider />
+        </div>
       </ResizablePane>
-    {/if}
-  </ResizablePaneGroup>
-</div>
+      {#if showChart}
+        <ResizableHandle withHandle />
+        <ResizablePane defaultSize={50} minSize={30}>
+          {#if weatherData}
+            <div class="flex h-full flex-col overflow-y-auto">
+              <div class="grow bg-white p-2 sm:p-4">
+                {#if error}
+                  <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
+                    <span class="block sm:inline">{error}</span>
+                  </div>
+                {/if}
+                <ChartContainer
+                  {weatherData}
+                  {startDate}
+                  bind:selectedDay={parameters.selectedDay}
+                  on:close={handleClose}
+                />
+              </div>
+            </div>
+          {/if}
+        </ResizablePane>
+      {/if}
+    </ResizablePaneGroup>
+  </div>
+{/if}
