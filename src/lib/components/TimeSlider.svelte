@@ -1,6 +1,13 @@
 <script lang="ts">
-  import { weatherMapStore, weatherMapManager } from '$lib/services/weatherMap/store';
+  import type { WeatherMapManager, WeatherMapState } from '$lib/services/weatherMap/manager';
   import { onDestroy } from 'svelte';
+  import type { Subscriber, Unsubscriber } from 'svelte/store';
+
+  // Accept the manager and store as props
+  export let weatherMapManager: WeatherMapManager;
+  export let weatherMapStore: {
+    subscribe: (this: void, run: Subscriber<WeatherMapState>, invalidate?: () => void) => Unsubscriber;
+  };
 
   let timeIndex = 0;
   let isPlaying = false;

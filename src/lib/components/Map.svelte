@@ -2,33 +2,43 @@
   import { onMount, onDestroy } from 'svelte';
   import maplibregl, { type Map, type Marker, type RequestParameters } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { defaultOmProtocolSettings, GridFactory, omProtocol, type Domain } from '@openmeteo/mapbox-layer';
+  import { defaultOmProtocolSettings, GridFactory, omProtocol } from '@openmeteo/mapbox-layer';
   import { Protocol } from 'pmtiles';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
   import { LocationControlManager } from './LocationControl';
+  import type { WeatherMapManager, WeatherMapState } from '$lib/services/weatherMap/manager';
+  import type { Subscriber, Unsubscriber } from 'svelte/store';
+  import { buildOpenMeteoUrl } from '$lib/services/weatherMap/om_url';
 
-  interface Props {
-    latitude: number;
-    longitude: number;
-    domain: Domain;
-    initialOmUrl: string;
-    // Callbacks for updating parent state
-    onLocationChange: (lat: number, lng: number) => void;
-    onPaddingExceeded: (bounds: maplibregl.LngLatBounds) => void;
-    rasterTileSource?: maplibregl.RasterTileSource;
-  }
+  // Accept the manager and store as props
+  export let weatherMapManager: WeatherMapManager;
+  export let weatherMapStore: {
+    subscribe: (this: void, run: Subscriber<WeatherMapState>, invalidate?: () => void) => Unsubscriber;
+  };
+  export let rasterTileSource: maplibregl.RasterTileSource | undefined;
 
-  let {
-    latitude = $bindable(),
-    longitude = $bindable(),
-    domain,
-    initialOmUrl,
-    // weatherMapConfig,
-    onLocationChange,
-    onPaddingExceeded,
-    rasterTileSource = $bindable(),
-  }: Props = $props();
+  // interface Props {
+  //   latitude: number;
+  //   longitude: number;
+  //   domain: Domain;
+  //   initialOmUrl: string;
+  //   // Callbacks for updating parent state
+  //   onLocationChange: (lat: number, lng: number) => void;
+  //   onPaddingExceeded: (bounds: maplibregl.LngLatBounds) => void;
+  //   rasterTileSource?: maplibregl.RasterTileSource;
+  // }
+
+  // let {
+  //   latitude = $bindable(),
+  //   longitude = $bindable(),
+  //   domain,
+  //   initialOmUrl,
+  //   // weatherMapConfig,
+  //   onLocationChange,
+  //   onPaddingExceeded,
+  //   rasterTileSource = $bindable(),
+  // }: Props = $props();
 
   let mapContainer: HTMLElement;
   let map: Map;
@@ -40,13 +50,11 @@
     const newLat = parseFloat(lat.toFixed(5));
     const newLng = parseFloat(lng.toFixed(5));
 
-    latitude = newLat;
-    longitude = newLng;
-
     if (marker) {
-      marker.setLngLat([longitude, latitude]);
+      marker.setLngLat([newLng, newLat]);
     }
-    onLocationChange(newLat, newLng);
+
+    weatherMapManager.setLocation({ latitude: newLat, longitude: newLng });
   }
 
   function handleLocationDetected(location: Location) {
@@ -78,12 +86,14 @@
     map = new maplibregl.Map({
       container: mapContainer,
       style: 'https://maptiler.servert.nl/styles/minimal-world-maps/style.json',
-      center: [longitude, latitude],
+      center: [$weatherMapStore.location.longitude, $weatherMapStore.location.latitude],
       zoom: 8,
     });
 
     // Add marker
-    marker = new maplibregl.Marker({ draggable: true }).setLngLat([longitude, latitude]).addTo(map);
+    marker = new maplibregl.Marker({ draggable: true })
+      .setLngLat([$weatherMapStore.location.longitude, $weatherMapStore.location.latitude])
+      .addTo(map);
     marker.on('dragend', () => {
       const pos = marker.getLngLat();
       updatePosition(pos.lat, pos.lng);
@@ -134,6 +144,13 @@
       });
 
       updatePaddedBounds();
+      const initialOmUrl = buildOpenMeteoUrl({
+        paddedBounds: $weatherMapStore.paddedBounds,
+        domain: $weatherMapStore.domain,
+        variable: $weatherMapStore.variable,
+        datetime: $weatherMapStore.datetime,
+        domainInfo: $weatherMapStore.domainInfo,
+      });
 
       console.log('initial OmUrl', initialOmUrl);
 
@@ -143,7 +160,7 @@
         tileSize: 256,
         maxzoom: 12,
       });
-      rasterTileSource = map.getSource('omFileSource');
+      rasterTileSource = map.getSource('omFileSource')!;
 
       map.addLayer({
         id: 'omFileLayer',
@@ -167,7 +184,7 @@
   const padding = 25;
 
   const checkBounds = () => {
-    const currentDomain = domain;
+    const currentDomain = $weatherMapStore.domain;
     const mapBounds = map.getBounds();
     const currentPaddedBounds = paddedBounds;
 
@@ -196,7 +213,7 @@
   };
 
   const updatePaddedBounds = () => {
-    const currentDomain = domain;
+    const currentDomain = $weatherMapStore.domain;
     const mapBounds = map.getBounds();
 
     const gridBounds = GridFactory.create(currentDomain.grid).getBounds();
@@ -219,7 +236,7 @@
     paddedBounds = newPaddedBounds;
 
     // Notify parent that padding was exceeded
-    onPaddingExceeded(newPaddedBounds);
+    weatherMapManager.setPaddedBounds(newPaddedBounds);
   };
 </script>
 

@@ -16,8 +16,14 @@
   import { fetchWeatherData } from '$lib/api/api';
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
 
-  import { weatherMapStore, weatherMapManager } from '$lib/services/weatherMap/store';
+  import { WeatherMapManager, type WeatherMapState } from '$lib/services/weatherMap/manager';
   import type { WeatherModel } from '$lib/api/types';
+  import type { Subscriber, Unsubscriber } from 'svelte/store';
+
+  const weatherMapManager = new WeatherMapManager($page.url.searchParams);
+  const weatherMapStore: {
+    subscribe: (this: void, run: Subscriber<WeatherMapState>, invalidate?: () => void) => Unsubscriber;
+  } = { subscribe: weatherMapManager.subscribe };
 
   $: startDate = addDays(new Date(), $weatherMapStore.selectedDay - 1);
 
@@ -28,11 +34,7 @@
 
   let initialOmUrl: string;
   onMount(async () => {
-    weatherMapManager.init($page.url.searchParams);
-
     await weatherMapManager.setDomain($weatherMapStore.domain);
-
-    // const domainInfo = await fetchDomainInfo($weatherMapStore.domain);
 
     initialOmUrl = buildOpenMeteoUrl({
       paddedBounds: $weatherMapStore.paddedBounds,
@@ -71,7 +73,7 @@
       url.searchParams.set('map_domain', state.domain.value);
     }
     if (state.baseVariable) {
-      url.searchParams.set('map_variable', state.baseVariable);
+      url.searchParams.set('map_variable', state.variable);
     }
     if (state.level) {
       url.searchParams.set('map_level', state.level);
@@ -102,14 +104,6 @@
 
   function handleLevelChange(level: string) {
     weatherMapManager.setLevel(level);
-  }
-
-  function handleBoundsChange(bounds: maplibregl.LngLatBounds) {
-    weatherMapManager.setPaddedBounds(bounds);
-  }
-
-  function handleLocationChange(lat: number, lng: number) {
-    weatherMapManager.setLocation({ latitude: lat, longitude: lng });
   }
 
   // Synchronize selectedDay with weatherMapStore.datetime
@@ -168,17 +162,9 @@
   </div>
   <ResizablePaneGroup direction="vertical" class="flex-col-reverse">
     <ResizablePane defaultSize={showChart ? 15 : 100}>
-      <TimeSlider />
+      <TimeSlider {weatherMapManager} {weatherMapStore} />
       <div class="relative h-full w-full">
-        <Map
-          bind:latitude={$weatherMapStore.location.latitude}
-          bind:longitude={$weatherMapStore.location.longitude}
-          domain={$weatherMapStore.domain}
-          {initialOmUrl}
-          onLocationChange={handleLocationChange}
-          onPaddingExceeded={handleBoundsChange}
-          bind:rasterTileSource
-        />
+        <Map {weatherMapManager} {weatherMapStore} bind:rasterTileSource />
       </div>
     </ResizablePane>
     {#if showChart}
@@ -211,15 +197,7 @@
   <ResizablePaneGroup direction="horizontal">
     <ResizablePane defaultSize={showChart ? 50 : 100} minSize={30}>
       <div class="relative h-full w-full">
-        <Map
-          bind:latitude={$weatherMapStore.location.latitude}
-          bind:longitude={$weatherMapStore.location.longitude}
-          domain={$weatherMapStore.domain}
-          {initialOmUrl}
-          onLocationChange={handleLocationChange}
-          onPaddingExceeded={handleBoundsChange}
-          bind:rasterTileSource
-        />
+        <Map {weatherMapManager} {weatherMapStore} bind:rasterTileSource />
         <div class="absolute top-0 right-0 left-0 flex w-full justify-between p-4">
           <div class="rounded-md bg-white/80 p-2">
             <MapControls
@@ -242,7 +220,7 @@
             />
           </div>
         </div>
-        <TimeSlider />
+        <TimeSlider {weatherMapManager} {weatherMapStore} />
       </div>
     </ResizablePane>
     {#if showChart}
