@@ -6,24 +6,47 @@
   import { Protocol } from 'pmtiles';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
-  import { weatherMapStore, buildOpenMeteoUrl } from '$lib/services/weatherMap/store';
   import { LocationControlManager } from './LocationControl';
 
-  export let latitude: number;
-  export let longitude: number;
+  interface Props {
+    latitude: number;
+    longitude: number;
+    domain: Domain;
+    initialOmUrl: string;
+    // Callbacks for updating parent state
+    onLocationChange: (lat: number, lng: number) => void;
+    onPaddingExceeded: (bounds: maplibregl.LngLatBounds) => void;
+    rasterTileSource?: maplibregl.RasterTileSource;
+  }
+
+  let {
+    latitude = $bindable(),
+    longitude = $bindable(),
+    domain,
+    initialOmUrl,
+    // weatherMapConfig,
+    onLocationChange,
+    onPaddingExceeded,
+    rasterTileSource = $bindable(),
+  }: Props = $props();
 
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
   let locationUnsubscribe: () => void;
-  let omFileSource: maplibregl.RasterTileSource | undefined;
+  let paddedBounds: maplibregl.LngLatBounds | null = null;
 
   function updatePosition(lat: number, lng: number) {
-    latitude = parseFloat(lat.toFixed(5));
-    longitude = parseFloat(lng.toFixed(5));
+    const newLat = parseFloat(lat.toFixed(5));
+    const newLng = parseFloat(lng.toFixed(5));
+
+    latitude = newLat;
+    longitude = newLng;
+
     if (marker) {
       marker.setLngLat([longitude, latitude]);
     }
+    onLocationChange(newLat, newLng);
   }
 
   function handleLocationDetected(location: Location) {
@@ -31,38 +54,6 @@
     updatePosition(lat, lng);
     if (map) {
       map.flyTo({ center: [lng, lat], zoom: 10 });
-    }
-  }
-
-  function updateWeatherLayer() {
-    if (!map || !omFileSource) return;
-
-    // Update layer
-    const omUrl = buildOpenMeteoUrl($weatherMapStore);
-    omFileSource.setUrl('om://' + omUrl);
-  }
-
-  // Watch for prop changes and update map
-  $: if (map && marker && (latitude !== marker.getLngLat().lat || longitude !== marker.getLngLat().lng)) {
-    const newPos = { lat: latitude, lng: longitude };
-    marker.setLngLat(newPos);
-  }
-
-  $: triggeredUpdate(
-    $weatherMapStore.variable,
-    $weatherMapStore.domain,
-    $weatherMapStore.datetime,
-    $weatherMapStore.paddedBounds
-  );
-
-  function triggeredUpdate(
-    _variable: string,
-    _domain: Domain,
-    _datetime: string,
-    _paddedBounds: maplibregl.LngLatBounds | null
-  ) {
-    if (map && omFileSource) {
-      updateWeatherLayer();
     }
   }
 
@@ -97,6 +88,7 @@
       const pos = marker.getLngLat();
       updatePosition(pos.lat, pos.lng);
     });
+
     // Map click event
     map.on('click', (e: maplibregl.MapMouseEvent) => {
       const { lat, lng } = e.lngLat;
@@ -143,14 +135,13 @@
 
       updatePaddedBounds();
 
-      const omUrl = buildOpenMeteoUrl($weatherMapStore);
       map.addSource('omFileSource', {
-        url: 'om://' + omUrl,
+        url: 'om://' + initialOmUrl,
         type: 'raster',
         tileSize: 256,
         maxzoom: 12,
       });
-      omFileSource = map.getSource('omFileSource');
+      rasterTileSource = map.getSource('omFileSource');
 
       map.addLayer({
         id: 'omFileLayer',
@@ -173,25 +164,25 @@
   const padding = 25;
 
   const checkBounds = () => {
-    const domain = $weatherMapStore.domain;
+    const currentDomain = domain;
     const mapBounds = map.getBounds();
-    const paddedBounds = $weatherMapStore.paddedBounds;
+    const currentPaddedBounds = paddedBounds;
 
-    if (paddedBounds) {
+    if (currentPaddedBounds) {
       let exceededPadding = false;
 
-      const gridBounds = GridFactory.create(domain.grid).getBounds();
+      const gridBounds = GridFactory.create(currentDomain.grid).getBounds();
 
-      if (mapBounds.getSouth() < paddedBounds.getSouth() && paddedBounds.getSouth() > gridBounds[1]) {
+      if (mapBounds.getSouth() < currentPaddedBounds.getSouth() && currentPaddedBounds.getSouth() > gridBounds[1]) {
         exceededPadding = true;
       }
-      if (mapBounds.getWest() < paddedBounds.getWest() && paddedBounds.getWest() > gridBounds[0]) {
+      if (mapBounds.getWest() < currentPaddedBounds.getWest() && currentPaddedBounds.getWest() > gridBounds[0]) {
         exceededPadding = true;
       }
-      if (mapBounds.getNorth() > paddedBounds.getNorth() && paddedBounds.getNorth() < gridBounds[3]) {
+      if (mapBounds.getNorth() > currentPaddedBounds.getNorth() && currentPaddedBounds.getNorth() < gridBounds[3]) {
         exceededPadding = true;
       }
-      if (mapBounds.getEast() > paddedBounds.getEast() && paddedBounds.getEast() < gridBounds[2]) {
+      if (mapBounds.getEast() > currentPaddedBounds.getEast() && currentPaddedBounds.getEast() < gridBounds[2]) {
         exceededPadding = true;
       }
 
@@ -202,10 +193,10 @@
   };
 
   const updatePaddedBounds = () => {
-    const domain = $weatherMapStore.domain;
+    const currentDomain = domain;
     const mapBounds = map.getBounds();
 
-    const gridBounds = GridFactory.create(domain.grid).getBounds();
+    const gridBounds = GridFactory.create(currentDomain.grid).getBounds();
 
     const mapBoundsSW = mapBounds.getSouthWest();
     const mapBoundsNE = mapBounds.getNorthEast();
@@ -222,9 +213,10 @@
 
     // Create a new LngLatBounds object
     const newPaddedBounds = new maplibregl.LngLatBounds(newBounds);
+    paddedBounds = newPaddedBounds;
 
-    // Update the store with the new padded bounds
-    weatherMapStore.setPaddedBounds(newPaddedBounds);
+    // Notify parent that padding was exceeded
+    onPaddingExceeded(newPaddedBounds);
   };
 </script>
 

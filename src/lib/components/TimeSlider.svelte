@@ -1,24 +1,19 @@
 <script lang="ts">
-  import { weatherMapStore } from '$lib/services/weatherMap/store';
+  import { datetime, domainInfo, weatherMapActions } from '$lib/services/weatherMap/store';
   import { onDestroy } from 'svelte';
-
-  let weatherMapState: import('$lib/services/weatherMap/store').WeatherMapState;
-  const unsubscribe = weatherMapStore.subscribe((state) => {
-    weatherMapState = state;
-  });
 
   let timeIndex = 0;
   let isPlaying = false;
   let interval: number;
 
-  $: if (weatherMapState.domainInfo) {
-    timeIndex = weatherMapState.domainInfo.valid_times.indexOf(weatherMapState.datetime);
+  $: if ($domainInfo) {
+    timeIndex = $domainInfo.valid_times.indexOf($datetime);
   }
 
   function handleTimeChange(event: Event) {
     const newIndex = parseInt((event.target as HTMLInputElement).value, 10);
-    if (weatherMapState.domainInfo) {
-      weatherMapStore.setDatetime(weatherMapState.domainInfo.valid_times[newIndex]);
+    if ($domainInfo) {
+      weatherMapActions.setDatetime($domainInfo.valid_times[newIndex]);
     }
   }
 
@@ -43,37 +38,36 @@
   }
 
   function stepForward() {
-    if (weatherMapState.domainInfo) {
+    if ($domainInfo) {
       const nextIndex = timeIndex + 1;
-      if (nextIndex < weatherMapState.domainInfo.valid_times.length) {
-        weatherMapStore.setDatetime(weatherMapState.domainInfo.valid_times[nextIndex]);
+      if (nextIndex < $domainInfo.valid_times.length) {
+        weatherMapActions.setDatetime($domainInfo.valid_times[nextIndex]);
       } else {
         // Loop back to start
-        weatherMapStore.setDatetime(weatherMapState.domainInfo.valid_times[0]);
+        weatherMapActions.setDatetime($domainInfo.valid_times[0]);
       }
     }
   }
 
   function stepBackward() {
-    if (weatherMapState.domainInfo) {
+    if ($domainInfo) {
       const prevIndex = timeIndex - 1;
       if (prevIndex >= 0) {
-        weatherMapStore.setDatetime(weatherMapState.domainInfo.valid_times[prevIndex]);
+        weatherMapActions.setDatetime($domainInfo.valid_times[prevIndex]);
       } else {
         // Loop to end
-        const lastIndex = weatherMapState.domainInfo.valid_times.length - 1;
-        weatherMapStore.setDatetime(weatherMapState.domainInfo.valid_times[lastIndex]);
+        const lastIndex = $domainInfo.valid_times.length - 1;
+        weatherMapActions.setDatetime($domainInfo.valid_times[lastIndex]);
       }
     }
   }
 
   onDestroy(() => {
-    unsubscribe();
     clearInterval(interval);
   });
 </script>
 
-{#if weatherMapState.domainInfo}
+{#if $domainInfo}
   <div class="time-slider-container">
     <div class="controls">
       <button on:click={stepBackward}>&lt;&lt;</button>
@@ -84,14 +78,14 @@
       <input
         type="range"
         min="0"
-        max={weatherMapState.domainInfo.valid_times.length - 1}
+        max={$domainInfo.valid_times.length - 1}
         step="1"
         bind:value={timeIndex}
         on:input={handleTimeChange}
       />
     </div>
     <div class="time-label">
-      <span>{new Date(weatherMapState.datetime).toLocaleString()}</span>
+      <span>{new Date($datetime).toLocaleString()}</span>
     </div>
   </div>
 {/if}
@@ -149,6 +143,7 @@
 
   input[type='range'] {
     -webkit-appearance: none;
+    appearance: none;
     width: 100%;
     height: 6px;
     background: #d1d5db;
