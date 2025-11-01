@@ -61,18 +61,49 @@ export const defaultWeatherModel: WeatherModel = 'icon_seamless';
 export const defaultDay = 1;
 
 // --- URL Parsing ---
-function readURLParams(urlParams: URLSearchParams) {
+function readURLParams(urlParams: URLSearchParams): Partial<WeatherMapState> | null {
   const lat = urlParams.get('lat');
   const lon = urlParams.get('lon');
   const day = urlParams.get('day');
   const model = urlParams.get('model');
 
-  if (lat && lon && day && model) {
-    return {
-      location: { latitude: parseFloat(lat), longitude: parseFloat(lon) },
-      selectedDay: parseInt(day, 10),
-      selectedModel: model as WeatherModel,
-    };
+  const mapDomainValue = urlParams.get('map_domain');
+  const mapVariable = urlParams.get('map_variable');
+  const mapLevel = urlParams.get('map_level');
+  const mapDatetime = urlParams.get('map_datetime');
+
+  const result: Partial<WeatherMapState> = {};
+
+  if (lat && lon) {
+    result.location = { latitude: parseFloat(lat), longitude: parseFloat(lon) };
+  }
+  if (day) {
+    result.selectedDay = parseInt(day, 10);
+  }
+  if (model) {
+    result.selectedModel = model as WeatherModel;
+  }
+
+  if (mapDomainValue) {
+    const domainOption = domainOptions.find((d) => d.value === mapDomainValue);
+    if (domainOption) {
+      result.domain = domainOption;
+    }
+  }
+  if (mapVariable) {
+    result.variable = mapVariable;
+    // Assuming base variable is before first underscore, or is the variable itself
+    result.baseVariable = mapVariable.includes('_') ? mapVariable.split('_')[0] : mapVariable;
+  }
+  if (mapLevel) {
+    result.level = mapLevel;
+  }
+  if (mapDatetime) {
+    result.datetime = mapDatetime;
+  }
+
+  if (Object.keys(result).length > 0) {
+    return result;
   }
   return null;
 }
@@ -94,7 +125,7 @@ export interface WeatherMapState {
 
 // Helper to get initial state
 function getInitialState(urlParams: URLSearchParams): WeatherMapState {
-  const initialMapState = {
+  const defaultMapState: WeatherMapState = {
     domain: domainOptions.find((option) => option.value === 'dwd_icon')!,
     variable: 'temperature_2m',
     baseVariable: 'temperature',
@@ -103,30 +134,32 @@ function getInitialState(urlParams: URLSearchParams): WeatherMapState {
     domainInfo: null,
     paddedBounds: null,
     availableLevels: [],
-  };
-
-  const initialPageParams = readURLParams(urlParams) || {
     location: defaultLocation,
-    selectedModel: defaultWeatherModel,
     selectedDay: defaultDay,
+    selectedModel: defaultWeatherModel,
   };
 
-  return { ...initialMapState, ...initialPageParams };
+  const parsedURLState = readURLParams(urlParams);
+
+  const initialState = {
+    ...defaultMapState,
+    ...parsedURLState,
+  };
+
+  console.log(initialState);
+  return initialState;
 }
 
-class WeatherMapManager {
+export class WeatherMapManager {
   private readonly store: Writable<WeatherMapState>;
   public readonly subscribe;
 
-  constructor() {
-    this.store = writable(getInitialState(new URLSearchParams())); // Initialize with empty params, will be updated by init
+  constructor(urlParams: URLSearchParams) {
+    console.log('Constructing WeatherMapManager...');
+    // Don't initialize state here - just create an empty store
+    this.store = writable(getInitialState(urlParams));
     this.subscribe = this.store.subscribe;
-  }
-
-  async init(urlParams: URLSearchParams) {
-    const initialState = getInitialState(urlParams);
-    this.store.set(initialState);
-    await this.initializeDomainInfo(); // Fetch domain info after initial state is set
+    this.initializeDomainInfo();
   }
 
   private async initializeDomainInfo() {
@@ -324,5 +357,3 @@ class WeatherMapManager {
     });
   }
 }
-
-export const weatherMapManager = new WeatherMapManager();
