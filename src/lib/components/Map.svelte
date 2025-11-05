@@ -162,11 +162,14 @@
       });
       rasterTileSource = map.getSource('omFileSource')!;
 
-      map.addLayer({
-        id: 'omFileLayer',
-        type: 'raster',
-        source: 'omFileSource',
-      });
+      map.addLayer(
+        {
+          id: 'omFileLayer',
+          type: 'raster',
+          source: 'omFileSource',
+        },
+        'waterway-tunnel'
+      );
       console.log('added weather layer');
     });
   });
