@@ -7,18 +7,19 @@
   export let weatherData: WeatherDataType;
   export let startDate: Date;
   export let selectedDay: number;
+  export let onSelectedDayChange: (day: number) => void;
 
   const dispatch = createEventDispatcher();
 
   function handleNextDay(e: MouseEvent) {
     e.preventDefault();
-    selectedDay += 1;
+    onSelectedDayChange(selectedDay + 1);
   }
 
   function handlePreviousDay(e: MouseEvent) {
     e.preventDefault();
     if (selectedDay > -14) {
-      selectedDay -= 1;
+      onSelectedDayChange(selectedDay - 1);
     }
   }
 
