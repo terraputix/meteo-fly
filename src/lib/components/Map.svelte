@@ -78,7 +78,6 @@
 
     // Add OpenMeteo Protocol for weather maps
     const omProtocolOptions = defaultOmProtocolSettings;
-    omProtocolOptions.resolutionFactor = 1;
     omProtocolOptions.useSAB = true;
     maplibregl.addProtocol('om', (params) => omProtocol(params, undefined, omProtocolOptions));
 
