@@ -25,6 +25,16 @@ export default ts.config(
         parser: ts.parser,
       },
     },
+    rules: {
+      // Add project-specific rules here
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
+    },
   },
   {
     ignores: ['build/', '.svelte-kit/', 'dist/'],
