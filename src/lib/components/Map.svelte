@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import maplibregl, { type Map, type Marker, type RequestParameters } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { defaultOmProtocolSettings, GridFactory, omProtocol } from '@openmeteo/mapbox-layer';
+  import { defaultOmProtocolSettings, omProtocol, updateCurrentBounds } from '@openmeteo/mapbox-layer';
   import { Protocol } from 'pmtiles';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
@@ -44,7 +44,6 @@
   let map: Map;
   let marker: Marker;
   let locationUnsubscribe: () => void;
-  let paddedBounds: maplibregl.LngLatBounds | null = null;
 
   function updatePosition(lat: number, lng: number) {
     const newLat = parseFloat(lat.toFixed(5));
@@ -105,8 +104,9 @@
     });
 
     // Update bounds when map moves
-    map.on('moveend', checkBounds);
-    map.on('zoomend', checkBounds);
+    map.on('dataloading', () => {
+      updateCurrentBounds(map.getBounds());
+    });
 
     const locationControlManager = new LocationControlManager({});
     map.addControl(locationControlManager, 'top-right');
@@ -142,7 +142,6 @@
         exaggeration: 1.0,
       });
 
-      updatePaddedBounds();
       const initialOmUrl = buildOpenMeteoUrl({
         paddedBounds: $weatherMapStore.paddedBounds,
         domain: $weatherMapStore.domain,
@@ -182,64 +181,6 @@
       map.remove();
     }
   });
-
-  const padding = 25;
-
-  const checkBounds = () => {
-    const currentDomain = $weatherMapStore.domain;
-    const mapBounds = map.getBounds();
-    const currentPaddedBounds = paddedBounds;
-
-    if (currentPaddedBounds) {
-      let exceededPadding = false;
-
-      const gridBounds = GridFactory.create(currentDomain.grid).getBounds();
-
-      if (mapBounds.getSouth() < currentPaddedBounds.getSouth() && currentPaddedBounds.getSouth() > gridBounds[1]) {
-        exceededPadding = true;
-      }
-      if (mapBounds.getWest() < currentPaddedBounds.getWest() && currentPaddedBounds.getWest() > gridBounds[0]) {
-        exceededPadding = true;
-      }
-      if (mapBounds.getNorth() > currentPaddedBounds.getNorth() && currentPaddedBounds.getNorth() < gridBounds[3]) {
-        exceededPadding = true;
-      }
-      if (mapBounds.getEast() > currentPaddedBounds.getEast() && currentPaddedBounds.getEast() < gridBounds[2]) {
-        exceededPadding = true;
-      }
-
-      if (exceededPadding) {
-        updatePaddedBounds();
-      }
-    }
-  };
-
-  const updatePaddedBounds = () => {
-    const currentDomain = $weatherMapStore.domain;
-    const mapBounds = map.getBounds();
-
-    const gridBounds = GridFactory.create(currentDomain.grid).getBounds();
-
-    const mapBoundsSW = mapBounds.getSouthWest();
-    const mapBoundsNE = mapBounds.getNorthEast();
-    const dLat = mapBoundsNE.lat - mapBoundsSW.lat;
-    const dLon = mapBoundsNE.lng - mapBoundsSW.lng;
-
-    // Calculate the new padded bounds
-    const newBounds: [number, number, number, number] = [
-      Math.max(Math.max(mapBoundsSW.lng - (dLon * padding) / 100, gridBounds[0]), -180),
-      Math.max(Math.max(mapBoundsSW.lat - (dLat * padding) / 100, gridBounds[1]), -90),
-      Math.min(Math.min(mapBoundsNE.lng + (dLon * padding) / 100, gridBounds[2]), 180),
-      Math.min(Math.min(mapBoundsNE.lat + (dLat * padding) / 100, gridBounds[3]), 90),
-    ];
-
-    // Create a new LngLatBounds object
-    const newPaddedBounds = new maplibregl.LngLatBounds(newBounds);
-    paddedBounds = newPaddedBounds;
-
-    // Notify parent that padding was exceeded
-    weatherMapManager.setPaddedBounds(newPaddedBounds);
-  };
 </script>
 
 <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
