@@ -18,28 +18,6 @@
   };
   export let rasterTileSource: maplibregl.RasterTileSource | undefined;
 
-  // interface Props {
-  //   latitude: number;
-  //   longitude: number;
-  //   domain: Domain;
-  //   initialOmUrl: string;
-  //   // Callbacks for updating parent state
-  //   onLocationChange: (lat: number, lng: number) => void;
-  //   onPaddingExceeded: (bounds: maplibregl.LngLatBounds) => void;
-  //   rasterTileSource?: maplibregl.RasterTileSource;
-  // }
-
-  // let {
-  //   latitude = $bindable(),
-  //   longitude = $bindable(),
-  //   domain,
-  //   initialOmUrl,
-  //   // weatherMapConfig,
-  //   onLocationChange,
-  //   onPaddingExceeded,
-  //   rasterTileSource = $bindable(),
-  // }: Props = $props();
-
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
@@ -77,8 +55,10 @@
 
     // Add OpenMeteo Protocol for weather maps
     const omProtocolOptions = defaultOmProtocolSettings;
-    omProtocolOptions.useSAB = true;
-    maplibregl.addProtocol('om', (params) => omProtocol(params, undefined, omProtocolOptions));
+    omProtocolOptions.fileReaderConfig.useSAB = true;
+    maplibregl.addProtocol('om', (params: RequestParameters, abortController: AbortController) =>
+      omProtocol(params, abortController, omProtocolOptions)
+    );
 
     // Initialize the map
     map = new maplibregl.Map({
@@ -143,7 +123,6 @@
       });
 
       const initialOmUrl = buildOpenMeteoUrl({
-        paddedBounds: $weatherMapStore.paddedBounds,
         domain: $weatherMapStore.domain,
         variable: $weatherMapStore.variable,
         datetime: $weatherMapStore.datetime,
@@ -169,6 +148,10 @@
         'waterway-tunnel'
       );
       console.log('added weather layer');
+    });
+
+    map.on('dataloading', () => {
+      updateCurrentBounds(map.getBounds());
     });
   });
 

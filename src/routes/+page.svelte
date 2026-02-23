@@ -37,7 +37,6 @@
     await weatherMapManager.setDomain($weatherMapStore.domain);
 
     initialOmUrl = buildOpenMeteoUrl({
-      paddedBounds: $weatherMapStore.paddedBounds,
       domain: $weatherMapStore.domain,
       variable: $weatherMapStore.variable,
       datetime: $weatherMapStore.datetime,
@@ -49,7 +48,6 @@
   // Centralized reactive statement for all map updates
   $: if (rasterTileSource && $weatherMapStore.domainInfo) {
     const omUrl = buildOpenMeteoUrl({
-      paddedBounds: $weatherMapStore.paddedBounds,
       domain: $weatherMapStore.domain,
       variable: $weatherMapStore.variable,
       datetime: $weatherMapStore.datetime,

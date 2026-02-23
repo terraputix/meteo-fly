@@ -7,7 +7,6 @@ export interface DomainInfo {
 }
 
 interface QueryVariables {
-  paddedBounds: maplibregl.LngLatBounds | null;
   domain: Domain;
   variable: string;
   datetime: string;
@@ -16,9 +15,7 @@ interface QueryVariables {
 
 // Helper function to build the Open-Meteo URL
 export const buildOpenMeteoUrl = (state: QueryVariables): string => {
-  const { paddedBounds, domain, variable, datetime, domainInfo } = state;
-
-  console.log(variable);
+  const { domain, variable, datetime, domainInfo } = state;
 
   // Parse the reference time from domain info
   const referenceTimeObj = new Date(domainInfo!.reference_time);
@@ -41,9 +38,5 @@ export const buildOpenMeteoUrl = (state: QueryVariables): string => {
   // Format valid time for the filename (YYYY-MM-DDTHHMM)
   const formattedValidTime = `${validYear}-${validMonth}-${validDay}T${validHour}${validMinute}`;
 
-  if (!paddedBounds) {
-    return `https://map-tiles.open-meteo.com/data_spatial/${domain.value}/${formattedReferenceTime}/${formattedValidTime}.om?variable=${variable}`;
-  } else {
-    return `https://map-tiles.open-meteo.com/data_spatial/${domain.value}/${formattedReferenceTime}/${formattedValidTime}.om?variable=${variable}&bounds=${paddedBounds.getSouth()},${paddedBounds.getWest()},${paddedBounds.getNorth()},${paddedBounds.getEast()}&partial=true`;
-  }
+  return `https://map-tiles.open-meteo.com/data_spatial/${domain.value}/${formattedReferenceTime}/${formattedValidTime}.om?variable=${variable}`;
 };
