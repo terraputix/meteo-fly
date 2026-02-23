@@ -18,7 +18,7 @@
 </svelte:head>
 
 <div class="flex min-h-screen flex-col">
-  <main class="flex-grow">
-      {@render children()}
-    </main>
+  <main class="grow">
+    {@render children()}
+  </main>
 </div>
