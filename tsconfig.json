@@ -1,6 +1,7 @@
 {
   "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
+    "types": ["vite-plugin-pwa/svelte", "vite-plugin-pwa/info", "vite-plugin-pwa/client"],
     "allowJs": true,
     "checkJs": true,
     "esModuleInterop": true,
@@ -10,8 +11,8 @@
     "sourceMap": true,
     "strict": true,
     "moduleResolution": "bundler",
-    "lib": ["dom", "esnext", "webworker"]
-  }
+    "lib": ["dom", "esnext"],
+  },
   // Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
   // except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
   //
