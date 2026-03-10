@@ -1,5 +1,5 @@
 import { scalePow, scaleLinear } from 'd3';
-import { type ScaleOptions } from '@observablehq/plot';
+
 export const windMaxSpeed = 80;
 export const windDomains = [
   0,
@@ -15,14 +15,21 @@ export const windColorScale = scalePow<string>().domain(windDomains).range(windC
 
 export const strokeWidthScale = scaleLinear().domain([0, windMaxSpeed]).range([0.75, 8]);
 
-export const windSpeedScaleOptions: ScaleOptions = {
+export interface LegendScaleOptions {
+  domain: number[];
+  range: string[];
+  type: 'pow' | 'sequential' | 'linear';
+  label: string;
+}
+
+export const windSpeedScaleOptions: LegendScaleOptions = {
   domain: windDomains,
   range: windColors,
   type: 'pow',
   label: 'Wind Speed (km/h)',
 };
 
-export const cloudCoverScaleOptions: ScaleOptions = {
+export const cloudCoverScaleOptions: LegendScaleOptions = {
   domain: [0, 100],
   range: ['white', 'gray'],
   type: 'sequential',

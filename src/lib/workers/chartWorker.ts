@@ -17,8 +17,8 @@ import type {
 import { addSeconds } from '../../utils/dateExtensions';
 
 function prepareTemperatureData(data: WeatherDataType): TemperatureChartData {
-  const tempAxisMin = (d3Min(data.hourly.dewpoint_2m) ?? 0) - 5;
-  const tempAxisMax = (d3Max(data.hourly.temperature_2m) ?? 0) + 5;
+  const tempAxisMin = Math.floor((d3Min(data.hourly.dewpoint_2m) ?? 0) - 5);
+  const tempAxisMax = Math.ceil((d3Max(data.hourly.temperature_2m) ?? 0) + 5);
   const humidityScale = scaleLinear([0, 100], [tempAxisMin, tempAxisMax]);
 
   return {
