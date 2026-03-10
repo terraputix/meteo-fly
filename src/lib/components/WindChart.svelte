@@ -12,8 +12,7 @@
     YAXisComponentOption,
   } from 'echarts';
 
-  // CallbackDataParams is not exported from the public echarts API, so we define
-  // a local equivalent covering the properties we actually use.
+  // CallbackDataParams is not exported from the public echarts API – define what we use.
   interface EChartsCallbackParams {
     seriesName?: string;
     seriesIndex?: number;
@@ -24,6 +23,7 @@
     componentIndex?: number;
     axisValue?: number;
     axisDimension?: string;
+    axisIndex?: number;
   }
 
   import { windColorScale, strokeWidthScale, windDomains, windColors, windMaxSpeed } from '$lib/charts/scales';
@@ -34,6 +34,7 @@
     TemperatureChartData,
     RainCloudChartData,
     WindChartData,
+    WindCloudColumn,
   } from '$lib/workers/chartWorker.types';
   import type { CloudCoverData } from '$lib/charts/clouds';
   import type { WindFieldLevel } from '$lib/charts/wind';
@@ -43,23 +44,21 @@
   let isRendering = false;
 
   // ─── Layout constants ────────────────────────────────────────────────────────
-  // All grids share the same left/right margins so x-axes align perfectly.
+  // All grids share the same left/right so x-axes align perfectly.
   const MARGIN_LEFT = 60;
-  const MARGIN_RIGHT = 70; // extra for right-side humidity axis label
+  const MARGIN_RIGHT = 70;
   const TEMP_HEIGHT_PX = 160;
   const RAIN_HEIGHT_PX = 100;
-  // wind chart fills the rest
+  const WIND_HEIGHT_PX = 620;
 
-  // Grid top offsets (pixels from chart top)
   const TEMP_TOP = 10;
-  const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX; // absolute bottom edge of temp grid
+  const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX;
   const RAIN_GAP = 4;
   const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
   const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
   const WIND_GAP = 4;
   const WIND_TOP = RAIN_BOTTOM_PX + WIND_GAP;
-  const WIND_HEIGHT_PX = 620;
-  const TOTAL_HEIGHT = WIND_TOP + WIND_HEIGHT_PX + 40; // +40 for bottom axis label
+  const TOTAL_HEIGHT = WIND_TOP + WIND_HEIGHT_PX + 42;
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -68,102 +67,95 @@
   }
 
   // ─── Raindrop symbol ─────────────────────────────────────────────────────────
-  // Registered once so ECharts can use 'raindrop' as a symbol name.
+  // ECharts supports SVG path strings via the 'path://' prefix.
+  const RAINDROP_SYMBOL = 'path://M 0 -7 C 3.5 -3.5 5 0.5 5 3 A 5 5 0 0 1 -5 3 C -5 0.5 -3.5 -3.5 0 -7 Z';
 
-  // SVG path for a raindrop symbol, used via ECharts' 'path://' prefix.
-  // The path is centred at (0,0) in a 10×14 viewBox so ECharts can scale it.
-  const RAINDROP_SYMBOL = 'path://M 0 -7 C 4 -3 5 1 5 4 A 5 5 0 0 1 -5 4 C -5 1 -4 -3 0 -7 Z';
+  // ─── Tooltip store ────────────────────────────────────────────────────────────
+  // Pre-built look-up maps keyed by timestamp so the formatter is O(1).
 
-  function ensureRaindropSymbol() {
-    // No registration needed — ECharts supports 'path://' natively.
-  }
-
-  // ─── Unified tooltip data store ───────────────────────────────────────────────
-  // We build look-up maps outside the option builder so the tooltip formatter
-  // can access all series data for a given timestamp.
-
-  interface UnifiedTooltipStore {
-    temperatureByTime: Map<number, { temp: number; dew: number; hum: number }>;
+  interface TooltipStore {
+    tempByTime: Map<number, { temp: number; dew: number; hum: number }>;
     rainByTime: Map<number, number>;
     cloudLowByTime: Map<number, number>;
     cloudMidByTime: Map<number, number>;
     cloudHighByTime: Map<number, number>;
     cloudBaseByTime: Map<number, number>;
     windByTimeHeight: Map<string, { speed: number; direction: number }>;
-    timezoneAbbr: string;
+    sortedWindTimes: number[]; // unique sorted timestamps in wind data
+    sortedWindHeights: number[]; // unique sorted heights in wind data
   }
 
   function buildTooltipStore(
-    temperatureChartData: TemperatureChartData,
-    rainCloudChartData: RainCloudChartData,
+    tempData: TemperatureChartData,
+    rainData: RainCloudChartData,
     windData: WindFieldLevel[],
-    cloudBase: Array<{ x: Date; y: number }>,
-    timezoneAbbr: string
-  ): UnifiedTooltipStore {
-    const temperatureByTime = new Map<number, { temp: number; dew: number; hum: number }>();
-    temperatureChartData.temperatureData.forEach((d, i) => {
-      temperatureByTime.set(d.time.getTime(), {
+    cloudBase: Array<{ x: Date; y: number }>
+  ): TooltipStore {
+    const tempByTime = new Map<number, { temp: number; dew: number; hum: number }>();
+    tempData.temperatureData.forEach((d, i) => {
+      tempByTime.set(d.time.getTime(), {
         temp: d.value,
-        dew: temperatureChartData.dewpointData[i].value,
-        hum: temperatureChartData.humidityData[i].value,
+        dew: tempData.dewpointData[i].value,
+        hum: tempData.humidityData[i].value,
       });
     });
 
     const rainByTime = new Map<number, number>();
-    rainCloudChartData.rainDots.forEach((d) => rainByTime.set(d.time.getTime(), d.rain));
+    rainData.rainDots.forEach((d) => rainByTime.set(d.time.getTime(), d.rain));
 
-    // Build cloud cover maps from rects: pick the rect centred on each hour
     const cloudLowByTime = new Map<number, number>();
     const cloudMidByTime = new Map<number, number>();
     const cloudHighByTime = new Map<number, number>();
-    rainCloudChartData.cloudRects.forEach((r) => {
-      const t = new Date((r.x1.getTime() + r.x2.getTime()) / 2).getTime();
-      // snap to nearest hour
-      const snap = Math.round(t / 3_600_000) * 3_600_000;
-      if (r.y1 < 0.01) cloudLowByTime.set(snap, r.cloudCover);
-      else if (r.y1 < 0.4) cloudMidByTime.set(snap, r.cloudCover);
-      else cloudHighByTime.set(snap, r.cloudCover);
+    rainData.cloudRects.forEach((r) => {
+      const mid = Math.round((r.x1.getTime() + r.x2.getTime()) / 2 / 3_600_000) * 3_600_000;
+      if (r.y1 < 0.01) cloudLowByTime.set(mid, r.cloudCover);
+      else if (r.y1 < 0.4) cloudMidByTime.set(mid, r.cloudCover);
+      else cloudHighByTime.set(mid, r.cloudCover);
     });
 
     const cloudBaseByTime = new Map<number, number>();
     cloudBase.forEach((d) => cloudBaseByTime.set(d.x.getTime(), d.y));
 
     const windByTimeHeight = new Map<string, { speed: number; direction: number }>();
+    const windTimesSet = new Set<number>();
+    const windHeightsSet = new Set<number>();
     windData.forEach((w) => {
-      windByTimeHeight.set(`${w.time.getTime()}_${w.height}`, {
-        speed: w.speed,
-        direction: w.direction,
-      });
+      const t = w.time.getTime();
+      windByTimeHeight.set(`${t}_${w.height}`, { speed: w.speed, direction: w.direction });
+      windTimesSet.add(t);
+      windHeightsSet.add(w.height);
     });
 
     return {
-      temperatureByTime,
+      tempByTime,
       rainByTime,
       cloudLowByTime,
       cloudMidByTime,
       cloudHighByTime,
       cloudBaseByTime,
       windByTimeHeight,
-      timezoneAbbr,
+      sortedWindTimes: Array.from(windTimesSet).sort((a, b) => a - b),
+      sortedWindHeights: Array.from(windHeightsSet).sort((a, b) => a - b),
     };
   }
 
-  // ─── Main chart option builder ────────────────────────────────────────────────
+  // ─── Main option builder ──────────────────────────────────────────────────────
 
   function buildOption(
-    temperatureChartData: TemperatureChartData,
-    rainCloudChartData: RainCloudChartData,
+    tempChartData: TemperatureChartData,
+    rainChartData: RainCloudChartData,
     windData: WindFieldLevel[],
     cloudData: CloudCoverData[],
+    windCloudColumns: WindCloudColumn[],
     cloudBase: Array<{ x: Date; y: number }>,
     windChartData: WindChartData,
     xDomain: [Date, Date],
-    store: UnifiedTooltipStore
+    store: TooltipStore
   ): EChartsOption {
     const xMin = xDomain[0].getTime();
     const xMax = xDomain[1].getTime();
 
-    // ── Shared x-axis config factory ─────────────────────────────────────────
+    // ── Shared x-axis factory ─────────────────────────────────────────────────
     function makeXAxis(gridIndex: number, showLabels: boolean): XAXisComponentOption {
       return {
         type: 'time',
@@ -173,25 +165,21 @@
         axisLabel: showLabels ? { formatter: (v: number) => fmtTime(new Date(v)), fontSize: 11 } : { show: false },
         axisTick: { show: showLabels },
         axisLine: { show: true, lineStyle: { color: '#ccc' } },
-        splitLine: { show: showLabels, lineStyle: { color: '#eee' } },
+        splitLine: { show: false },
       };
     }
 
-    // ── Three grids ──────────────────────────────────────────────────────────
-    // Use absolute pixel values for top so all grids line up exactly.
+    // ── Grids ──────────────────────────────────────────────────────────────────
     const grids: GridComponentOption[] = [
-      // grid 0 – temperature
       { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: TEMP_TOP, height: TEMP_HEIGHT_PX },
-      // grid 1 – rain / cloud cover
       { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: RAIN_TOP, height: RAIN_HEIGHT_PX },
-      // grid 2 – wind field
       { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: WIND_TOP, height: WIND_HEIGHT_PX },
     ];
 
-    // ── X axes (one per grid) ────────────────────────────────────────────────
+    // ── X axes ─────────────────────────────────────────────────────────────────
     const xAxes: XAXisComponentOption[] = [
-      makeXAxis(0, false), // temp — no bottom labels (rain is directly below)
-      makeXAxis(1, false), // rain — no bottom labels
+      makeXAxis(0, false),
+      makeXAxis(1, false),
       {
         ...makeXAxis(2, true),
         name: `Time [${windChartData.timezoneAbbr}]`,
@@ -200,30 +188,30 @@
       },
     ];
 
-    // ── Y axes ───────────────────────────────────────────────────────────────
-    const { tempAxisMin, tempAxisMax, humidityScale } = temperatureChartData;
+    // ── Y axes ─────────────────────────────────────────────────────────────────
+    const { tempAxisMin, tempAxisMax, humidityScale } = tempChartData;
     const humMin = humidityScale.domain[0];
     const humMax = humidityScale.domain[1];
     const { yDomain, elevation } = windChartData;
 
     const yAxes: YAXisComponentOption[] = [
-      // 0 – temperature (left)
+      // 0 – temperature left
       {
         type: 'value',
         gridIndex: 0,
         name: '°C',
         nameLocation: 'end',
-        nameTextStyle: { fontSize: 11, padding: [0, 0, 0, 0] },
+        nameTextStyle: { fontSize: 11 },
         min: tempAxisMin,
         max: tempAxisMax,
         axisLabel: { fontSize: 11 },
         splitLine: { show: true, lineStyle: { color: '#eee' } },
       },
-      // 1 – humidity (right)
+      // 1 – humidity right
       {
         type: 'value',
         gridIndex: 0,
-        name: 'Hum %',
+        name: 'Hum%',
         nameLocation: 'end',
         nameTextStyle: { fontSize: 11 },
         min: humMin,
@@ -232,7 +220,7 @@
         axisLabel: { formatter: (v: number) => `${v}%`, fontSize: 11 },
         splitLine: { show: false },
       },
-      // 2 – rain/cloud (hidden)
+      // 2 – rain/cloud hidden
       {
         type: 'value',
         gridIndex: 1,
@@ -243,7 +231,7 @@
         axisLine: { show: false },
         splitLine: { show: false },
       },
-      // 3 – wind height (left)
+      // 3 – wind height left
       {
         type: 'value',
         gridIndex: 2,
@@ -258,13 +246,30 @@
       },
     ];
 
-    // ── Temperature series ────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════════
+    // GRID 0 – Temperature / Dewpoint / Humidity
+    // ═══════════════════════════════════════════════════════════════════════════
+
     const sunriseMarkData: [object, object][] = [
       [
-        { xAxis: temperatureChartData.sunrise.getTime(), itemStyle: { color: 'rgba(255,220,0,0.18)' } },
-        { xAxis: temperatureChartData.sunset.getTime() },
+        { xAxis: tempChartData.sunrise.getTime(), itemStyle: { color: 'rgba(255,220,0,0.18)' } },
+        { xAxis: tempChartData.sunset.getTime() },
       ],
     ];
+
+    // Anchor series: a silent line whose data drives the axis tooltip trigger.
+    // It must have real [time, value] pairs so ECharts picks up the x position.
+    const tempAnchorSeries: LineSeriesOption = {
+      name: '__anchor_temp',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      silent: true,
+      symbol: 'none',
+      lineStyle: { opacity: 0 },
+      itemStyle: { opacity: 0 },
+      data: tempChartData.temperatureData.map((d) => [d.time.getTime(), d.value] as [number, number]),
+    };
 
     const tempSeries: LineSeriesOption = {
       name: 'Temperature',
@@ -276,8 +281,8 @@
       lineStyle: { color: '#e53e3e', width: 2 },
       itemStyle: { color: '#e53e3e' },
       markArea: { silent: true, data: sunriseMarkData },
-      data: temperatureChartData.temperatureData.map((d) => [d.time.getTime(), d.value] as [number, number]),
-      tooltip: { show: false }, // handled by unified formatter
+      data: tempChartData.temperatureData.map((d) => [d.time.getTime(), d.value] as [number, number]),
+      tooltip: { show: false },
     };
 
     const dewpointSeries: LineSeriesOption = {
@@ -289,7 +294,7 @@
       symbol: 'none',
       lineStyle: { color: '#276749', width: 2 },
       itemStyle: { color: '#276749' },
-      data: temperatureChartData.dewpointData.map((d) => [d.time.getTime(), d.value] as [number, number]),
+      data: tempChartData.dewpointData.map((d) => [d.time.getTime(), d.value] as [number, number]),
       tooltip: { show: false },
     };
 
@@ -302,12 +307,28 @@
       symbol: 'none',
       lineStyle: { color: '#3182ce', width: 2, type: 'dashed' },
       itemStyle: { color: '#3182ce' },
-      data: temperatureChartData.humidityData.map((d) => [d.time.getTime(), d.value] as [number, number]),
+      data: tempChartData.humidityData.map((d) => [d.time.getTime(), d.value] as [number, number]),
       tooltip: { show: false },
     };
 
-    // ── Rain / cloud cover series ─────────────────────────────────────────────
-    const cloudItems = rainCloudChartData.cloudRects.map((r) => ({
+    // ═══════════════════════════════════════════════════════════════════════════
+    // GRID 1 – Rain / Cloud cover bands
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Anchor for grid 1 tooltip trigger
+    const rainAnchorSeries: LineSeriesOption = {
+      name: '__anchor_rain',
+      type: 'line',
+      xAxisIndex: 1,
+      yAxisIndex: 2,
+      silent: true,
+      symbol: 'none',
+      lineStyle: { opacity: 0 },
+      itemStyle: { opacity: 0 },
+      data: tempChartData.temperatureData.map((d) => [d.time.getTime(), 0.5] as [number, number]),
+    };
+
+    const cloudItems = rainChartData.cloudRects.map((r) => ({
       x1: r.x1.getTime(),
       x2: r.x2.getTime(),
       y1: r.y1,
@@ -315,17 +336,10 @@
       cloudCover: r.cloudCover,
     }));
 
-    type RainDot = { value: [number, number]; rain: number };
-    const rainData: RainDot[] = rainCloudChartData.rainDots.map((d) => ({
-      value: [d.time.getTime(), d.y] as [number, number],
-      rain: d.rain,
-    }));
-
-    // Band background markArea (phantom line over the rain/cloud grid)
     const bandMarkData: [object, object][] = [
-      [{ yAxis: 0, itemStyle: { color: '#fafafa' } }, { yAxis: 1 / 3 }],
-      [{ yAxis: 1 / 3, itemStyle: { color: '#f4f4f4' } }, { yAxis: 2 / 3 }],
-      [{ yAxis: 2 / 3, itemStyle: { color: '#eeeeee' } }, { yAxis: 1 }],
+      [{ yAxis: 0, itemStyle: { color: '#f8f8f8' } }, { yAxis: 1 / 3 }],
+      [{ yAxis: 1 / 3, itemStyle: { color: '#f2f2f2' } }, { yAxis: 2 / 3 }],
+      [{ yAxis: 2 / 3, itemStyle: { color: '#ebebeb' } }, { yAxis: 1 }],
     ];
 
     const bandPhantomSeries: LineSeriesOption = {
@@ -343,25 +357,38 @@
     };
 
     const cloudRectSeries: CustomSeriesOption = {
-      name: 'Cloud Cover',
+      name: '_cloudRects',
       type: 'custom',
       xAxisIndex: 1,
       yAxisIndex: 2,
-      silent: true, // tooltip handled globally
+      silent: true,
       renderItem(params, api) {
         const item = cloudItems[params.dataIndex];
+        // p1 = top-left corner in canvas pixels (high y-value → lower canvas-y)
         const p1 = api.coord([item.x1, item.y2]);
         const p2 = api.coord([item.x2, item.y1]);
+        const w = Math.max(0, p2[0] - p1[0]);
+        const h = Math.max(0, p2[1] - p1[1]);
+        if (w === 0 || h === 0) return { type: 'group', children: [] };
         return {
           type: 'rect',
-          shape: { x: p1[0], y: p1[1], width: Math.max(0, p2[0] - p1[0]), height: Math.max(0, p2[1] - p1[1]) },
-          style: { fill: `rgba(100,120,140,${item.cloudCover / 100})`, stroke: 'none' },
+          shape: { x: p1[0], y: p1[1], width: w, height: h },
+          style: {
+            fill: `rgba(100,120,145,${(item.cloudCover / 100).toFixed(3)})`,
+            stroke: 'none',
+          },
         };
       },
       data: cloudItems.map((_, i) => i),
       z: 1,
       tooltip: { show: false },
     };
+
+    type RainDot = { value: [number, number]; rain: number };
+    const rainData: RainDot[] = rainChartData.rainDots.map((d) => ({
+      value: [d.time.getTime(), 0.18] as [number, number],
+      rain: d.rain,
+    }));
 
     const rainSeries: ScatterSeriesOption = {
       name: 'Rain',
@@ -376,19 +403,98 @@
         if (dot.rain > 1) return [9, 14];
         return [6, 10];
       },
-      itemStyle: { color: 'rgba(30,100,220,0.75)' },
+      itemStyle: { color: 'rgba(30,100,220,0.80)' },
       z: 3,
       tooltip: { show: false },
     };
 
-    // ── Wind field series ─────────────────────────────────────────────────────
-    const windCloudItems = cloudData.map((c) => ({
-      x1: c.x1.getTime(),
-      x2: c.x2.getTime(),
-      y1: c.y1,
-      y2: c.y2,
-      value: c.value,
-    }));
+    // ═══════════════════════════════════════════════════════════════════════════
+    // GRID 2 – Wind field / cloud raster
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Anchor for grid 2 tooltip trigger
+    const windAnchorSeries: LineSeriesOption = {
+      name: '__anchor_wind',
+      type: 'line',
+      xAxisIndex: 2,
+      yAxisIndex: 3,
+      silent: true,
+      symbol: 'none',
+      lineStyle: { opacity: 0 },
+      itemStyle: { opacity: 0 },
+      data: tempChartData.temperatureData.map((d) => [d.time.getTime(), yDomain[0]] as [number, number]),
+    };
+
+    // ── Cloud gradient columns ──────────────────────────────────────────────
+    // Each WindCloudColumn covers one hourly timestamp.
+    // x is the exact hourly timestamp (same as wind arrow x), halfWidth = 30 min,
+    // so the column spans [x-30min, x+30min] — perfectly centred on each arrow.
+    //
+    // We render a single tall rectangle per column whose fill is a vertical
+    // LinearGradient derived from the cloud-cover values at each pressure level.
+    // The gradient stops are spaced proportionally by altitude so the colour
+    // correctly reflects height even though pressure levels are not evenly spaced.
+    //
+    // Gradient direction in ECharts LinearGradient: (x0,y0) → (x1,y1) in
+    // normalised rect coordinates where (0,0) = top-left, (1,1) = bottom-right.
+    // We want top of rect (highest altitude, canvas y=0) → bottom of rect
+    // (lowest altitude), so x0=0,y0=0,x1=0,y1=1.
+
+    const windCloudSeries: CustomSeriesOption = {
+      name: '_windCloud',
+      type: 'custom',
+      xAxisIndex: 2,
+      yAxisIndex: 3,
+      silent: true,
+      renderItem(params, api) {
+        const col = windCloudColumns[params.dataIndex];
+
+        // Canvas pixel coordinates for the column edges.
+        // topLeft  = coord of (left edge, top altitude)
+        // botRight = coord of (right edge, bottom altitude)
+        const topLeft = api.coord([col.x - col.halfWidth, col.yMax]);
+        const botRight = api.coord([col.x + col.halfWidth, col.yMin]);
+
+        const x = topLeft[0];
+        const y = topLeft[1];
+        const w = Math.max(1, botRight[0] - topLeft[0]);
+        const h = Math.max(1, botRight[1] - topLeft[1]);
+
+        // Build gradient stops.
+        // col.levels is sorted bottom-to-top (ascending heightMeters).
+        // We must map each level's altitude to a normalised [0,1] position in
+        // the rect, where 0 = top of rect (yMax) and 1 = bottom of rect (yMin).
+        const altRange = col.yMax - col.yMin;
+
+        // Gradient runs top→bottom in the rect (y0=0 → y1=1).
+        // A level at heightMeters=yMax maps to stop offset 0 (top).
+        // A level at heightMeters=yMin maps to stop offset 1 (bottom).
+        const stops = col.levels.map((lv) => {
+          const offset = altRange > 0 ? 1 - (lv.heightMeters - col.yMin) / altRange : 0;
+          const alpha = (0.85 * lv.cloudCover) / 100;
+          return { offset: Math.max(0, Math.min(1, offset)), color: `rgba(90,110,140,${alpha.toFixed(3)})` };
+        });
+
+        // Ensure we always have stops at exactly 0 and 1 to avoid gradient artefacts.
+        if (stops.length === 0) return { type: 'group', children: [] };
+        const firstStop = { offset: 0, color: stops[0].color };
+        const lastStop = { offset: 1, color: stops[stops.length - 1].color };
+        const allStops = [firstStop, ...stops, lastStop];
+
+        return {
+          type: 'rect',
+          // Expand 1 px horizontally to close any sub-pixel gap between columns.
+          shape: { x: x - 0.5, y, width: w + 1, height: h },
+          style: {
+            fill: new echarts.graphic.LinearGradient(0, 0, 0, 1, allStops),
+            stroke: 'none',
+          },
+        };
+      },
+      data: windCloudColumns.map((_, i) => i),
+      z: 1,
+      tooltip: { show: false },
+    };
 
     type WindItem = { time: number; height: number; speed: number; direction: number };
     const windItems: WindItem[] = windData.map((w) => ({
@@ -398,34 +504,12 @@
       direction: w.direction,
     }));
 
-    const windCloudRasterSeries: CustomSeriesOption = {
-      name: '_windCloud',
+    const windArrowSeries: CustomSeriesOption = {
+      name: '_windArrows',
       type: 'custom',
       xAxisIndex: 2,
       yAxisIndex: 3,
       silent: true,
-      renderItem(params, api) {
-        const item = windCloudItems[params.dataIndex];
-        const p1 = api.coord([item.x1, item.y2]);
-        const p2 = api.coord([item.x2, item.y1]);
-        const alpha = 0.85 * (item.value / 100);
-        return {
-          type: 'rect',
-          shape: { x: p1[0], y: p1[1], width: Math.max(0, p2[0] - p1[0]), height: Math.max(0, p2[1] - p1[1]) },
-          style: { fill: `rgba(100,120,140,${alpha})`, stroke: 'none' },
-        };
-      },
-      data: windCloudItems.map((_, i) => i),
-      z: 1,
-      tooltip: { show: false },
-    };
-
-    const windArrowSeries: CustomSeriesOption = {
-      name: 'Wind',
-      type: 'custom',
-      xAxisIndex: 2,
-      yAxisIndex: 3,
-      silent: true, // tooltip handled globally
       renderItem(params, api) {
         const item = windItems[params.dataIndex];
         const coord = api.coord([item.time, item.height]);
@@ -436,9 +520,8 @@
         const strokeW = Math.max(0.75, strokeWidthScale(item.speed));
         const color = windColorScale(item.speed) as string;
 
-        const angleDeg = item.direction - 180; // arrow points in direction wind travels
+        const angleDeg = item.direction - 180;
         const angleRad = (angleDeg * Math.PI) / 180;
-
         const dx = Math.sin(angleRad) * arrowLength;
         const dy = -Math.cos(angleRad) * arrowLength;
 
@@ -521,84 +604,136 @@
       tooltip: { show: false },
     };
 
-    // ── Unified tooltip ───────────────────────────────────────────────────────
-    // ECharts fires the tooltip on the axisPointer time value from whichever
-    // grid the cursor is in.  We snap the hovered x to the nearest hour and
-    // show a combined panel for all three charts, plus wind info at the
-    // nearest height level when hovering over the wind chart.
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Unified tooltip formatter
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ECharts passes params as an array of CallbackDataParams when trigger='axis'.
+    // The __anchor_* series have real [time, value] data so ECharts will fire the
+    // axis trigger even when the cursor is over grids with only custom series.
+    // We extract the hovered timestamp from the anchor series value.
 
     const tooltipFormatter = (paramsRaw: EChartsCallbackParams | EChartsCallbackParams[]): string => {
-      // params can be an array (axis trigger) or single object (item trigger)
       const params = Array.isArray(paramsRaw) ? paramsRaw : [paramsRaw];
       if (!params.length) return '';
 
-      // Determine hovered time from the first param that has a value
+      // Find the hovered time from any anchor series
       let hoveredTime: number | null = null;
       for (const p of params) {
-        if (p.axisValue != null) {
-          hoveredTime = p.axisValue;
-          break;
-        }
         const v = p.value as [number, number] | undefined;
-        if (v?.[0] != null) {
-          hoveredTime = v[0];
+        if (Array.isArray(v) && v[0] != null) {
+          hoveredTime = v[0] as number;
           break;
         }
       }
       if (hoveredTime == null) return '';
 
-      // Snap to nearest hour
+      // Snap to the nearest hour (data is hourly)
       const snap = Math.round(hoveredTime / 3_600_000) * 3_600_000;
       const timeStr = fmtTime(new Date(snap));
 
-      // Determine which grid is active (0=temp, 1=rain, 2=wind)
-      const activeGridIndex = params[0]?.componentIndex ?? params[0]?.seriesIndex ?? 0;
+      // Find which grid is hovered to optionally show wind data at nearest height.
+      // We determine this by which anchor series appeared in params.
+      const seriesNames = params.map((p) => p.seriesName ?? '');
+      const inWindGrid = seriesNames.some((n) => n === '__anchor_wind');
 
-      // ── Temperature section ──
-      const td = store.temperatureByTime.get(snap);
-      let html = `<div style="font-weight:600;margin-bottom:4px;border-bottom:1px solid #ddd;padding-bottom:3px">🕐 ${timeStr}</div>`;
+      let html =
+        `<div style="font-weight:600;margin-bottom:4px;padding-bottom:3px;` +
+        `border-bottom:1px solid #ddd;font-size:13px">🕐 ${timeStr}</div>`;
 
+      // ── Temperature / Dewpoint / Humidity ──
+      const td = store.tempByTime.get(snap);
       if (td) {
-        html += `<div style="display:flex;flex-direction:column;gap:1px;margin-bottom:4px">`;
-        html += `<span><span style="display:inline-block;width:10px;height:2px;background:#e53e3e;margin-right:4px;vertical-align:middle"></span>Temp: <b>${td.temp.toFixed(1)}°C</b></span>`;
-        html += `<span><span style="display:inline-block;width:10px;height:2px;background:#276749;margin-right:4px;vertical-align:middle"></span>Dew: <b>${td.dew.toFixed(1)}°C</b></span>`;
-        html += `<span><span style="display:inline-block;width:10px;height:2px;background:#3182ce;margin-right:4px;border-top:2px dashed #3182ce;height:0"></span>Humidity: <b>${td.hum.toFixed(0)}%</b></span>`;
-        html += `</div>`;
+        html += `<table style="border-collapse:collapse;width:100%;margin-bottom:4px">`;
+        html +=
+          `<tr><td style="padding:1px 4px 1px 0">` +
+          `<span style="display:inline-block;width:12px;height:2px;background:#e53e3e;vertical-align:middle;margin-right:3px"></span>` +
+          `Temp</td><td style="text-align:right;font-weight:600">${td.temp.toFixed(1)}&nbsp;°C</td></tr>`;
+        html +=
+          `<tr><td style="padding:1px 4px 1px 0">` +
+          `<span style="display:inline-block;width:12px;height:2px;background:#276749;vertical-align:middle;margin-right:3px"></span>` +
+          `Dew</td><td style="text-align:right;font-weight:600">${td.dew.toFixed(1)}&nbsp;°C</td></tr>`;
+        html +=
+          `<tr><td style="padding:1px 4px 1px 0">` +
+          `<span style="display:inline-block;width:12px;height:0;border-top:2px dashed #3182ce;vertical-align:middle;margin-right:3px"></span>` +
+          `Humidity</td><td style="text-align:right;font-weight:600">${td.hum.toFixed(0)}&nbsp;%</td></tr>`;
+        html += `</table>`;
       }
 
-      // ── Rain + cloud cover section ──
+      // ── Rain ──
       const rain = store.rainByTime.get(snap);
+      if (rain != null && rain > 0) {
+        html += `<div style="margin-bottom:3px">` + `💧 Rain:&nbsp;<b>${rain.toFixed(1)}&nbsp;mm/h</b></div>`;
+      }
+
+      // ── Cloud cover bands ──
       const low = store.cloudLowByTime.get(snap);
       const mid = store.cloudMidByTime.get(snap);
       const high = store.cloudHighByTime.get(snap);
-
-      html += `<div style="display:flex;flex-direction:column;gap:1px;margin-bottom:4px">`;
-      if (rain != null && rain > 0) {
-        html += `<span>🌧 Rain: <b>${rain.toFixed(1)} mm/h</b></span>`;
+      if (low != null || mid != null || high != null) {
+        html += `<table style="border-collapse:collapse;width:100%;margin-bottom:4px">`;
+        if (low != null)
+          html += `<tr><td style="padding:1px 4px 1px 0">☁ Low cloud</td><td style="text-align:right;font-weight:600">${low}&nbsp;%</td></tr>`;
+        if (mid != null)
+          html += `<tr><td style="padding:1px 4px 1px 0">☁ Mid cloud</td><td style="text-align:right;font-weight:600">${mid}&nbsp;%</td></tr>`;
+        if (high != null)
+          html += `<tr><td style="padding:1px 4px 1px 0">☁ High cloud</td><td style="text-align:right;font-weight:600">${high}&nbsp;%</td></tr>`;
+        html += `</table>`;
       }
-      if (low != null) html += `<span>☁ Cloud Low: <b>${low}%</b></span>`;
-      if (mid != null) html += `<span>☁ Cloud Mid: <b>${mid}%</b></span>`;
-      if (high != null) html += `<span>☁ Cloud High: <b>${high}%</b></span>`;
-      html += `</div>`;
 
       // ── Cloud base ──
       const cb = store.cloudBaseByTime.get(snap);
       if (cb != null) {
-        html += `<div style="margin-bottom:4px"><span style="display:inline-block;width:10px;height:2px;background:#805ad5;margin-right:4px;vertical-align:middle"></span>Cloud Base: <b>${Math.round(cb)} m</b></div>`;
+        html +=
+          `<div style="margin-bottom:3px">` +
+          `<span style="display:inline-block;width:12px;height:2px;background:#805ad5;vertical-align:middle;margin-right:3px"></span>` +
+          `Cloud base:&nbsp;<b>${Math.round(cb)}&nbsp;m</b></div>`;
+      }
+
+      // ── Wind at all heights (only when hovering wind grid) ──
+      if (inWindGrid) {
+        const entries: { height: number; speed: number; direction: number }[] = [];
+        for (const h of store.sortedWindHeights) {
+          const w = store.windByTimeHeight.get(`${snap}_${h}`);
+          if (w) entries.push({ height: h, speed: w.speed, direction: w.direction });
+        }
+        if (entries.length) {
+          html += `<div style="margin-top:4px;padding-top:3px;border-top:1px solid #eee;font-size:11px">`;
+          html += `<b>Wind at ${timeStr}</b>`;
+          html += `<table style="border-collapse:collapse;width:100%;margin-top:2px">`;
+          for (const e of entries) {
+            const col = windColorScale(e.speed) as string;
+            html +=
+              `<tr>` +
+              `<td style="padding:0 4px 0 0;color:#666">${e.height}&nbsp;m</td>` +
+              `<td style="color:${col};font-weight:600;text-align:right">${e.speed}&nbsp;km/h</td>` +
+              `<td style="color:#555;text-align:right;padding-left:6px">${e.direction}°</td>` +
+              `</tr>`;
+          }
+          html += `</table></div>`;
+        }
       }
 
       return html;
     };
 
-    // ── Assemble option ───────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Assemble
+    // ═══════════════════════════════════════════════════════════════════════════
+
     const allSeries: SeriesOption[] = [
+      // Grid 0
+      tempAnchorSeries,
       tempSeries,
       dewpointSeries,
       humiditySeries,
+      // Grid 1
+      rainAnchorSeries,
       bandPhantomSeries,
       cloudRectSeries,
       rainSeries,
-      windCloudRasterSeries,
+      // Grid 2 – cloud gradient must be z=1, arrows z=3, lines above
+      windAnchorSeries,
+      windCloudSeries,
       windArrowSeries,
       cloudBaseSeries,
       elevationLineSeries,
@@ -611,7 +746,7 @@
       yAxis: yAxes,
       axisPointer: {
         link: [{ xAxisIndex: [0, 1, 2] }],
-        lineStyle: { color: '#aaa', type: 'dashed' },
+        lineStyle: { color: '#999', type: 'dashed', width: 1 },
       },
       tooltip: {
         trigger: 'axis',
@@ -621,7 +756,7 @@
         borderColor: '#ddd',
         borderWidth: 1,
         textStyle: { fontSize: 12, color: '#333' },
-        extraCssText: 'box-shadow: 0 2px 8px rgba(0,0,0,0.12); max-width: 220px;',
+        extraCssText: 'box-shadow:0 2px 10px rgba(0,0,0,0.14);max-width:260px;overflow-y:auto;max-height:80vh;',
         confine: true,
       },
       series: allSeries,
@@ -634,8 +769,6 @@
     let currentWorker: Worker | null = null;
     let chart: echarts.ECharts | null = null;
     let resizeObserver: ResizeObserver | null = null;
-
-    ensureRaindropSymbol(); // noop, kept for clarity
 
     function destroyChart() {
       resizeObserver?.disconnect();
@@ -659,23 +792,24 @@
 
         if (response.success) {
           try {
-            const { cloudData, windData, cloudBase, temperatureChartData, rainCloudChartData, windChartData, xDomain } =
-              response.data;
+            const {
+              cloudData,
+              windCloudColumns,
+              windData,
+              cloudBase,
+              temperatureChartData,
+              rainCloudChartData,
+              windChartData,
+              xDomain,
+            } = response.data;
 
-            // Single canvas element sized to fit all grids
             const canvas = document.createElement('div');
             canvas.style.cssText = `width:100%;height:${TOTAL_HEIGHT}px;`;
             node.appendChild(canvas);
 
             chart = echarts.init(canvas);
 
-            const store = buildTooltipStore(
-              temperatureChartData,
-              rainCloudChartData,
-              windData,
-              cloudBase,
-              windChartData.timezoneAbbr
-            );
+            const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, cloudBase);
 
             chart.setOption(
               buildOption(
@@ -683,6 +817,7 @@
                 rainCloudChartData,
                 windData,
                 cloudData,
+                windCloudColumns,
                 cloudBase,
                 windChartData,
                 xDomain,
@@ -741,7 +876,7 @@
   {#if isRendering}
     <div class="loading-state">
       <div class="loading-spinner"></div>
-      <p>Processing weather data...</p>
+      <p>Processing weather data…</p>
     </div>
   {/if}
   <div use:renderChart={weatherData} class="chart-content" style="opacity: {isRendering ? 0 : 1}"></div>
@@ -760,13 +895,13 @@
         <span class="legend-line" style="background:#276749"></span>Dewpoint
       </span>
       <span class="legend-item">
-        <span class="legend-line legend-dashed" style="border-color:#3182ce"></span>Humidity
+        <span class="legend-dashed" style="border-color:#3182ce"></span>Humidity
       </span>
       <span class="legend-item">
         <span class="legend-line" style="background:#805ad5"></span>Cloud Base
       </span>
       <span class="legend-item">
-        <span class="legend-line legend-dashed" style="border-color:#8B4513"></span>Surface Elev.
+        <span class="legend-dashed" style="border-color:#8B4513"></span>Surface Elev.
       </span>
       <span class="legend-item">
         <span class="legend-raindrop">💧</span>Rain
@@ -774,34 +909,36 @@
     </div>
   </div>
 
-  <!-- Row 2: Cloud cover gradient -->
+  <!-- Row 2: Cloud cover -->
   <div class="legend-section">
     <span class="legend-title">Cloud Cover</span>
     <div class="legend-gradient-wrap">
       <div
         class="legend-gradient"
-        style="background: linear-gradient(to right, rgba(100,120,140,0) 0%, rgba(100,120,140,0.5) 50%, rgba(100,120,140,0.85) 100%);"
+        style="background:linear-gradient(to right,
+          rgba(100,120,145,0) 0%,
+          rgba(100,120,145,0.4) 50%,
+          rgba(100,120,145,0.82) 100%);"
       ></div>
       <div class="legend-gradient-ticks">
         <span>0%</span><span>50%</span><span>100%</span>
       </div>
     </div>
     <div class="legend-bands">
-      <span class="band-label" style="background:#fafafa">Low</span>
-      <span class="band-label" style="background:#f4f4f4">Mid</span>
-      <span class="band-label" style="background:#eeeeee">High</span>
-      <span class="band-note">(rain/cloud panel)</span>
-      <span class="band-label" style="background:#dde4ea;color:#333">↑ in wind panel</span>
+      <span class="band-label" style="background:#f8f8f8">Low</span>
+      <span class="band-label" style="background:#f2f2f2">Mid</span>
+      <span class="band-label" style="background:#ebebeb">High</span>
+      <span class="band-note">(rain panel)</span>
     </div>
   </div>
 
-  <!-- Row 3: Wind speed gradient -->
+  <!-- Row 3: Wind speed -->
   <div class="legend-section">
     <span class="legend-title">Wind Speed (km/h)</span>
     <div class="legend-gradient-wrap">
       <div
         class="legend-gradient"
-        style="background: linear-gradient(to right, {windDomains
+        style="background:linear-gradient(to right, {windDomains
           .map((d, i) => `${windColors[i]} ${((d / windMaxSpeed) * 100).toFixed(1)}%`)
           .join(', ')});"
       ></div>
@@ -815,6 +952,8 @@
 </div>
 
 <style>
+  /* ── Chart ───────────────────────────────────────────────────────────────── */
+
   .chart-container {
     width: 100%;
     max-width: 1040px;
