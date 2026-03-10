@@ -13,7 +13,7 @@ import type {
 import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { makeAnchorSeries, makeLineSeries } from '$lib/charts/seriesFactories';
-import { createTooltipFormatter, type TooltipStore } from '$lib/charts/tooltipFormatter';
+import { createTooltipFormatter, type TooltipStore, type ActiveState } from '$lib/charts/tooltipFormatter';
 import type { TemperatureChartData, RainCloudChartData, WindChartData } from '$lib/workers/chartWorker.types';
 import type { WindFieldLevel } from '$lib/charts/wind';
 import type { CloudCoverData } from '$lib/charts/clouds';
@@ -107,7 +107,8 @@ export function buildWindChartOption(
   cloudBase: Array<{ x: Date; y: number }>,
   windChartData: WindChartData,
   xDomain: [Date, Date],
-  store: TooltipStore
+  store: TooltipStore,
+  activeState: ActiveState
 ): EChartsOption {
   const xMin = xDomain[0].getTime();
   const xMax = xDomain[1].getTime();
@@ -488,7 +489,7 @@ export function buildWindChartOption(
   // Unified tooltip formatter
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const tooltipFormatter = createTooltipFormatter(store);
+  const tooltipFormatter = createTooltipFormatter(store, activeState);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Assemble
@@ -524,7 +525,7 @@ export function buildWindChartOption(
     },
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'line' },
+      axisPointer: { type: 'cross' },
       formatter: tooltipFormatter as TooltipComponentOption['formatter'],
       backgroundColor: 'rgba(255,255,255,0.97)',
       borderColor: '#ddd',

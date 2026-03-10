@@ -1,6 +1,6 @@
 <script lang="ts">
   import * as echarts from 'echarts';
-  import { buildTooltipStore } from '$lib/charts/tooltipFormatter';
+  import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
   import { buildWindChartOption, TOTAL_HEIGHT } from '$lib/charts/buildWindChartOption';
   import type { WeatherDataType } from '$lib/api/types';
   import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
@@ -72,6 +72,7 @@
         chart = echarts.init(canvas);
 
         const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, cloudBase);
+        const activeState: ActiveState = createActiveState();
 
         chart.setOption(
           buildWindChartOption(
@@ -82,9 +83,44 @@
             cloudBase,
             windChartData,
             xDomain,
-            store
+            store,
+            activeState
           )
         );
+
+        // Track which grid the cursor is in and the hovered y-value for the
+        // wind grid.  ECharts fires `updateaxispointer` on every mouse-move
+        // with an `axesInfo` array describing each active axis.
+        //
+        // Y-axis → grid mapping:
+        //   axisIndex 0 or 1  →  grid 0 (temperature)
+        //   axisIndex 2       →  grid 1 (rain / cloud)
+        //   axisIndex 3       →  grid 2 (wind field)
+        chart.on('updateaxispointer', (event: unknown) => {
+          const e = event as { axesInfo?: Array<{ axisDim: string; axisIndex: number; value: number }> };
+          const axes = e?.axesInfo;
+          if (!axes?.length) {
+            activeState.gridIndex = -1;
+            activeState.hoveredWindY = null;
+            return;
+          }
+          const yInfo = axes.find((a) => a.axisDim === 'y');
+          if (!yInfo) {
+            activeState.gridIndex = -1;
+            activeState.hoveredWindY = null;
+            return;
+          }
+          if (yInfo.axisIndex <= 1) {
+            activeState.gridIndex = 0;
+            activeState.hoveredWindY = null;
+          } else if (yInfo.axisIndex === 2) {
+            activeState.gridIndex = 1;
+            activeState.hoveredWindY = null;
+          } else {
+            activeState.gridIndex = 2;
+            activeState.hoveredWindY = yInfo.value;
+          }
+        });
 
         resizeObserver = new ResizeObserver(() => chart?.resize());
         resizeObserver.observe(node);
