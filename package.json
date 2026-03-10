@@ -23,7 +23,6 @@
     "@types/d3": "^7.4.3",
     "@types/eslint": "^9.6.1",
     "@types/maplibre-gl": "^1.14.0",
-    "@vite-pwa/sveltekit": "^1.1.0",
     "clsx": "^2.1.1",
     "d3": "^7.9.0",
     "eslint": "^10.0.3",
@@ -46,6 +45,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^7.3.1",
+    "vite-plugin-pwa": "^1.2.0",
     "vitest": "^4.0.18"
   }
 }

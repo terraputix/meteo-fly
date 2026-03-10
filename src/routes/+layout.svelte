@@ -2,7 +2,6 @@
   import '../app.css';
   import { onMount } from 'svelte';
   import { pwaInfo } from 'virtual:pwa-info';
-  import { useRegisterSW } from 'virtual:pwa-register/svelte';
 
   const webManifest = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
@@ -25,6 +24,7 @@
 </script>
 
 <svelte:head>
+  {@html webManifest}
   <title>Meteo-Fly - Wind Forecast for Paragliding & Hang Gliding</title>
   <meta
     name="description"

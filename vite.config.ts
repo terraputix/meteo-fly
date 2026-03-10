@@ -1,13 +1,13 @@
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { SvelteKitPWA } from '@vite-pwa/sveltekit';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
     tailwindcss(),
     sveltekit(),
-    SvelteKitPWA({
+    VitePWA({
       strategies: 'generateSW',
       registerType: 'autoUpdate',
       manifest: {
