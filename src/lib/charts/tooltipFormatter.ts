@@ -2,6 +2,7 @@ import type { TemperatureChartData, RainCloudChartData } from '$lib/workers/char
 import type { WindFieldLevel } from '$lib/charts/wind';
 import { windColorScale } from '$lib/charts/scales';
 import { CHART_COLORS } from '$lib/charts/chartColors';
+import { fmtTime } from '$lib/helpers';
 
 // ─── Tooltip store ──────────────────────────────────────────────────────────
 // Pre-built look-up maps keyed by timestamp so the formatter is O(1).
@@ -79,12 +80,6 @@ export interface TooltipParam {
   value?: [number, number];
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function fmtTime(d: Date): string {
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
-}
-
 /** Tiny helper to build an inline colour swatch for the tooltip. */
 function swatch(color: string, dashed = false): string {
   if (dashed) {
@@ -120,10 +115,6 @@ export function createTooltipFormatter(store: TooltipStore): (paramsRaw: Tooltip
     // Snap to the nearest hour (data is hourly)
     const snap = Math.round(hoveredTime / 3_600_000) * 3_600_000;
     const timeStr = fmtTime(new Date(snap));
-
-    // Determine which grid is hovered
-    const seriesNames = params.map((p) => p.seriesName ?? '');
-    const inWindGrid = seriesNames.some((n) => n === '__anchor_wind');
 
     let html =
       `<div style="font-weight:600;margin-bottom:4px;padding-bottom:3px;` +
@@ -178,28 +169,25 @@ export function createTooltipFormatter(store: TooltipStore): (paramsRaw: Tooltip
         `Cloud base:&nbsp;<b>${Math.round(cb)}&nbsp;m</b></div>`;
     }
 
-    // ── Wind at all heights (only when hovering wind grid) ──
-    if (inWindGrid) {
-      const entries: { height: number; speed: number; direction: number }[] = [];
-      for (const h of store.sortedWindHeights) {
-        const w = store.windByTimeHeight.get(`${snap}_${h}`);
-        if (w) entries.push({ height: h, speed: w.speed, direction: w.direction });
+    const entries: { height: number; speed: number; direction: number }[] = [];
+    for (const h of store.sortedWindHeights) {
+      const w = store.windByTimeHeight.get(`${snap}_${h}`);
+      if (w) entries.push({ height: h, speed: w.speed, direction: w.direction });
+    }
+    if (entries.length) {
+      html += `<div style="margin-top:4px;padding-top:3px;border-top:1px solid #eee;font-size:11px">`;
+      html += `<b>Wind at ${timeStr}</b>`;
+      html += `<table style="border-collapse:collapse;width:100%;margin-top:2px">`;
+      for (const e of entries) {
+        const col = windColorScale(e.speed) as string;
+        html +=
+          `<tr>` +
+          `<td style="padding:0 4px 0 0;color:#666">${e.height}&nbsp;m</td>` +
+          `<td style="color:${col};font-weight:600;text-align:right">${e.speed}&nbsp;km/h</td>` +
+          `<td style="color:#555;text-align:right;padding-left:6px">${e.direction}°</td>` +
+          `</tr>`;
       }
-      if (entries.length) {
-        html += `<div style="margin-top:4px;padding-top:3px;border-top:1px solid #eee;font-size:11px">`;
-        html += `<b>Wind at ${timeStr}</b>`;
-        html += `<table style="border-collapse:collapse;width:100%;margin-top:2px">`;
-        for (const e of entries) {
-          const col = windColorScale(e.speed) as string;
-          html +=
-            `<tr>` +
-            `<td style="padding:0 4px 0 0;color:#666">${e.height}&nbsp;m</td>` +
-            `<td style="color:${col};font-weight:600;text-align:right">${e.speed}&nbsp;km/h</td>` +
-            `<td style="color:#555;text-align:right;padding-left:6px">${e.direction}°</td>` +
-            `</tr>`;
-        }
-        html += `</table></div>`;
-      }
+      html += `</table></div>`;
     }
 
     return html;

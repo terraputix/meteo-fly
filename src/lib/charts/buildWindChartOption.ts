@@ -1,4 +1,3 @@
-import * as echarts from 'echarts';
 import type {
   EChartsOption,
   SeriesOption,
@@ -14,14 +13,12 @@ import type {
 import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { makeAnchorSeries, makeLineSeries } from '$lib/charts/seriesFactories';
-import { createTooltipFormatter, type TooltipStore, type TooltipParam } from '$lib/charts/tooltipFormatter';
-import type {
-  TemperatureChartData,
-  RainCloudChartData,
-  WindChartData,
-  WindCloudColumn,
-} from '$lib/workers/chartWorker.types';
+import { createTooltipFormatter, type TooltipStore } from '$lib/charts/tooltipFormatter';
+import type { TemperatureChartData, RainCloudChartData, WindChartData } from '$lib/workers/chartWorker.types';
 import type { WindFieldLevel } from '$lib/charts/wind';
+import type { CloudCoverData } from '$lib/charts/clouds';
+import { pressureLevels } from '$lib/charts/pressureLevels';
+import { fmtTime } from '$lib/helpers';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.
@@ -33,21 +30,42 @@ export const WIND_HEIGHT_PX = 620;
 
 export const TEMP_TOP = 10;
 const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX;
-const RAIN_GAP = 4;
+const RAIN_GAP = 20;
 export const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
 const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
-const WIND_GAP = 4;
+const WIND_GAP = 30;
 export const WIND_TOP = RAIN_BOTTOM_PX + WIND_GAP;
 export const TOTAL_HEIGHT = WIND_TOP + WIND_HEIGHT_PX + 42;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function fmtTime(d: Date): string {
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
-}
-
 // ECharts supports SVG path strings via the 'path://' prefix.
 const RAINDROP_SYMBOL = 'path://M 0 -7 C 3.5 -3.5 5 0.5 5 3 A 5 5 0 0 1 -5 3 C -5 0.5 -3.5 -3.5 0 -7 Z';
+
+// ─── Pre-computed pressure-level band boundaries ─────────────────────────────
+// For each pressure level at index i, the band it paints spans from the
+// midpoint between level[i-1] and level[i] (or the chart floor for the first)
+// to the midpoint between level[i] and level[i+1] (or the chart ceiling for
+// the last).  These boundaries are in metres and stay constant across renders.
+interface LevelBand {
+  height: number; // centre altitude of this pressure level (metres)
+  bandBottom: number; // lower altitude boundary of the band (metres)
+  bandTop: number; // upper altitude boundary of the band (metres)
+}
+
+const CLOUD_Y_FLOOR = pressureLevels[0].heightMeters - 100;
+const CLOUD_Y_CEIL = pressureLevels[pressureLevels.length - 1].heightMeters + 200;
+
+const LEVEL_BANDS: LevelBand[] = pressureLevels.map((lv, i) => {
+  const prev = pressureLevels[i - 1];
+  const next = pressureLevels[i + 1];
+  return {
+    height: lv.heightMeters,
+    bandBottom: prev ? (prev.heightMeters + lv.heightMeters) / 2 : CLOUD_Y_FLOOR,
+    bandTop: next ? (lv.heightMeters + next.heightMeters) / 2 : CLOUD_Y_CEIL,
+  };
+});
+
+// Map height → band boundaries for O(1) lookup inside renderItem.
+const BAND_BY_HEIGHT = new Map<number, LevelBand>(LEVEL_BANDS.map((b) => [b.height, b]));
 
 // ─── Shared x-axis factory ───────────────────────────────────────────────────
 
@@ -70,13 +88,22 @@ function toTimePairs(data: Array<{ time: Date; value: number }>): [number, numbe
   return data.map((d) => [d.time.getTime(), d.value]);
 }
 
+// ─── Cloud cover render items ─────────────────────────────────────────────────
+// Flat CloudCoverData[] is indexed directly; each point knows its time and
+// height.  We convert time → ms once up front so renderItem is allocation-free.
+interface CloudItem {
+  timeMs: number;
+  height: number;
+  value: number; // 0–100 %
+}
+
 // ─── Main option builder ─────────────────────────────────────────────────────
 
 export function buildWindChartOption(
   tempChartData: TemperatureChartData,
   rainChartData: RainCloudChartData,
   windData: WindFieldLevel[],
-  windCloudColumns: WindCloudColumn[],
+  cloudData: CloudCoverData[],
   cloudBase: Array<{ x: Date; y: number }>,
   windChartData: WindChartData,
   xDomain: [Date, Date],
@@ -116,6 +143,7 @@ export function buildWindChartOption(
       type: 'value',
       gridIndex: 0,
       name: '°C',
+      offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
       min: tempAxisMin,
@@ -128,6 +156,7 @@ export function buildWindChartOption(
       type: 'value',
       gridIndex: 0,
       name: 'Hum%',
+      offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
       min: humMin,
@@ -140,6 +169,7 @@ export function buildWindChartOption(
     {
       type: 'value',
       gridIndex: 1,
+      offset: 10,
       min: 0,
       max: 1,
       axisLabel: { show: false },
@@ -152,6 +182,7 @@ export function buildWindChartOption(
       type: 'value',
       gridIndex: 2,
       name: 'm',
+      offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
       min: yDomain[0],
@@ -304,7 +335,20 @@ export function buildWindChartOption(
     tempChartData.temperatureData.map((d) => [d.time.getTime(), yDomain[0]] as [number, number])
   );
 
-  // ── Cloud gradient columns ──────────────────────────────────────────────
+  // ── Cloud cover rectangles ─────────────────────────────────────────────────
+  // Each CloudCoverData point maps to exactly one rect in the wind grid whose
+  // horizontal extent spans ±30 min around the observation time and whose
+  // vertical extent covers the midpoint band around that pressure level.
+  // api.coord() is called inside renderItem so ECharts handles all axis-to-pixel
+  // conversion correctly regardless of zoom or resize.
+  const HALF_WIDTH_MS = 1_800_000; // 30 minutes
+
+  const cloudItems2: CloudItem[] = cloudData.map((d) => ({
+    timeMs: d.time.getTime(),
+    height: d.height,
+    value: d.value,
+  }));
+
   const windCloudSeries: CustomSeriesOption = {
     name: '_windCloud',
     type: 'custom',
@@ -312,42 +356,36 @@ export function buildWindChartOption(
     yAxisIndex: 3,
     silent: true,
     renderItem(params, api) {
-      const col = windCloudColumns[params.dataIndex];
+      const item = cloudItems2[params.dataIndex];
+      if (item.value <= 0) return { type: 'group', children: [] };
 
-      const topLeft = api.coord([col.x - col.halfWidth, col.yMax]);
-      const botRight = api.coord([col.x + col.halfWidth, col.yMin]);
+      const band = BAND_BY_HEIGHT.get(item.height);
+      if (!band) return { type: 'group', children: [] };
 
-      const x = topLeft[0];
-      const y = topLeft[1];
-      const w = Math.max(1, botRight[0] - topLeft[0]);
-      const h = Math.max(1, botRight[1] - topLeft[1]);
+      // Horizontal: pixel coords of the ±30 min window around this timestamp.
+      const xLeft = api.coord([item.timeMs - HALF_WIDTH_MS, band.bandBottom])[0];
+      const xRight = api.coord([item.timeMs + HALF_WIDTH_MS, band.bandBottom])[0];
+      const w = Math.max(1, xRight - xLeft);
 
-      const altRange = col.yMax - col.yMin;
+      // Vertical: pixel coords of the band boundaries.
+      // Higher altitude → smaller canvas-y, so yTop < yBottom in pixel space.
+      const yBottom = api.coord([item.timeMs, band.bandBottom])[1];
+      const yTop = api.coord([item.timeMs, band.bandTop])[1];
+      const h = Math.max(1, yBottom - yTop);
 
-      const stops = col.levels.map((lv) => {
-        const offset = altRange > 0 ? 1 - (lv.heightMeters - col.yMin) / altRange : 0;
-        const alpha = (0.85 * lv.cloudCover) / 100;
-        return {
-          offset: Math.max(0, Math.min(1, offset)),
-          color: `${CHART_COLORS.windCloud},${alpha.toFixed(3)})`,
-        };
-      });
-
-      if (stops.length === 0) return { type: 'group', children: [] };
-      const firstStop = { offset: 0, color: stops[0].color };
-      const lastStop = { offset: 1, color: stops[stops.length - 1].color };
-      const allStops = [firstStop, ...stops, lastStop];
+      const alpha = (0.85 * item.value) / 100;
 
       return {
         type: 'rect',
-        shape: { x: x - 0.5, y, width: w + 1, height: h },
+        // Expand 1 px horizontally to close any sub-pixel gap between columns.
+        shape: { x: xLeft - 0.5, y: yTop, width: w + 1, height: h },
         style: {
-          fill: new echarts.graphic.LinearGradient(0, 0, 0, 1, allStops),
+          fill: `${CHART_COLORS.windCloud},${alpha.toFixed(3)})`,
           stroke: 'none',
         },
       };
     },
-    data: windCloudColumns.map((_, i) => i),
+    data: cloudItems2.map((_, i) => i),
     z: 1,
     tooltip: { show: false },
   };
@@ -467,7 +505,7 @@ export function buildWindChartOption(
     bandPhantomSeries,
     cloudRectSeries,
     rainSeries,
-    // Grid 2 – cloud gradient must be z=1, arrows z=3, lines above
+    // Grid 2 – cloud rects z=1, arrows z=3, lines above
     windAnchorSeries,
     windCloudSeries,
     windArrowSeries,
