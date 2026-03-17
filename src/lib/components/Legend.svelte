@@ -38,12 +38,6 @@
         <span>0%</span><span>50%</span><span>100%</span>
       </div>
     </div>
-    <div class="legend-bands">
-      <span class="band-label" style="background:#f8f8f8">Low</span>
-      <span class="band-label" style="background:#f2f2f2">Mid</span>
-      <span class="band-label" style="background:#ebebeb">High</span>
-      <span class="band-note">(rain panel)</span>
-    </div>
   </div>
 
   <!-- Row 3: Wind speed -->
@@ -152,26 +146,6 @@
     justify-content: space-between;
     font-size: 0.62rem;
     color: #888;
-  }
-
-  .legend-bands {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-
-  .band-label {
-    padding: 1px 6px;
-    border-radius: 3px;
-    border: 1px solid #ddd;
-    font-size: 0.68rem;
-    color: #555;
-  }
-
-  .band-note {
-    font-size: 0.65rem;
-    color: #999;
   }
 
   @media (max-width: 768px) {

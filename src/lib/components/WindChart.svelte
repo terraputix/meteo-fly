@@ -151,14 +151,20 @@
   }
 </script>
 
-<div class="chart-container">
+<div class="chart-container" style="min-height: {TOTAL_HEIGHT}px;">
   {#if isRendering}
     <div class="loading-state">
       <div class="loading-spinner"></div>
       <p>Processing weather data…</p>
     </div>
   {/if}
-  <div use:renderChart={weatherData} class="chart-content" style="opacity: {isRendering ? 0 : 1}"></div>
+
+  <!-- Use a wrapper with fixed height to prevent layout shift -->
+  <div
+    use:renderChart={weatherData}
+    class="chart-content"
+    style="opacity: {isRendering ? 0 : 1}; height: {TOTAL_HEIGHT}px;"
+  ></div>
 </div>
 
 <Legend />
@@ -166,19 +172,18 @@
 <style>
   .chart-container {
     width: 100%;
-    max-width: 1040px;
+    max-width: 920px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     align-items: stretch;
     position: relative;
     padding: 0 20px;
+    contain: layout;
   }
 
   .chart-content {
     width: 100%;
-    display: flex;
-    flex-direction: column;
     transition: opacity 0.3s ease;
   }
 
@@ -190,8 +195,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    gap: 12px;
     z-index: 10;
+    pointer-events: none;
   }
 
   .loading-spinner {

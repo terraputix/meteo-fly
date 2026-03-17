@@ -24,16 +24,16 @@ import { fmtTime } from '$lib/helpers';
 // All grids share the same left/right so x-axes align perfectly.
 export const MARGIN_LEFT = 60;
 export const MARGIN_RIGHT = 70;
-export const TEMP_HEIGHT_PX = 160;
-export const RAIN_HEIGHT_PX = 100;
-export const WIND_HEIGHT_PX = 620;
+export const TEMP_HEIGHT_PX = 130;
+export const RAIN_HEIGHT_PX = 66;
+export const WIND_HEIGHT_PX = 440;
 
 export const TEMP_TOP = 10;
 const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX;
-const RAIN_GAP = 20;
+const RAIN_GAP = 10;
 export const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
 const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
-const WIND_GAP = 30;
+const WIND_GAP = 20;
 export const WIND_TOP = RAIN_BOTTOM_PX + WIND_GAP;
 export const TOTAL_HEIGHT = WIND_TOP + WIND_HEIGHT_PX + 42;
 
@@ -144,11 +144,13 @@ export function buildWindChartOption(
       type: 'value',
       gridIndex: 0,
       name: '°C',
+      nameGap: 0,
       offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
-      min: tempAxisMin,
-      max: tempAxisMax,
+      interval: 5,
+      min: Math.round(tempAxisMin / 5) * 5,
+      max: Math.round(tempAxisMax / 5) * 5,
       axisLabel: { fontSize: 11 },
       splitLine: { show: true, lineStyle: { color: CHART_COLORS.gridLine } },
     },
@@ -156,24 +158,36 @@ export function buildWindChartOption(
     {
       type: 'value',
       gridIndex: 0,
-      name: 'Hum%',
+      name: 'Hum %',
+      nameGap: 0,
       offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
       min: humMin,
       max: humMax,
       position: 'right',
-      axisLabel: { formatter: (v: number) => `${v}%`, fontSize: 11 },
+      axisLabel: { fontSize: 11 },
       splitLine: { show: false },
     },
     // 2 – rain/cloud hidden
     {
       type: 'value',
       gridIndex: 1,
-      offset: 10,
       min: 0,
-      max: 1,
-      axisLabel: { show: false },
+      max: 3,
+      interval: 0.5,
+      axisLabel: {
+        show: true,
+        fontSize: 10,
+        color: '#999',
+        margin: 10,
+        formatter: (v: number) => {
+          if (v === 0.5) return 'Low ☁️';
+          if (v === 1.5) return 'Mid ☁️';
+          if (v === 2.5) return 'High ☁️';
+          return '';
+        },
+      },
       axisTick: { show: false },
       axisLine: { show: false },
       splitLine: { show: false },
@@ -183,6 +197,7 @@ export function buildWindChartOption(
       type: 'value',
       gridIndex: 2,
       name: 'm',
+      nameGap: 0,
       offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
@@ -243,8 +258,24 @@ export function buildWindChartOption(
     '__anchor_rain',
     1,
     2,
-    tempChartData.temperatureData.map((d) => [d.time.getTime(), 0.5] as [number, number])
+    tempChartData.temperatureData.map((d) => [d.time.getTime(), 1.5] as [number, number])
   );
+
+  rainAnchorSeries.markLine = {
+    silent: true,
+    symbol: 'none',
+    label: { show: false },
+    lineStyle: {
+      color: CHART_COLORS.gridLine,
+      type: 'solid',
+      width: 1,
+    },
+    data: [
+      { yAxis: 1 }, // Line between Low and Mid
+      { yAxis: 2 }, // Line between Mid and High
+      { yAxis: 3 }, // Line between Mid and High
+    ],
+  };
 
   const cloudItems = rainChartData.cloudRects.map((r) => ({
     x1: r.x1.getTime(),
@@ -254,26 +285,6 @@ export function buildWindChartOption(
     cloudCover: r.cloudCover,
   }));
 
-  const bandMarkData: [object, object][] = [
-    [{ yAxis: 0, itemStyle: { color: '#f8f8f8' } }, { yAxis: 1 / 3 }],
-    [{ yAxis: 1 / 3, itemStyle: { color: '#f2f2f2' } }, { yAxis: 2 / 3 }],
-    [{ yAxis: 2 / 3, itemStyle: { color: '#ebebeb' } }, { yAxis: 1 }],
-  ];
-
-  const bandPhantomSeries: LineSeriesOption = {
-    name: '_bands',
-    type: 'line',
-    xAxisIndex: 1,
-    yAxisIndex: 2,
-    silent: true,
-    symbol: 'none',
-    lineStyle: { opacity: 0 },
-    data: [[xMin, 0] as [number, number], [xMax, 1] as [number, number]],
-    markArea: { silent: true, data: bandMarkData },
-    z: 0,
-    tooltip: { show: false },
-  };
-
   const cloudRectSeries: CustomSeriesOption = {
     name: '_cloudRects',
     type: 'custom',
@@ -282,8 +293,8 @@ export function buildWindChartOption(
     silent: true,
     renderItem(params, api) {
       const item = cloudItems[params.dataIndex];
-      const p1 = api.coord([item.x1, item.y2]);
-      const p2 = api.coord([item.x2, item.y1]);
+      const p1 = api.coord([item.x1, item.y2 * 3]);
+      const p2 = api.coord([item.x2, item.y1 * 3]);
       const w = Math.max(0, p2[0] - p1[0]);
       const h = Math.max(0, p2[1] - p1[1]);
       if (w === 0 || h === 0) return { type: 'group', children: [] };
@@ -303,7 +314,7 @@ export function buildWindChartOption(
 
   type RainDot = { value: [number, number]; rain: number };
   const rainData: RainDot[] = rainChartData.rainDots.map((d) => ({
-    value: [d.time.getTime(), 0.18] as [number, number],
+    value: [d.time.getTime(), 0.5] as [number, number],
     rain: d.rain,
   }));
 
@@ -503,7 +514,6 @@ export function buildWindChartOption(
     humiditySeries,
     // Grid 1
     rainAnchorSeries,
-    bandPhantomSeries,
     cloudRectSeries,
     rainSeries,
     // Grid 2 – cloud rects z=1, arrows z=3, lines above

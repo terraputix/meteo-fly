@@ -190,23 +190,23 @@ export function createTooltipFormatter(
 
     // ── Grid 1 – Rain / Cloud cover bands ──────────────────────────────────
     if (gridIndex === 1 || gridIndex === -1) {
-      const rain = store.rainByTime.get(snap);
-      if (rain != null && rain > 0) {
-        html += `<div style="margin-bottom:3px">💧 Rain:&nbsp;<b>${rain.toFixed(1)}&nbsp;mm/h</b></div>`;
-      }
-
       const low = store.cloudLowByTime.get(snap);
       const mid = store.cloudMidByTime.get(snap);
       const high = store.cloudHighByTime.get(snap);
       if (low != null || mid != null || high != null) {
         html += `<table style="border-collapse:collapse;width:100%;margin-bottom:4px">`;
-        if (low != null)
-          html += `<tr><td style="padding:1px 4px 1px 0">☁ Low cloud</td><td style="text-align:right;font-weight:600">${low}&nbsp;%</td></tr>`;
-        if (mid != null)
-          html += `<tr><td style="padding:1px 4px 1px 0">☁ Mid cloud</td><td style="text-align:right;font-weight:600">${mid}&nbsp;%</td></tr>`;
         if (high != null)
           html += `<tr><td style="padding:1px 4px 1px 0">☁ High cloud</td><td style="text-align:right;font-weight:600">${high}&nbsp;%</td></tr>`;
+        if (mid != null)
+          html += `<tr><td style="padding:1px 4px 1px 0">☁ Mid cloud</td><td style="text-align:right;font-weight:600">${mid}&nbsp;%</td></tr>`;
+        if (low != null)
+          html += `<tr><td style="padding:1px 4px 1px 0">☁ Low cloud</td><td style="text-align:right;font-weight:600">${low}&nbsp;%</td></tr>`;
+
         html += `</table>`;
+      }
+      const rain = store.rainByTime.get(snap);
+      if (rain != null && rain > 0) {
+        html += `<div style="margin-bottom:3px">💧 Rain:&nbsp;<b>${rain.toFixed(1)}&nbsp;mm/h</b></div>`;
       }
     }
 
