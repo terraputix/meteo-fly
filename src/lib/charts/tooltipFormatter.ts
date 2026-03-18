@@ -23,7 +23,7 @@ export function buildTooltipStore(
   tempData: TemperatureChartData,
   rainData: RainCloudChartData,
   windData: WindFieldLevel[],
-  cloudBase: Array<{ x: Date; y: number }>
+  cloudBase: Array<{ time: Date; value: number }>
 ): TooltipStore {
   const tempByTime = new Map<number, { temp: number; dew: number; hum: number }>();
   tempData.temperatureData.forEach((d, i) => {
@@ -48,7 +48,7 @@ export function buildTooltipStore(
   });
 
   const cloudBaseByTime = new Map<number, number>();
-  cloudBase.forEach((d) => cloudBaseByTime.set(d.x.getTime(), d.y));
+  cloudBase.forEach((d) => cloudBaseByTime.set(d.time.getTime(), d.value));
 
   const windByTimeHeight = new Map<string, { speed: number; direction: number }>();
   const windTimesSet = new Set<number>();

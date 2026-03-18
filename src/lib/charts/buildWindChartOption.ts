@@ -3,7 +3,6 @@ import type {
   SeriesOption,
   CustomSeriesOption,
   LineSeriesOption,
-  ScatterSeriesOption,
   TooltipComponentOption,
   GridComponentOption,
   XAXisComponentOption,
@@ -14,7 +13,7 @@ import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { makeAnchorSeries, makeLineSeries } from '$lib/charts/seriesFactories';
 import { createTooltipFormatter, type TooltipStore, type ActiveState } from '$lib/charts/tooltipFormatter';
-import type { TemperatureChartData, RainCloudChartData, WindChartData } from '$lib/workers/chartWorker.types';
+import type { TemperatureChartData, RainCloudChartData } from '$lib/workers/chartWorker.types';
 import type { WindFieldLevel } from '$lib/charts/wind';
 import type { CloudCoverData } from '$lib/charts/clouds';
 import { pressureLevels } from '$lib/charts/pressureLevels';
@@ -36,9 +35,6 @@ const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
 const WIND_GAP = 20;
 export const WIND_TOP = RAIN_BOTTOM_PX + WIND_GAP;
 export const TOTAL_HEIGHT = WIND_TOP + WIND_HEIGHT_PX + 42;
-
-// ECharts supports SVG path strings via the 'path://' prefix.
-const RAINDROP_SYMBOL = 'path://M 0 -7 C 3.5 -3.5 5 0.5 5 3 A 5 5 0 0 1 -5 3 C -5 0.5 -3.5 -3.5 0 -7 Z';
 
 // ─── Pre-computed pressure-level band boundaries ─────────────────────────────
 // For each pressure level at index i, the band it paints spans from the
@@ -104,8 +100,9 @@ export function buildWindChartOption(
   rainChartData: RainCloudChartData,
   windData: WindFieldLevel[],
   cloudData: CloudCoverData[],
-  cloudBase: Array<{ x: Date; y: number }>,
-  windChartData: WindChartData,
+  cloudBase: Array<{ time: Date; value: number }>,
+  elevation: number,
+  timezoneAbbr: string,
   xDomain: [Date, Date],
   store: TooltipStore,
   activeState: ActiveState
@@ -126,14 +123,13 @@ export function buildWindChartOption(
     makeXAxis(1, false, xMin, xMax),
     {
       ...makeXAxis(2, true, xMin, xMax),
-      name: `Time [${windChartData.timezoneAbbr}]`,
+      name: `Time [${timezoneAbbr}]`,
       nameLocation: 'middle',
       nameGap: 28,
     },
   ];
 
   // ── Y axes ─────────────────────────────────────────────────────────────────
-  const { elevation } = windChartData;
   const WIND_Y_MIN = 0;
   const WIND_Y_MAX = 4350;
 
@@ -257,7 +253,7 @@ export function buildWindChartOption(
     '__anchor_rain',
     1,
     2,
-    tempChartData.temperatureData.map((d) => [d.time.getTime(), 1.5] as [number, number])
+    rainChartData.cloudRects.filter((r) => r.y1 === 0).map((r) => [r.x1.getTime() + 1_800_000, 1.5] as [number, number])
   );
 
   rainAnchorSeries.markLine = {
@@ -482,7 +478,7 @@ export function buildWindChartOption(
     xAxisIndex: 2,
     yAxisIndex: 3,
     color: CHART_COLORS.cloudBase,
-    data: cloudBase.map((d) => [d.x.getTime(), d.y] as [number, number]),
+    data: cloudBase.map((d) => [d.time.getTime(), d.value] as [number, number]),
     z: 4,
   });
 

@@ -28,20 +28,16 @@ export interface RainCloudChartData {
   }>;
 }
 
-export interface WindChartData {
-  elevation: number;
-  timezoneAbbr: string;
-}
-
 export interface ChartWorkerSuccessOutput {
   success: true;
   data: {
     cloudData: CloudCoverData[];
     windData: WindFieldLevel[];
-    cloudBase: Array<{ x: Date; y: number }>;
+    cloudBase: Array<{ time: Date; value: number }>;
+    elevation: number;
+    timezoneAbbr: string;
     temperatureChartData: TemperatureChartData;
     rainCloudChartData: RainCloudChartData;
-    windChartData: WindChartData;
     xDomain: [Date, Date];
   };
 }

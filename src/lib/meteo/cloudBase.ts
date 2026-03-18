@@ -25,8 +25,8 @@ function calculateCloudBase(temperature: number, dewpoint: number): number {
   return Math.round(cloudBaseHeight);
 }
 
-export function calculateCloudBaseWeather(data: WeatherDataType): { x: Date; y: number }[] {
-  const cloudBases: { x: Date; y: number }[] = [];
+export function calculateCloudBaseWeather(data: WeatherDataType): { time: Date; value: number }[] {
+  const cloudBases: { time: Date; value: number }[] = [];
 
   const times = data.hourly.time;
   const temperatures = data.hourly.temperature_2m;
@@ -37,7 +37,7 @@ export function calculateCloudBaseWeather(data: WeatherDataType): { x: Date; y: 
     const dewpoint = dewpoints[i];
 
     const cloudBase = calculateCloudBase(temperature, dewpoint);
-    cloudBases.push({ x: times[i], y: cloudBase + data.elevation });
+    cloudBases.push({ time: times[i], value: cloudBase + data.elevation });
   }
 
   return cloudBases;

@@ -10,7 +10,6 @@ import type {
   ChartWorkerErrorOutput,
   TemperatureChartData,
   RainCloudChartData,
-  WindChartData,
 } from './chartWorker.types';
 import { addSeconds } from '$lib/utils/dateExtensions';
 
@@ -67,13 +66,6 @@ function prepareRainAndCloudData(data: WeatherDataType): RainCloudChartData {
   };
 }
 
-function prepareWindChartData(data: WeatherDataType): WindChartData {
-  return {
-    elevation: data.elevation,
-    timezoneAbbr: data.timezoneAbbr,
-  };
-}
-
 function calculateDomains(windData: Array<{ time: Date }>): [Date, Date] {
   const xMin = addSeconds(d3Min(windData, (d) => d.time) as Date, -1800);
   const xMax = addSeconds(d3Max(windData, (d) => d.time) as Date, 1800);
@@ -92,7 +84,6 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
 
     const temperatureChartData = prepareTemperatureData(weatherData);
     const rainCloudChartData = prepareRainAndCloudData(weatherData);
-    const windChartData = prepareWindChartData(weatherData);
 
     const successResponse: ChartWorkerSuccessOutput = {
       success: true,
@@ -100,9 +91,10 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
         cloudData,
         windData,
         cloudBase,
+        elevation: weatherData.elevation,
+        timezoneAbbr: weatherData.timezoneAbbr,
         temperatureChartData,
         rainCloudChartData,
-        windChartData,
         xDomain,
       },
     };

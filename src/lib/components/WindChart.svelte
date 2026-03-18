@@ -62,8 +62,16 @@
           return;
         }
 
-        const { cloudData, windData, cloudBase, temperatureChartData, rainCloudChartData, windChartData, xDomain } =
-          response.data;
+        const {
+          cloudData,
+          windData,
+          cloudBase,
+          elevation,
+          timezoneAbbr,
+          temperatureChartData,
+          rainCloudChartData,
+          xDomain,
+        } = response.data;
 
         const canvas = document.createElement('div');
         canvas.style.cssText = `width:100%;height:${TOTAL_HEIGHT}px;`;
@@ -81,7 +89,8 @@
             windData,
             cloudData,
             cloudBase,
-            windChartData,
+            elevation,
+            timezoneAbbr,
             xDomain,
             store,
             activeState
