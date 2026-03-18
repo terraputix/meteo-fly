@@ -196,11 +196,11 @@ export function createTooltipFormatter(
       if (low != null || mid != null || high != null) {
         html += `<table style="border-collapse:collapse;width:100%;margin-bottom:4px">`;
         if (high != null)
-          html += `<tr><td style="padding:1px 4px 1px 0">☁ High cloud</td><td style="text-align:right;font-weight:600">${high}&nbsp;%</td></tr>`;
+          html += `<tr><td style="padding:1px 4px 1px 0">☁️ High cloud</td><td style="text-align:right;font-weight:600">${high}&nbsp;%</td></tr>`;
         if (mid != null)
-          html += `<tr><td style="padding:1px 4px 1px 0">☁ Mid cloud</td><td style="text-align:right;font-weight:600">${mid}&nbsp;%</td></tr>`;
+          html += `<tr><td style="padding:1px 4px 1px 0">☁️ Mid cloud</td><td style="text-align:right;font-weight:600">${mid}&nbsp;%</td></tr>`;
         if (low != null)
-          html += `<tr><td style="padding:1px 4px 1px 0">☁ Low cloud</td><td style="text-align:right;font-weight:600">${low}&nbsp;%</td></tr>`;
+          html += `<tr><td style="padding:1px 4px 1px 0">☁️ Low cloud</td><td style="text-align:right;font-weight:600">${low}&nbsp;%</td></tr>`;
 
         html += `</table>`;
       }
