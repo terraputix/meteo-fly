@@ -437,8 +437,8 @@ export function buildWindChartOption(
       const cy = coord[1];
 
       const arrowLength = 18;
-      const strokeW = Math.max(0.75, strokeWidthScale(item.speed));
-      const color = windColorScale(item.speed) as string;
+      const strokeW = strokeWidthScale(item.speed);
+      const color = windColorScale(item.speed);
 
       const angleDeg = item.direction - 180;
       const angleRad = (angleDeg * Math.PI) / 180;

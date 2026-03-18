@@ -2,7 +2,6 @@ import { getCloudCoverData } from '$lib/charts/clouds';
 import { getWindFieldAllLevels } from '$lib/charts/wind';
 import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
 
-import { min as d3Min, max as d3Max } from 'd3-array';
 import type { WeatherDataType } from '$lib/api/types';
 import type {
   ChartWorkerInput,
@@ -67,8 +66,9 @@ function prepareRainAndCloudData(data: WeatherDataType): RainCloudChartData {
 }
 
 function calculateDomains(windData: Array<{ time: Date }>): [Date, Date] {
-  const xMin = addSeconds(d3Min(windData, (d) => d.time) as Date, -1800);
-  const xMax = addSeconds(d3Max(windData, (d) => d.time) as Date, 1800);
+  const times = windData.map((d) => d.time.getTime());
+  const xMin = addSeconds(new Date(Math.min(...times)), -1800);
+  const xMax = addSeconds(new Date(Math.max(...times)), 1800);
   return [xMin, xMax];
 }
 

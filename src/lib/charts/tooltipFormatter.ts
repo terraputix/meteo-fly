@@ -227,7 +227,7 @@ export function createTooltipFormatter(
         if (nearestHeight != null) {
           const w = store.windByTimeHeight.get(`${snap}_${nearestHeight}`);
           if (w) {
-            const col = windColorScale(w.speed) as string;
+            const col = windColorScale(w.speed);
             html += `<div style="margin-top:4px;padding-top:3px;border-top:1px solid #eee">`;
             html += `<table style="border-collapse:collapse;width:100%">`;
             html +=
@@ -251,7 +251,7 @@ export function createTooltipFormatter(
           html += `<b>Wind at ${timeStr}</b>`;
           html += `<table style="border-collapse:collapse;width:100%;margin-top:2px">`;
           for (const e of entries) {
-            const col = windColorScale(e.speed) as string;
+            const col = windColorScale(e.speed);
             html +=
               `<tr>` +
               `<td style="padding:0 4px 0 0;color:#666">${e.height}&nbsp;m</td>` +

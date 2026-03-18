@@ -1,6 +1,5 @@
-import { scalePow, scaleLinear } from 'd3';
-
 export const windMaxSpeed = 80;
+
 export const windDomains = [
   0,
   windMaxSpeed / 6,
@@ -10,28 +9,18 @@ export const windDomains = [
   (5 * windMaxSpeed) / 6,
   windMaxSpeed,
 ];
+
 export const windColors = ['#00FF00', '#7FFF00', '#FFA500', '#FFA500', '#FF4500', '#660066', '#000000'];
-export const windColorScale = scalePow<string>().domain(windDomains).range(windColors);
 
-export const strokeWidthScale = scaleLinear().domain([0, windMaxSpeed]).range([0.75, 8]);
-
-export interface LegendScaleOptions {
-  domain: number[];
-  range: string[];
-  type: 'pow' | 'sequential' | 'linear';
-  label: string;
+/** Returns the colour for the highest domain threshold that speed exceeds. */
+export function windColorScale(speed: number): string {
+  for (let i = windDomains.length - 1; i >= 0; i--) {
+    if (speed >= windDomains[i]) return windColors[i];
+  }
+  return windColors[0];
 }
 
-export const windSpeedScaleOptions: LegendScaleOptions = {
-  domain: windDomains,
-  range: windColors,
-  type: 'pow',
-  label: 'Wind Speed (km/h)',
-};
-
-export const cloudCoverScaleOptions: LegendScaleOptions = {
-  domain: [0, 100],
-  range: ['white', 'gray'],
-  type: 'sequential',
-  label: 'Cloud Cover (%)',
-};
+/** Maps wind speed linearly to a stroke width in [0.75, 8]. */
+export function strokeWidthScale(speed: number): number {
+  return 0.75 + (Math.min(Math.max(speed, 0), windMaxSpeed) / windMaxSpeed) * (8 - 0.75);
+}
