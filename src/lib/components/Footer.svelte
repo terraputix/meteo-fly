@@ -1,10 +1,13 @@
-<div class="flex items-center justify-between px-4 text-xs text-gray-600">
-  <span>© {new Date().getFullYear()} terraputix</span>
+<div class="flex items-center justify-between px-4 text-xs text-gray-600 hover:text-gray-900">
+  <p>
+    <a href="https://open-meteo.com/" target="_blank" class="underline">Weather data by Open-Meteo.com</a>
+  </p>
+
   <a
     href="https://github.com/terraputix/meteo-fly"
     target="_blank"
     rel="noopener noreferrer"
-    class="flex items-center transition-colors hover:text-gray-900"
+    class="flex items-center transition-colors"
   >
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="mr-1">
       <path

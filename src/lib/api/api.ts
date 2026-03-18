@@ -84,7 +84,6 @@ export function createQueryParams(
 ) {
   // Get the user's local timezone from the browser
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  console.log('Using local timezone:', localTimezone);
 
   const endDate = new Date(start.getTime() + (numberOfDays - 1) * 24 * 60 * 60 * 1000);
 

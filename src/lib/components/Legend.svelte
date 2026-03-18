@@ -1,42 +1,45 @@
 <script lang="ts">
-  import { legend, type ScaleOptions } from '@observablehq/plot';
-  import { cloudCoverScaleOptions, windSpeedScaleOptions } from '$lib/charts/scales';
+  import { windColors, windMaxSpeed } from '$lib/charts/scales';
 
-  function renderLegend(node: HTMLElement, scaleOptions: ScaleOptions) {
-    const legendItem = legend({ color: scaleOptions });
-    node.appendChild(legendItem);
+  const cloudGradient =
+    'linear-gradient(to right, rgba(100,120,145,0), rgba(100,120,145,0.45) 50%, rgba(100,120,145,0.85))';
 
-    return {
-      destroy() {
-        node.innerHTML = '';
-      },
-    };
-  }
+  const step = 100 / (windColors.length - 1);
+  const windGradient = `linear-gradient(to right, ${windColors
+    .flatMap((color, i) => {
+      const start = (i * step).toFixed(1) + '%';
+      const end = ((i + 1) * step).toFixed(1) + '%';
+      return i < windColors.length - 1 ? [`${color} ${start}`, `${color} ${end}`] : [`${color} ${start}`];
+    })
+    .join(', ')})`;
 </script>
 
-<div class="legend-container">
-  <div use:renderLegend={cloudCoverScaleOptions} class="legend-item"></div>
-  <div use:renderLegend={windSpeedScaleOptions} class="legend-item"></div>
+<div
+  class="mx-auto flex max-w-3xl flex-wrap justify-center gap-x-10 gap-y-4 p-4 opacity-60 transition-opacity hover:opacity-100"
+>
+  <!-- Cloud Scale -->
+  <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
+    <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
+      Clouds <small class="lowercase opacity-60">%</small>
+    </span>
+    <div class="flex flex-1 flex-col gap-[3px]">
+      <div class="h-[5px] w-full rounded-full border border-slate-200" style="background: {cloudGradient};"></div>
+      <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
+        <span>0</span><span>100</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wind Scale -->
+  <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
+    <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
+      Wind <small class="lowercase opacity-60">km/h</small>
+    </span>
+    <div class="flex flex-1 flex-col gap-[3px]">
+      <div class="h-[5px] w-full rounded-full" style="background: {windGradient};"></div>
+      <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
+        <span>0</span><span>{windMaxSpeed}</span>
+      </div>
+    </div>
+  </div>
 </div>
-
-<style>
-  .legend-container {
-    display: flex;
-    flex-wrap: wrap;
-    margin: 1rem auto;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .legend-item {
-    flex: 1 1 auto;
-    margin: 0 2.5rem;
-    max-width: 60%;
-  }
-
-  .legend-item :global(svg) {
-    width: 100%;
-    height: auto;
-  }
-</style>

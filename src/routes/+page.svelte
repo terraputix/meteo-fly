@@ -4,20 +4,19 @@
   import { saveLastVisitedURL } from '$lib/services/storage';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
+  import { isMobile } from '$lib/stores/media';
   import maplibregl from 'maplibre-gl';
   import Map from '$lib/components/Map.svelte';
   import MapControls from '$lib/components/MapControls.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { updateWeatherLayer } from '$lib/services/weatherMap/url';
   import { buildOpenMeteoUrl } from '$lib/services/weatherMap/om_url';
-  import ChartContainer from '../lib/components/ChartContainer.svelte';
-  import { addDays } from '../utils/dateExtensions';
-  import type { Location, WeatherDataType } from '$lib/api/types';
-  import { fetchWeatherData } from '$lib/api/api';
+  import ChartContainer from '$lib/components/ChartContainer.svelte';
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
-
+  import { fetchWeatherData } from '$lib/api/api';
+  import { addDays } from '$lib/utils/dateExtensions';
   import { WeatherMapManager, type WeatherMapState } from '$lib/services/weatherMap/manager';
-  import type { WeatherModel } from '$lib/api/types';
+  import type { Location, WeatherDataType, WeatherModel } from '$lib/api/types';
   import type { Subscriber, Unsubscriber } from 'svelte/store';
 
   const weatherMapManager = new WeatherMapManager($page.url.searchParams);
@@ -43,6 +42,8 @@
       domainInfo: $weatherMapStore.domainInfo,
     });
     console.log('initialOmUrl', initialOmUrl);
+
+    await updateWeather();
   });
 
   // Centralized reactive statement for all map updates
@@ -66,7 +67,6 @@
     url.searchParams.set('day', state.selectedDay.toString());
     url.searchParams.set('model', state.selectedModel);
 
-    // Weather map specific parameters
     if (state.domain) {
       url.searchParams.set('map_domain', state.domain.value);
     }
@@ -83,12 +83,24 @@
     }
 
     if (url.search !== $page.url.search) {
-      saveLastVisitedURL(url.toString()); // Save full URL
+      saveLastVisitedURL(url.toString());
       history.replaceState({}, '', url);
     }
   }
 
-  // Simplified handlers that call the manager
+  // Synchronize selectedDay with weatherMapStore.datetime
+  $: if ($weatherMapStore.datetime) {
+    const currentDatetime = new Date($weatherMapStore.datetime);
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffTime = currentDatetime.getTime() - today.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    weatherMapManager.setSelectedDay(diffDays + 1);
+  }
+
   function handleDomainChange(domainValue: string) {
     const selectedDomain = domainOptions.find((d) => d.value === domainValue);
     if (selectedDomain) {
@@ -104,23 +116,11 @@
     weatherMapManager.setLevel(level);
   }
 
-  // Synchronize selectedDay with weatherMapStore.datetime
-  $: if ($weatherMapStore.datetime) {
-    const currentDatetime = new Date($weatherMapStore.datetime);
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today to start of day
-
-    const diffTime = currentDatetime.getTime() - today.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    weatherMapManager.setSelectedDay(diffDays + 1);
-  }
-
   async function updateWeather() {
     try {
       error = null;
       weatherData = await fetchWeatherData($weatherMapStore.location, $weatherMapStore.selectedModel, startDate);
+      showChart = true;
     } catch (err) {
       console.error(err);
       error = 'Failed to fetch weather data. Please try again.';
@@ -137,67 +137,37 @@
   }
 </script>
 
-<div class="h-screen sm:hidden">
-  <div class="z-10 block w-full bg-white/80 p-4">
-    <MapControls
-      currentDomain={$weatherMapStore.domain}
-      currentBaseVariable={$weatherMapStore.baseVariable}
-      currentLevel={$weatherMapStore.level}
-      domainInfo={$weatherMapStore.domainInfo}
-      availableLevels={$weatherMapStore.availableLevels}
-      onDomainChange={handleDomainChange}
-      onBaseVariableChange={handleBaseVariableChange}
-      onLevelChange={handleLevelChange}
-      latitude={$weatherMapStore.location.latitude}
-      longitude={$weatherMapStore.location.longitude}
-      selectedDay={$weatherMapStore.selectedDay}
-      selectedModel={$weatherMapStore.selectedModel}
-      onLocationChange={(loc: Location) => weatherMapManager.setLocation(loc)}
-      onSelectedDayChange={(day: number) => weatherMapManager.setSelectedDay(day)}
-      onSelectedModelChange={(model: WeatherModel) => weatherMapManager.setSelectedModel(model)}
-      onOpenChart={handleOpenChart}
-    />
-  </div>
-  <ResizablePaneGroup direction="vertical" class="flex-col-reverse">
-    <ResizablePane defaultSize={showChart ? 15 : 100}>
-      <TimeSlider {weatherMapManager} {weatherMapStore} />
-      <div class="relative h-full w-full">
-        <Map {weatherMapManager} {weatherMapStore} bind:rasterTileSource />
-      </div>
-    </ResizablePane>
-    {#if showChart}
-      <ResizableHandle withHandle />
-      <ResizablePane defaultSize={50}>
-        {#if weatherData}
-          <div class="flex h-full flex-col overflow-y-auto">
-            <div class="grow bg-white p-2 sm:p-4">
-              {#if error}
-                <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
-                  <span class="block sm:inline">{error}</span>
-                </div>
-              {/if}
-              <ChartContainer
-                {weatherData}
-                {startDate}
-                selectedDay={$weatherMapStore.selectedDay}
-                onSelectedDayChange={weatherMapManager.setSelectedDay}
-                on:close={handleClose}
-              />
-            </div>
-          </div>
-        {/if}
-      </ResizablePane>
-    {/if}
-  </ResizablePaneGroup>
-</div>
+<div class="h-screen w-full">
+  {#if $isMobile}
+    <div class="z-10 w-full bg-white/80 p-2 shadow-sm">
+      <MapControls
+        currentDomain={$weatherMapStore.domain}
+        currentBaseVariable={$weatherMapStore.baseVariable}
+        currentLevel={$weatherMapStore.level}
+        domainInfo={$weatherMapStore.domainInfo}
+        availableLevels={$weatherMapStore.availableLevels}
+        onDomainChange={handleDomainChange}
+        onBaseVariableChange={handleBaseVariableChange}
+        onLevelChange={handleLevelChange}
+        latitude={$weatherMapStore.location.latitude}
+        longitude={$weatherMapStore.location.longitude}
+        selectedDay={$weatherMapStore.selectedDay}
+        selectedModel={$weatherMapStore.selectedModel}
+        onLocationChange={(loc: Location) => weatherMapManager.setLocation(loc)}
+        onSelectedDayChange={(day: number) => weatherMapManager.setSelectedDay(day)}
+        onSelectedModelChange={(model: WeatherModel) => weatherMapManager.setSelectedModel(model)}
+        onOpenChart={handleOpenChart}
+      />
+    </div>
+  {/if}
 
-<div class="hidden h-screen w-full sm:block">
-  <ResizablePaneGroup direction="horizontal">
-    <ResizablePane defaultSize={showChart ? 50 : 100} minSize={30}>
+  <ResizablePaneGroup direction={$isMobile ? 'vertical' : 'horizontal'}>
+    <ResizablePane defaultSize={showChart ? ($isMobile ? 15 : 50) : 100} minSize={$isMobile ? 10 : 30}>
       <div class="relative h-full w-full">
         <Map {weatherMapManager} {weatherMapStore} bind:rasterTileSource />
-        <div class="absolute top-0 right-0 left-0 flex w-full justify-between p-4">
-          <div class="rounded-md bg-white/80 p-2">
+        <TimeSlider {weatherMapManager} {weatherMapStore} />
+        {#if !$isMobile}
+          <div class="absolute inset-x-0 top-0 bg-white/80 p-4 shadow-sm">
             <MapControls
               currentDomain={$weatherMapStore.domain}
               currentBaseVariable={$weatherMapStore.baseVariable}
@@ -217,31 +187,27 @@
               onOpenChart={handleOpenChart}
             />
           </div>
-        </div>
-        <TimeSlider {weatherMapManager} {weatherMapStore} />
+        {/if}
       </div>
     </ResizablePane>
-    {#if showChart}
+
+    {#if showChart && weatherData}
       <ResizableHandle withHandle />
-      <ResizablePane defaultSize={50} minSize={30}>
-        {#if weatherData}
-          <div class="flex h-full flex-col overflow-y-auto">
-            <div class="grow bg-white p-2 sm:p-4">
-              {#if error}
-                <div class="mb-4 bg-red-50 px-4 py-3 text-red-700" role="alert">
-                  <span class="block sm:inline">{error}</span>
-                </div>
-              {/if}
-              <ChartContainer
-                {weatherData}
-                {startDate}
-                selectedDay={$weatherMapStore.selectedDay}
-                onSelectedDayChange={weatherMapManager.setSelectedDay}
-                on:close={handleClose}
-              />
+      <ResizablePane defaultSize={50} minSize={$isMobile ? 10 : 30}>
+        <div class="h-full overflow-y-auto bg-white p-2 sm:p-4">
+          {#if error}
+            <div class="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+              {error}
             </div>
-          </div>
-        {/if}
+          {/if}
+          <ChartContainer
+            {weatherData}
+            {startDate}
+            selectedDay={$weatherMapStore.selectedDay}
+            onSelectedDayChange={weatherMapManager.setSelectedDay}
+            on:close={handleClose}
+          />
+        </div>
       </ResizablePane>
     {/if}
   </ResizablePaneGroup>
