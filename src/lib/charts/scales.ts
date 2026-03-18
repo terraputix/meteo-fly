@@ -1,23 +1,14 @@
 export const windMaxSpeed = 80;
 
-export const windDomains = [
-  0,
-  windMaxSpeed / 6,
-  windMaxSpeed / 3,
-  windMaxSpeed / 2,
-  (2 * windMaxSpeed) / 3,
-  (5 * windMaxSpeed) / 6,
-  windMaxSpeed,
-];
-
+// One color per evenly-spaced threshold: 0, 1/6, 2/6, … 6/6 of windMaxSpeed.
 export const windColors = ['#00FF00', '#7FFF00', '#FFA500', '#FFA500', '#FF4500', '#660066', '#000000'];
 
-/** Returns the colour for the highest domain threshold that speed exceeds. */
+const step = windMaxSpeed / (windColors.length - 1);
+
+/** Returns the colour for the highest threshold that speed meets or exceeds. */
 export function windColorScale(speed: number): string {
-  for (let i = windDomains.length - 1; i >= 0; i--) {
-    if (speed >= windDomains[i]) return windColors[i];
-  }
-  return windColors[0];
+  const i = Math.min(Math.floor(speed / step), windColors.length - 1);
+  return windColors[Math.max(i, 0)];
 }
 
 /** Maps wind speed linearly to a stroke width in [0.75, 8]. */

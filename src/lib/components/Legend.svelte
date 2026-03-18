@@ -1,11 +1,16 @@
 <script lang="ts">
-  import { windDomains, windColors, windMaxSpeed } from '$lib/charts/scales';
+  import { windColors, windMaxSpeed } from '$lib/charts/scales';
 
   const cloudGradient =
     'linear-gradient(to right, rgba(100,120,145,0), rgba(100,120,145,0.45) 50%, rgba(100,120,145,0.85))';
 
-  const windGradient = `linear-gradient(to right, ${windDomains
-    .map((d, i) => `${windColors[i]} ${((d / windMaxSpeed) * 100).toFixed(1)}%`)
+  const step = 100 / (windColors.length - 1);
+  const windGradient = `linear-gradient(to right, ${windColors
+    .flatMap((color, i) => {
+      const start = (i * step).toFixed(1) + '%';
+      const end = ((i + 1) * step).toFixed(1) + '%';
+      return i < windColors.length - 1 ? [`${color} ${start}`, `${color} ${end}`] : [`${color} ${start}`];
+    })
     .join(', ')})`;
 </script>
 
@@ -33,8 +38,7 @@
     <div class="flex flex-1 flex-col gap-[3px]">
       <div class="h-[5px] w-full rounded-full" style="background: {windGradient};"></div>
       <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
-        <span>{Math.round(windDomains[0])}</span>
-        <span>{Math.round(windDomains[windDomains.length - 1])}</span>
+        <span>0</span><span>{windMaxSpeed}</span>
       </div>
     </div>
   </div>
