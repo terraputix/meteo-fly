@@ -532,6 +532,10 @@ export function buildWindChartOption(
     axisPointer: {
       link: [{ xAxisIndex: [0, 1, 2] }],
       lineStyle: { color: '#999', type: 'dashed', width: 1 },
+      label: {
+        fontSize: 0,
+        backgroundColor: 'transparent',
+      },
     },
     tooltip: {
       trigger: 'axis',
