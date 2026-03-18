@@ -312,28 +312,46 @@ export function buildWindChartOption(
     tooltip: { show: false },
   };
 
-  type RainDot = { value: [number, number]; rain: number };
-  const rainData: RainDot[] = rainChartData.rainDots.map((d) => ({
-    value: [d.time.getTime(), 0.5] as [number, number],
+  type RainDot = { timeMs: number; rain: number };
+  const rainDots: RainDot[] = rainChartData.rainDots.map((d) => ({
+    timeMs: d.time.getTime(),
     rain: d.rain,
   }));
 
-  const rainSeries: ScatterSeriesOption = {
+  function rainDropCount(rain: number): number {
+    if (rain > 5) return 3;
+    if (rain > 1) return 2;
+    return 1;
+  }
+
+  const DROP_W = 8;
+  const DROP_H = 12;
+  const DROP_PATH = 'M 0 -7 C 3.5 -3.5 5 0.5 5 3 A 5 5 0 0 1 -5 3 C -5 0.5 -3.5 -3.5 0 -7 Z';
+
+  const rainSeries: CustomSeriesOption = {
     name: 'Rain',
-    type: 'scatter',
+    type: 'custom',
     xAxisIndex: 1,
     yAxisIndex: 2,
-    data: rainData,
-    symbol: RAINDROP_SYMBOL,
-    symbolSize: (d: unknown) => {
-      const dot = d as RainDot;
-      if (dot.rain > 4) return [12, 18];
-      if (dot.rain > 1) return [9, 14];
-      return [6, 10];
-    },
-    itemStyle: { color: CHART_COLORS.rain },
     z: 3,
     tooltip: { show: false },
+    silent: true,
+    renderItem(params, api) {
+      const dot = rainDots[params.dataIndex];
+      const count = rainDropCount(dot.rain);
+
+      const drops = Array.from({ length: count }, (_, i) => {
+        const [cx, cy] = api.coord([dot.timeMs, i + 0.5]);
+        return {
+          type: 'path' as const,
+          shape: { pathData: DROP_PATH, x: cx - DROP_W / 2, y: cy - DROP_H / 2, width: DROP_W, height: DROP_H },
+          style: { fill: CHART_COLORS.rain },
+        };
+      });
+
+      return { type: 'group', children: drops };
+    },
+    data: rainDots.map((_, i) => i),
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
