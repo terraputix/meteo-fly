@@ -1,338 +1,179 @@
 <script lang="ts">
-  import * as Plot from '@observablehq/plot';
-  import { timeFormat } from 'd3-time-format';
-  import { windColorScale, strokeWidthScale, cloudCoverScaleOptions } from '$lib/charts/scales';
-  import { getRainSymbol } from '$lib/icons/RainIcons';
-  import Legend from './Legend.svelte';
+  import * as echarts from 'echarts';
+  import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
+  import { buildWindChartOption, TOTAL_HEIGHT } from '$lib/charts/buildWindChartOption';
   import type { WeatherDataType } from '$lib/api/types';
-  import type {
-    ChartWorkerInput,
-    ChartWorkerOutput,
-    TemperatureChartData,
-    RainCloudChartData,
-    WindChartData,
-  } from '$lib/workers/chartWorker.types';
-  import type { CloudCoverData } from '$lib/charts/clouds';
-  import type { WindFieldLevel } from '$lib/charts/wind';
+  import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
+  import Legend from './Legend.svelte';
 
   export let weatherData: WeatherDataType | null = null;
 
   let isRendering = false;
 
-  function createTemperaturePlot(
-    chartData: TemperatureChartData,
-    xDomain: [Date, Date],
-    chartSettings: object
-  ): Element {
-    const { tempAxisMin, tempAxisMax, humidityScale, temperatureData, dewpointData, humidityData, sunrise, sunset } =
-      chartData;
+  // ─── Worker helper ────────────────────────────────────────────────────────
 
-    const interpolatedLinePlotSettings: Plot.LineOptions = {
-      x: 'time',
-      curve: 'catmull-rom',
-      strokeWidth: 2,
-      tip: true,
-    };
-
-    return Plot.plot({
-      height: 160,
-      ...chartSettings,
-      marginBottom: 30,
-      x: { type: 'time', domain: xDomain, tickFormat: timeFormat('%H:%M') },
-      y: { domain: [tempAxisMin, tempAxisMax], label: 'Temperature (°C)' },
-      marks: [
-        Plot.frame(),
-        Plot.rect([{ x1: sunrise, x2: sunset, y1: tempAxisMin, y2: tempAxisMax }], {
-          x1: 'x1',
-          x2: 'x2',
-          y1: 'y1',
-          y2: 'y2',
-          fill: () => 'rgba(255, 255, 0, 0.15)',
-        }),
-        Plot.gridX({ stroke: '#ddd', strokeOpacity: 0.5 }),
-        Plot.gridY({ stroke: '#ddd', strokeOpacity: 0.5 }),
-        Plot.axisY({ label: 'Temperature (°C)' }),
-        Plot.axisY(humidityScale.ticks, {
-          anchor: 'right',
-          label: 'Humidity (%)',
-          y: (d: number) =>
-            humidityScale.range[0] +
-            ((d - humidityScale.domain[0]) / (humidityScale.domain[1] - humidityScale.domain[0])) *
-              (humidityScale.range[1] - humidityScale.range[0]),
-          tickFormat: (d: number) => `${d}%`,
-        }),
-        Plot.line(temperatureData, {
-          y: 'value',
-          stroke: 'red',
-          title: (d) => `Temperature: ${d.value.toFixed(1)}°C`,
-          ...interpolatedLinePlotSettings,
-        }),
-        Plot.line(dewpointData, {
-          y: 'value',
-          stroke: 'green',
-          title: (d) => `Dewpoint: ${d.value.toFixed(1)}°C`,
-          ...interpolatedLinePlotSettings,
-        }),
-        Plot.line(humidityData, {
-          y: (d) =>
-            humidityScale.range[0] +
-            ((d.value - humidityScale.domain[0]) / (humidityScale.domain[1] - humidityScale.domain[0])) *
-              (humidityScale.range[1] - humidityScale.range[0]),
-          stroke: 'blue',
-          title: (d) => `Humidity: ${d.value.toFixed(0)}%`,
-          ...interpolatedLinePlotSettings,
-        }),
-      ],
+  function runChartWorker(input: ChartWorkerInput, signal?: { cancelled: boolean }): Promise<ChartWorkerOutput> {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(new URL('$lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
+      worker.onmessage = (e: MessageEvent<ChartWorkerOutput>) => {
+        worker.terminate();
+        if (signal?.cancelled) return;
+        resolve(e.data);
+      };
+      worker.onerror = (err) => {
+        worker.terminate();
+        if (signal?.cancelled) return;
+        reject(err);
+      };
+      worker.postMessage(input);
     });
   }
 
-  function createRainAndCloudPlot(
-    chartData: RainCloudChartData,
-    xDomain: [Date, Date],
-    chartSettings: object
-  ): Element {
-    const { cloudRects, rainDots, xMin, xMax } = chartData;
+  // ─── Svelte action ────────────────────────────────────────────────────────
 
-    return Plot.plot({
-      height: 110,
-      ...chartSettings,
-      marginBottom: 10,
-      x: { type: 'time', domain: xDomain, axis: null },
-      y: { domain: [0, 1], axis: 'left', ticks: 0, label: 'Rain' },
-      marks: [
-        Plot.axisY([0, 1], { anchor: 'right', label: 'Cloud Cover (%)', dx: 100 }),
-        Plot.text(
-          [
-            { x: xMax, y: 1 / 6, text: 'Low' },
-            { x: xMax, y: 3 / 6, text: 'Mid' },
-            { x: xMax, y: 5 / 6, text: 'High' },
-          ],
-          { x: 'x', y: 'y', text: 'text', dx: 15 }
-        ),
-        Plot.rect(
-          [
-            { x1: xMin, x2: xMax, y1: 0, y2: 1 / 3 },
-            { x1: xMin, x2: xMax, y1: 1 / 3, y2: 2 / 3 },
-            { x1: xMin, x2: xMax, y1: 2 / 3, y2: 1 },
-          ],
-          { x1: 'x1', x2: 'x2', y1: 'y1', y2: 'y2', fill: '#fafafa' }
-        ),
-        Plot.rect(cloudRects, {
-          x1: 'x1',
-          x2: 'x2',
-          y1: 'y1',
-          y2: 'y2',
-          fill: (d) => `rgba(128, 128, 128, ${d.cloudCover / 100})`,
-          title: (d) => `Cloud Cover: ${d.cloudCover}%`,
-        }),
-        Plot.dot(rainDots, {
-          x: 'time',
-          y: 'y',
-          fill: 'blue',
-          symbol: (d) => getRainSymbol(d.rain),
-          r: 6,
-          title: (d) => `Rain: ${d.rain.toFixed(1)} mm/h`,
-          opacity: 0.6,
-        }),
-        Plot.frame(),
-      ],
-    });
-  }
+  function renderChart(node: HTMLElement, data: WeatherDataType | null) {
+    let chart: echarts.ECharts | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+    let cancellation: { cancelled: boolean } | null = null;
 
-  function createWindPlot(
-    windData: WindFieldLevel[],
-    cloudData: CloudCoverData[],
-    cloudBase: Array<{ x: Date; y: number }>,
-    windChartData: WindChartData,
-    xDomain: [Date, Date],
-    chartSettings: object,
-    cloudCoverScaleOptions: Plot.ScaleOptions
-  ): Element {
-    const { yDomain, elevation, timezoneAbbr, tickValues } = windChartData;
-
-    return Plot.plot({
-      height: 700,
-      ...chartSettings,
-      marginTop: 0,
-      x: { type: 'time', domain: xDomain },
-      y: { domain: yDomain },
-      color: cloudCoverScaleOptions,
-      marks: [
-        Plot.frame(),
-        Plot.axisY(tickValues, { label: 'Height', tickFormat: (d) => `${d} m` }),
-        Plot.axisX({ label: `Time [${timezoneAbbr}]`, tickFormat: timeFormat('%H:%M') }),
-        Plot.gridY({ stroke: '#ddd', strokeOpacity: 0.5 }),
-        Plot.raster(cloudData, {
-          x: 'x1',
-          y: 'y1',
-          interpolate: 'nearest',
-          opacity: 0.9,
-          fill: 'value',
-          title: (d) => `Cloud Cover: ${d.value}%`,
-          tip: false,
-        }),
-        Plot.vector(windData, {
-          x: 'time',
-          y: 'height',
-          shape: 'arrow',
-          r: 6,
-          rotate: (d) => d.direction - 180,
-          length: 18,
-          strokeLinecap: 'round',
-          strokeWidth: (d) => strokeWidthScale(d.speed),
-          stroke: (d) => windColorScale(d.speed),
-          title: (d) => {
-            const formattedTime = timeFormat('%H:%M')(d.time);
-            const formattedHeight = `${Math.round(d.height)}m`;
-            const cloudPoint = cloudData.find(
-              (c) => c.x1.getTime() === d.time.getTime() && Math.abs(c.y1 - d.height) < 50
-            );
-            return cloudPoint
-              ? `Time: ${formattedTime}\nHeight: ${formattedHeight}\nWind Speed: ${d.speed} km/h\nDirection: ${d.direction}°\nCloud Cover: ${cloudPoint.value}%`
-              : `Time: ${formattedTime}\nHeight: ${formattedHeight}\nWind Speed: ${d.speed} km/h\nDirection: ${d.direction}°`;
-          },
-          tip: true,
-        }),
-        Plot.ruleY([elevation], {
-          stroke: '#8B4513',
-          strokeWidth: 2,
-          strokeDasharray: '5,5',
-        }),
-        Plot.text([{ y: elevation, text: `Surface Elevation (${elevation}m)` }], {
-          x: xDomain[0],
-          y: 'y',
-          text: 'text',
-          dx: +10,
-          dy: +10,
-          fill: '#8B4513',
-          fontWeight: 'bold',
-          textAnchor: 'start',
-        }),
-        Plot.line(cloudBase, {
-          x: 'x',
-          y: 'y',
-          stroke: 'purple',
-          title: (d) => `Potential Cloud Base: ${d.y.toFixed(0)}m`,
-          curve: 'catmull-rom',
-          strokeWidth: 2,
-          tip: true,
-        }),
-      ],
-    });
-  }
-
-  function renderPlot(node: HTMLElement, data: WeatherDataType | null) {
-    let currentWorker: Worker | null = null;
-
-    function draw(currentData: WeatherDataType): void {
-      isRendering = true;
+    function destroyChart() {
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+      chart?.dispose();
+      chart = null;
       node.innerHTML = '';
+    }
 
-      // Terminate any existing worker
-      if (currentWorker) {
-        currentWorker.terminate();
-      }
+    async function draw(currentData: WeatherDataType) {
+      isRendering = true;
+      destroyChart();
 
-      // Create worker for heavy data processing
-      currentWorker = new Worker(new URL('$lib/workers/chartWorker.ts', import.meta.url), {
-        type: 'module',
-      });
+      // Cancel any previous in-flight worker
+      if (cancellation) cancellation.cancelled = true;
+      const signal = { cancelled: false };
+      cancellation = signal;
 
-      currentWorker.onmessage = function (e: MessageEvent<ChartWorkerOutput>) {
-        const response = e.data;
+      try {
+        const response = await runChartWorker({ weatherData: currentData }, signal);
+        if (signal.cancelled) return;
 
-        if (response.success) {
-          try {
-            // Type-safe access to processed data
-            const { cloudData, windData, cloudBase, temperatureChartData, rainCloudChartData, windChartData, xDomain } =
-              response.data;
-
-            const chartSettings = { width: 1000, marginLeft: 50, marginRight: 40 };
-
-            // Create plots using pre-processed data
-            const temperaturePlot = createTemperaturePlot(temperatureChartData, xDomain, chartSettings);
-            const rainPlot = createRainAndCloudPlot(rainCloudChartData, xDomain, chartSettings);
-            const windPlot = createWindPlot(
-              windData,
-              cloudData,
-              cloudBase,
-              windChartData,
-              xDomain,
-              chartSettings,
-              cloudCoverScaleOptions
-            );
-            const plotContainer = document.createElement('div');
-            plotContainer.appendChild(temperaturePlot);
-            plotContainer.appendChild(rainPlot);
-            plotContainer.appendChild(windPlot);
-
-            node.appendChild(plotContainer);
-          } catch (plotError) {
-            console.error('Error creating plots:', plotError);
-          }
-        } else {
-          // TypeScript knows this is an error response
+        if (!response.success) {
           console.error('Chart worker error:', response.error);
+          return;
         }
 
-        isRendering = false;
-        currentWorker?.terminate();
-        currentWorker = null;
-      };
+        const {
+          cloudData,
+          windData,
+          cloudBase,
+          elevation,
+          timezoneAbbr,
+          temperatureChartData,
+          rainCloudChartData,
+          xDomain,
+        } = response.data;
 
-      currentWorker.onerror = function (error: ErrorEvent) {
-        console.error('Worker error:', error);
-        isRendering = false;
-        currentWorker?.terminate();
-        currentWorker = null;
-      };
+        const canvas = document.createElement('div');
+        canvas.style.cssText = `width:100%;height:${TOTAL_HEIGHT}px;`;
+        node.appendChild(canvas);
 
-      // Type-safe message to worker
-      const workerInput: ChartWorkerInput = {
-        weatherData: currentData,
-      };
+        chart = echarts.init(canvas);
 
-      currentWorker.postMessage(workerInput);
+        const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, cloudBase);
+        const activeState: ActiveState = createActiveState();
+
+        chart.setOption(
+          buildWindChartOption(
+            temperatureChartData,
+            rainCloudChartData,
+            windData,
+            cloudData,
+            cloudBase,
+            elevation,
+            timezoneAbbr,
+            xDomain,
+            store,
+            activeState
+          )
+        );
+
+        // Track which grid the cursor is in and the hovered y-value for the
+        // wind grid.  ECharts fires `updateaxispointer` on every mouse-move
+        // with an `axesInfo` array describing each active axis.
+        //
+        // Y-axis → grid mapping:
+        //   axisIndex 0 or 1  →  grid 0 (temperature)
+        //   axisIndex 2       →  grid 1 (rain / cloud)
+        //   axisIndex 3       →  grid 2 (wind field)
+        chart.on('updateaxispointer', (event: unknown) => {
+          const e = event as { axesInfo?: Array<{ axisDim: string; axisIndex: number; value: number }> };
+          const axes = e?.axesInfo;
+          if (!axes?.length) {
+            activeState.gridIndex = -1;
+            activeState.hoveredWindY = null;
+            return;
+          }
+          const yInfo = axes.find((a) => a.axisDim === 'y');
+          if (!yInfo) {
+            activeState.gridIndex = -1;
+            activeState.hoveredWindY = null;
+            return;
+          }
+          if (yInfo.axisIndex <= 1) {
+            activeState.gridIndex = 0;
+            activeState.hoveredWindY = null;
+          } else if (yInfo.axisIndex === 2) {
+            activeState.gridIndex = 1;
+            activeState.hoveredWindY = null;
+          } else {
+            activeState.gridIndex = 2;
+            activeState.hoveredWindY = yInfo.value;
+          }
+        });
+
+        resizeObserver = new ResizeObserver(() => chart?.resize());
+        resizeObserver.observe(node);
+      } catch (err) {
+        if (!signal.cancelled) console.error('Error creating EChart:', err);
+      } finally {
+        if (!signal.cancelled) isRendering = false;
+      }
     }
 
-    if (data) {
-      draw(data);
-    }
+    if (data) draw(data);
 
     return {
       update(newData: WeatherDataType | null) {
         if (newData) {
           draw(newData);
         } else {
-          // Terminate worker if no data
-          if (currentWorker) {
-            currentWorker.terminate();
-            currentWorker = null;
-          }
-          node.innerHTML = '';
+          if (cancellation) cancellation.cancelled = true;
+          destroyChart();
           isRendering = false;
         }
       },
       destroy() {
-        // Clean up worker on destroy
-        if (currentWorker) {
-          currentWorker.terminate();
-          currentWorker = null;
-        }
-        node.innerHTML = '';
+        if (cancellation) cancellation.cancelled = true;
+        destroyChart();
       },
     };
   }
 </script>
 
-<div class="chart-container">
+<div class="chart-container" style="min-height: {TOTAL_HEIGHT}px;">
   {#if isRendering}
     <div class="loading-state">
       <div class="loading-spinner"></div>
-      <p>Processing weather data...</p>
+      <p>Processing weather data…</p>
     </div>
   {/if}
-  <div use:renderPlot={weatherData} class="chart-content" style="opacity: {isRendering ? 0 : 1}"></div>
+
+  <!-- Use a wrapper with fixed height to prevent layout shift -->
+  <div
+    use:renderChart={weatherData}
+    class="chart-content"
+    style="opacity: {isRendering ? 0 : 1}; height: {TOTAL_HEIGHT}px;"
+  ></div>
 </div>
 
 <Legend />
@@ -340,28 +181,19 @@
 <style>
   .chart-container {
     width: 100%;
-    max-width: 1040px;
+    max-width: 920px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     position: relative;
-    aspect-ratio: 900 / 850;
-    padding: 0 20px;
+    padding: 0;
+    contain: layout;
   }
 
   .chart-content {
     width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     transition: opacity 0.3s ease;
-  }
-
-  .chart-content :global(svg) {
-    width: 100%;
-    height: auto;
   }
 
   .loading-state {
@@ -372,7 +204,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    gap: 12px;
+    z-index: 10;
+    pointer-events: none;
   }
 
   .loading-spinner {
@@ -395,7 +229,7 @@
 
   @media (max-width: 768px) {
     .chart-container {
-      padding: 0 10px;
+      padding: 0;
     }
   }
 </style>

@@ -41,6 +41,7 @@
 - **DRY**: Reuse existing types, scales, and pressure level definitions.
 - **No useless comments**: Avoid basic code comments or "implemented change" summaries.
 - **Simplicity**: Prefer plain functions or short components over new abstractions.
+- **Update**: Keep everything up-to-date. If you need, adapt this Agents.md file as well!
 
 ### Coding Style
 - **Svelte 5**: Use runes (`$props`, `$state`, `$derived`, `$effect`).

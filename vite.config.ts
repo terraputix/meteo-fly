@@ -41,6 +41,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Raise the limit to 3 MiB to accommodate the echarts bundle
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         // Precache all build assets and static files
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         // Network-first for Open-Meteo weather API calls so fresh data is

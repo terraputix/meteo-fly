@@ -1,30 +1,17 @@
-import { scalePow, scaleLinear } from 'd3';
-import { type ScaleOptions } from '@observablehq/plot';
 export const windMaxSpeed = 80;
-export const windDomains = [
-  0,
-  windMaxSpeed / 6,
-  windMaxSpeed / 3,
-  windMaxSpeed / 2,
-  (2 * windMaxSpeed) / 3,
-  (5 * windMaxSpeed) / 6,
-  windMaxSpeed,
-];
+
+// One color per evenly-spaced threshold: 0, 1/6, 2/6, … 6/6 of windMaxSpeed.
 export const windColors = ['#00FF00', '#7FFF00', '#FFA500', '#FFA500', '#FF4500', '#660066', '#000000'];
-export const windColorScale = scalePow<string>().domain(windDomains).range(windColors);
 
-export const strokeWidthScale = scaleLinear().domain([0, windMaxSpeed]).range([0.75, 8]);
+const step = windMaxSpeed / (windColors.length - 1);
 
-export const windSpeedScaleOptions: ScaleOptions = {
-  domain: windDomains,
-  range: windColors,
-  type: 'pow',
-  label: 'Wind Speed (km/h)',
-};
+/** Returns the colour for the highest threshold that speed meets or exceeds. */
+export function windColorScale(speed: number): string {
+  const i = Math.min(Math.floor(speed / step), windColors.length - 1);
+  return windColors[Math.max(i, 0)];
+}
 
-export const cloudCoverScaleOptions: ScaleOptions = {
-  domain: [0, 100],
-  range: ['white', 'gray'],
-  type: 'sequential',
-  label: 'Cloud Cover (%)',
-};
+/** Maps wind speed linearly to a stroke width in [0.75, 8]. */
+export function strokeWidthScale(speed: number): number {
+  return 0.75 + (Math.min(Math.max(speed, 0), windMaxSpeed) / windMaxSpeed) * (8 - 0.75);
+}

@@ -27,7 +27,7 @@
   }
 </script>
 
-<div class="relative bg-white p-2 sm:overflow-y-auto sm:px-8 sm:py-4">
+<div class="relative mx-auto max-w-2xl min-w-lg bg-white p-0 sm:overflow-y-auto">
   <button
     on:click={close}
     class="absolute top-2 right-2 border-none bg-transparent text-gray-500 hover:text-gray-800"
@@ -73,11 +73,7 @@
     <WindChart {weatherData} />
   </div>
 
-  <p class="mt-2 text-right text-sm text-gray-500">
-    <a href="https://open-meteo.com/" target="_blank" class="underline">Weather data by Open-Meteo.com</a>
-  </p>
-
-  <div class="mt-4">
+  <div class="mt-1">
     <Footer />
   </div>
 </div>
