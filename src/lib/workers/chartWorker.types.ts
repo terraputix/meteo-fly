@@ -7,8 +7,6 @@ export interface ChartWorkerInput {
 }
 
 export interface TemperatureChartData {
-  tempAxisMin: number;
-  tempAxisMax: number;
   temperatureData: Array<{ time: Date; value: number }>;
   dewpointData: Array<{ time: Date; value: number }>;
   humidityData: Array<{ time: Date; value: number }>;

@@ -16,8 +16,6 @@ import { addSeconds } from '$lib/utils/dateExtensions';
 
 function prepareTemperatureData(data: WeatherDataType): TemperatureChartData {
   return {
-    tempAxisMin: Math.floor((d3Min(data.hourly.dewpoint_2m) ?? 0) - 5),
-    tempAxisMax: Math.ceil((d3Max(data.hourly.temperature_2m) ?? 0) + 5),
     temperatureData: data.hourly.time.map((time, i) => ({
       time,
       value: data.hourly.temperature_2m[i],

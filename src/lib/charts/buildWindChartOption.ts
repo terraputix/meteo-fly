@@ -133,7 +133,6 @@ export function buildWindChartOption(
   ];
 
   // ── Y axes ─────────────────────────────────────────────────────────────────
-  const { tempAxisMin, tempAxisMax } = tempChartData;
   const { elevation } = windChartData;
   const WIND_Y_MIN = 0;
   const WIND_Y_MAX = 4350;
@@ -148,9 +147,9 @@ export function buildWindChartOption(
       offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
+      minInterval: 5,
       interval: 5,
-      min: Math.round(tempAxisMin / 5) * 5,
-      max: Math.round(tempAxisMax / 5) * 5,
+      alignTicks: true,
       axisLabel: { fontSize: 11 },
       splitLine: { show: true, lineStyle: { color: CHART_COLORS.gridLine } },
     },
