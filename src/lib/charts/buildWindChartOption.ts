@@ -133,10 +133,10 @@ export function buildWindChartOption(
   ];
 
   // ── Y axes ─────────────────────────────────────────────────────────────────
-  const { tempAxisMin, tempAxisMax, humidityScale } = tempChartData;
-  const humMin = humidityScale.domain[0];
-  const humMax = humidityScale.domain[1];
-  const { yDomain, elevation } = windChartData;
+  const { tempAxisMin, tempAxisMax } = tempChartData;
+  const { elevation } = windChartData;
+  const WIND_Y_MIN = 0;
+  const WIND_Y_MAX = 4350;
 
   const yAxes: YAXisComponentOption[] = [
     // 0 – temperature left
@@ -163,8 +163,8 @@ export function buildWindChartOption(
       offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
-      min: humMin,
-      max: humMax,
+      min: 0,
+      max: 100,
       position: 'right',
       axisLabel: { fontSize: 11 },
       splitLine: { show: false },
@@ -201,8 +201,8 @@ export function buildWindChartOption(
       offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
-      min: yDomain[0],
-      max: yDomain[1],
+      min: WIND_Y_MIN,
+      max: WIND_Y_MAX,
       axisLabel: { formatter: (v: number) => `${v}`, fontSize: 10 },
       splitLine: { show: true, lineStyle: { color: CHART_COLORS.gridLine } },
       interval: 500,
@@ -362,7 +362,7 @@ export function buildWindChartOption(
     '__anchor_wind',
     2,
     3,
-    tempChartData.temperatureData.map((d) => [d.time.getTime(), yDomain[0]] as [number, number])
+    tempChartData.temperatureData.map((d) => [d.time.getTime(), WIND_Y_MIN] as [number, number])
   );
 
   // ── Cloud cover rectangles ─────────────────────────────────────────────────

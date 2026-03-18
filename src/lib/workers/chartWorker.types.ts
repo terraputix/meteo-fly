@@ -9,11 +9,6 @@ export interface ChartWorkerInput {
 export interface TemperatureChartData {
   tempAxisMin: number;
   tempAxisMax: number;
-  humidityScale: {
-    domain: [number, number];
-    range: [number, number];
-    ticks: number[];
-  };
   temperatureData: Array<{ time: Date; value: number }>;
   dewpointData: Array<{ time: Date; value: number }>;
   humidityData: Array<{ time: Date; value: number }>;
@@ -31,18 +26,13 @@ export interface RainCloudChartData {
   }>;
   rainDots: Array<{
     time: Date;
-    y: number;
     rain: number;
   }>;
-  xMin: Date;
-  xMax: Date;
 }
 
 export interface WindChartData {
-  yDomain: [number, number];
   elevation: number;
   timezoneAbbr: string;
-  tickValues: number[];
 }
 
 export interface ChartWorkerSuccessOutput {
@@ -51,7 +41,6 @@ export interface ChartWorkerSuccessOutput {
     cloudData: CloudCoverData[];
     windData: WindFieldLevel[];
     cloudBase: Array<{ x: Date; y: number }>;
-    weatherData: WeatherDataType;
     temperatureChartData: TemperatureChartData;
     rainCloudChartData: RainCloudChartData;
     windChartData: WindChartData;

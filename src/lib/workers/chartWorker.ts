@@ -3,8 +3,6 @@ import { getWindFieldAllLevels } from '$lib/charts/wind';
 import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
 
 import { min as d3Min, max as d3Max } from 'd3-array';
-import { ticks as d3Ticks } from 'd3-array';
-import { scaleLinear } from 'd3-scale';
 import type { WeatherDataType } from '$lib/api/types';
 import type {
   ChartWorkerInput,
@@ -17,18 +15,9 @@ import type {
 import { addSeconds } from '$lib/utils/dateExtensions';
 
 function prepareTemperatureData(data: WeatherDataType): TemperatureChartData {
-  const tempAxisMin = Math.floor((d3Min(data.hourly.dewpoint_2m) ?? 0) - 5);
-  const tempAxisMax = Math.ceil((d3Max(data.hourly.temperature_2m) ?? 0) + 5);
-  const humidityScale = scaleLinear([0, 100], [tempAxisMin, tempAxisMax]);
-
   return {
-    tempAxisMin,
-    tempAxisMax,
-    humidityScale: {
-      domain: [0, 100] as [number, number],
-      range: [tempAxisMin, tempAxisMax] as [number, number],
-      ticks: humidityScale.ticks(4),
-    },
+    tempAxisMin: Math.floor((d3Min(data.hourly.dewpoint_2m) ?? 0) - 5),
+    tempAxisMax: Math.ceil((d3Max(data.hourly.temperature_2m) ?? 0) + 5),
     temperatureData: data.hourly.time.map((time, i) => ({
       time,
       value: data.hourly.temperature_2m[i],
@@ -46,7 +35,7 @@ function prepareTemperatureData(data: WeatherDataType): TemperatureChartData {
   };
 }
 
-function prepareRainAndCloudData(data: WeatherDataType, xMin: Date, xMax: Date): RainCloudChartData {
+function prepareRainAndCloudData(data: WeatherDataType): RainCloudChartData {
   return {
     cloudRects: data.hourly.time.flatMap((time, i) => [
       {
@@ -74,23 +63,16 @@ function prepareRainAndCloudData(data: WeatherDataType, xMin: Date, xMax: Date):
     rainDots: data.hourly.time
       .map((time, i) => ({
         time,
-        y: 0.2,
         rain: data.hourly.precipitation[i],
       }))
       .filter((d) => d.rain > 0),
-    xMin,
-    xMax,
   };
 }
 
 function prepareWindChartData(data: WeatherDataType): WindChartData {
-  const yDomain: [number, number] = [0, 4350];
-
   return {
-    yDomain,
     elevation: data.elevation,
     timezoneAbbr: data.timezoneAbbr,
-    tickValues: d3Ticks(0, 4500, 9),
   };
 }
 
@@ -111,7 +93,7 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
     const xDomain = calculateDomains(windData);
 
     const temperatureChartData = prepareTemperatureData(weatherData);
-    const rainCloudChartData = prepareRainAndCloudData(weatherData, xDomain[0], xDomain[1]);
+    const rainCloudChartData = prepareRainAndCloudData(weatherData);
     const windChartData = prepareWindChartData(weatherData);
 
     const successResponse: ChartWorkerSuccessOutput = {
@@ -120,7 +102,6 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
         cloudData,
         windData,
         cloudBase,
-        weatherData,
         temperatureChartData,
         rainCloudChartData,
         windChartData,
