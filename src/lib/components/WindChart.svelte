@@ -178,7 +178,7 @@
     flex-direction: column;
     align-items: stretch;
     position: relative;
-    padding: 0 20px;
+    padding: 0;
     contain: layout;
   }
 
@@ -220,7 +220,7 @@
 
   @media (max-width: 768px) {
     .chart-container {
-      padding: 0 10px;
+      padding: 0;
     }
   }
 </style>

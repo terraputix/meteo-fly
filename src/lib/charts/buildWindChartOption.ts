@@ -22,8 +22,8 @@ import { fmtTime } from '$lib/helpers';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.
-export const MARGIN_LEFT = 60;
-export const MARGIN_RIGHT = 70;
+export const MARGIN_LEFT = 40;
+export const MARGIN_RIGHT = 40;
 export const TEMP_HEIGHT_PX = 130;
 export const RAIN_HEIGHT_PX = 66;
 export const WIND_HEIGHT_PX = 440;

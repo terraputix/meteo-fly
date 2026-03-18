@@ -14,7 +14,7 @@ import type {
   RainCloudChartData,
   WindChartData,
 } from './chartWorker.types';
-import { addSeconds } from '../../utils/dateExtensions';
+import { addSeconds } from '$lib/utils/dateExtensions';
 
 function prepareTemperatureData(data: WeatherDataType): TemperatureChartData {
   const tempAxisMin = Math.floor((d3Min(data.hourly.dewpoint_2m) ?? 0) - 5);
