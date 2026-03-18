@@ -73,11 +73,7 @@
     <WindChart {weatherData} />
   </div>
 
-  <p class="mt-2 text-right text-sm text-gray-500">
-    <a href="https://open-meteo.com/" target="_blank" class="underline">Weather data by Open-Meteo.com</a>
-  </p>
-
-  <div class="mt-4">
+  <div class="mt-1">
     <Footer />
   </div>
 </div>
