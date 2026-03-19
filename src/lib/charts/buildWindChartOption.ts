@@ -139,6 +139,7 @@ export function buildWindChartOption(
       type: 'value',
       gridIndex: 0,
       name: '°C',
+      scale: true,
       nameGap: 0,
       offset: 10,
       nameLocation: 'end',
