@@ -22,10 +22,9 @@ import { fmtTime } from '$lib/helpers';
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.
 export const MARGIN_LEFT = 40;
-export const MARGIN_RIGHT = 55;
+export const MARGIN_RIGHT = 40;
 export const TEMP_HEIGHT_PX = 130;
 export const RAIN_HEIGHT_PX = 66;
-export const WIND_HEIGHT_PX = 440;
 
 export const TEMP_TOP = 10;
 const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX;
@@ -199,14 +198,12 @@ export function buildWindChartOption(
     {
       type: 'value',
       gridIndex: 2,
-      name: 'm',
-      nameGap: 0,
-      offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
       min: WIND_Y_MIN,
       max: WIND_Y_MAX,
-      axisLabel: { formatter: (v: number) => `${v}`, fontSize: 10 },
+      axisLine: { show: true, lineStyle: { color: CHART_COLORS.axisLine } },
+      axisLabel: { formatter: (v: number) => `${v}m`, fontSize: 10 },
       splitLine: { show: true, lineStyle: { color: CHART_COLORS.gridLine } },
       interval: 500,
     },

@@ -19,6 +19,7 @@ export const allPressureLevels: PressureLevel[] = [
   { hPa: 600, heightMeters: 4200 },
   { hPa: 500, heightMeters: 5600 },
   { hPa: 400, heightMeters: 7200 },
+  { hPa: 350, heightMeters: 8800 },
 ];
 
 /** Legacy export – all base pressure levels (used for LEVEL_BANDS in chart) */
@@ -50,14 +51,14 @@ export const allInterpolatedLevels: PressureLevel[] = [
   { hPa: -1, heightMeters: 5000 },
   { hPa: -1, heightMeters: 5250 },
   { hPa: -1, heightMeters: 5500 },
-  // Between 500hPa (5600m) and 400hPa (7200m) – 200m steps
-  { hPa: -1, heightMeters: 5800 },
+  // Between 500hPa (5600m) and 400hPa (7200m) – 250m steps
+  { hPa: -1, heightMeters: 5750 },
   { hPa: -1, heightMeters: 6000 },
-  { hPa: -1, heightMeters: 6200 },
-  { hPa: -1, heightMeters: 6400 },
-  { hPa: -1, heightMeters: 6600 },
-  { hPa: -1, heightMeters: 6800 },
+  { hPa: -1, heightMeters: 6250 },
+  { hPa: -1, heightMeters: 6500 },
+  { hPa: -1, heightMeters: 6750 },
   { hPa: -1, heightMeters: 7000 },
+  { hPa: -1, heightMeters: 7250 },
 ];
 
 /** Legacy export */
@@ -74,6 +75,3 @@ export function getAllLevelsForAltitude(maxAltitude: number): PressureLevel[] {
     (a, b) => a.heightMeters - b.heightMeters
   );
 }
-
-/** Legacy export */
-export const allLevels = getAllLevelsForAltitude(7500);

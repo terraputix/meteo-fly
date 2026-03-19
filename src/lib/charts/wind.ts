@@ -1,11 +1,6 @@
 import type { WeatherDataType } from '$lib/api/types';
 import { interpolateWind } from '$lib/meteo/wind';
-import {
-  getPressureLevelsForAltitude,
-  getInterpolatedLevelsForAltitude,
-  getAllLevelsForAltitude,
-  getAtLevel,
-} from './pressureLevels';
+import { getPressureLevelsForAltitude, getAllLevelsForAltitude, getAtLevel } from './pressureLevels';
 
 export interface WindFieldLevel {
   time: Date;
