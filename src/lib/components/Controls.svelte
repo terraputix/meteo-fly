@@ -17,6 +17,11 @@
     { id: 'cma_grapes_global', name: 'CMA GRAPES' },
   ];
 
+  const altitudes = [
+    { value: 4500, name: '4500m (600hPa)' },
+    { value: 7500, name: '7500m (400hPa)' },
+  ];
+
   const dispatch = createEventDispatcher();
   function openChart() {
     dispatch('openChart');
@@ -70,6 +75,20 @@
         max="7"
         min="-14"
       />
+    </div>
+
+    <!-- Altitude Selection -->
+    <div class="flex items-center">
+      <label for="altitude" class="mr-2 text-sm font-medium whitespace-nowrap text-gray-700">Alt:</label>
+      <select
+        id="altitude"
+        bind:value={parameters.maxAltitude}
+        class="rounded-sm bg-white px-2 py-1 text-sm focus:outline-indigo-500"
+      >
+        {#each altitudes as alt}
+          <option value={alt.value}>{alt.name}</option>
+        {/each}
+      </select>
     </div>
   </div>
 </div>

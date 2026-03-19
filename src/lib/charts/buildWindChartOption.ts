@@ -16,13 +16,13 @@ import { createTooltipFormatter, type TooltipStore, type ActiveState } from '$li
 import type { TemperatureChartData, RainCloudChartData } from '$lib/workers/chartWorker.types';
 import type { WindFieldLevel } from '$lib/charts/wind';
 import type { CloudCoverData } from '$lib/charts/clouds';
-import { pressureLevels } from '$lib/charts/pressureLevels';
+import { pressureLevels, getPressureLevelsForAltitude } from '$lib/charts/pressureLevels';
 import { fmtTime } from '$lib/helpers';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.
 export const MARGIN_LEFT = 40;
-export const MARGIN_RIGHT = 40;
+export const MARGIN_RIGHT = 55;
 export const TEMP_HEIGHT_PX = 130;
 export const RAIN_HEIGHT_PX = 66;
 export const WIND_HEIGHT_PX = 440;
@@ -34,7 +34,12 @@ export const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
 const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
 const WIND_GAP = 20;
 export const WIND_TOP = RAIN_BOTTOM_PX + WIND_GAP;
-export const TOTAL_HEIGHT = WIND_TOP + WIND_HEIGHT_PX + 42;
+
+export function getChartHeight(windHeight: number = 440) {
+  return WIND_TOP + windHeight + 42;
+}
+
+export const TOTAL_HEIGHT = getChartHeight(440);
 
 // ─── Pre-computed pressure-level band boundaries ─────────────────────────────
 // For each pressure level at index i, the band it paints spans from the
@@ -97,7 +102,7 @@ interface CloudItem {
 
 export function buildWindChartOption(
   tempChartData: TemperatureChartData,
-  rainChartData: RainCloudChartData,
+  rainCloudChartData: RainCloudChartData,
   windData: WindFieldLevel[],
   cloudData: CloudCoverData[],
   cloudBase: Array<{ time: Date; value: number }>,
@@ -105,7 +110,9 @@ export function buildWindChartOption(
   timezoneAbbr: string,
   xDomain: [Date, Date],
   store: TooltipStore,
-  activeState: ActiveState
+  activeState: ActiveState,
+  windHeight: number = 440,
+  maxAltitude: number = 4350
 ): EChartsOption {
   const xMin = xDomain[0].getTime();
   const xMax = xDomain[1].getTime();
@@ -114,7 +121,7 @@ export function buildWindChartOption(
   const grids: GridComponentOption[] = [
     { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: TEMP_TOP, height: TEMP_HEIGHT_PX },
     { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: RAIN_TOP, height: RAIN_HEIGHT_PX },
-    { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: WIND_TOP, height: WIND_HEIGHT_PX },
+    { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: WIND_TOP, height: windHeight },
   ];
 
   // ── X axes ─────────────────────────────────────────────────────────────────
@@ -131,7 +138,7 @@ export function buildWindChartOption(
 
   // ── Y axes ─────────────────────────────────────────────────────────────────
   const WIND_Y_MIN = 0;
-  const WIND_Y_MAX = 4350;
+  const WIND_Y_MAX = maxAltitude;
 
   const yAxes: YAXisComponentOption[] = [
     // 0 – temperature left
@@ -203,6 +210,18 @@ export function buildWindChartOption(
       splitLine: { show: true, lineStyle: { color: CHART_COLORS.gridLine } },
       interval: 500,
     },
+    // 4 – wind height right (pressure labels via markLine, axis provides right border)
+    {
+      type: 'value',
+      gridIndex: 2,
+      position: 'right',
+      min: WIND_Y_MIN,
+      max: WIND_Y_MAX,
+      axisLabel: { show: false },
+      axisTick: { show: false },
+      axisLine: { show: true, lineStyle: { color: CHART_COLORS.axisLine } },
+      splitLine: { show: false },
+    },
   ];
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -254,7 +273,9 @@ export function buildWindChartOption(
     '__anchor_rain',
     1,
     2,
-    rainChartData.cloudRects.filter((r) => r.y1 === 0).map((r) => [r.x1.getTime() + 1_800_000, 1.5] as [number, number])
+    rainCloudChartData.cloudRects
+      .filter((r) => r.y1 === 0)
+      .map((r) => [r.x1.getTime() + 1_800_000, 1.5] as [number, number])
   );
 
   rainAnchorSeries.markLine = {
@@ -273,7 +294,7 @@ export function buildWindChartOption(
     ],
   };
 
-  const cloudItems = rainChartData.cloudRects.map((r) => ({
+  const cloudItems = rainCloudChartData.cloudRects.map((r) => ({
     x1: r.x1.getTime(),
     x2: r.x2.getTime(),
     y1: r.y1,
@@ -309,7 +330,7 @@ export function buildWindChartOption(
   };
 
   type RainDot = { timeMs: number; rain: number };
-  const rainDots: RainDot[] = rainChartData.rainDots.map((d) => ({
+  const rainDots: RainDot[] = rainCloudChartData.rainDots.map((d) => ({
     timeMs: d.time.getTime(),
     rain: d.rain,
   }));
@@ -510,6 +531,43 @@ export function buildWindChartOption(
     tooltip: { show: false },
   };
 
+  // ── Pressure-level markLines (right-side hPa labels) ──────────────────────
+  // Build a height→hPa lookup for all levels visible at this maxAltitude.
+  const visiblePressureLevels = getPressureLevelsForAltitude(maxAltitude);
+  const heightToHpa = new Map<number, number>(visiblePressureLevels.map((l) => [l.heightMeters, l.hPa]));
+
+  const pressureLabelSeries: LineSeriesOption = {
+    name: '_pressureLabels',
+    type: 'line',
+    xAxisIndex: 2,
+    yAxisIndex: 3,
+    silent: true,
+    symbol: 'none',
+    lineStyle: { opacity: 0 },
+    data: [],
+    markLine: {
+      silent: true,
+      symbol: 'none',
+      animation: false,
+      lineStyle: { color: 'rgba(160,160,160,0.35)', type: 'dashed', width: 0.8 },
+      label: {
+        show: true,
+        position: 'insideEndTop',
+        formatter: (params: unknown) => {
+          const p = params as { value?: unknown };
+          const hPa = heightToHpa.get(Number(p.value));
+          return hPa != null ? `${hPa}hPa` : '';
+        },
+        color: '#888',
+        fontSize: 9,
+        padding: [1, 3],
+      },
+      data: visiblePressureLevels.map((l) => ({ yAxis: l.heightMeters })),
+    },
+    z: 2,
+    tooltip: { show: false },
+  };
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Unified tooltip formatter
   // ═══════════════════════════════════════════════════════════════════════════
@@ -536,6 +594,7 @@ export function buildWindChartOption(
     windArrowSeries,
     cloudBaseSeries,
     elevationLineSeries,
+    pressureLabelSeries,
   ];
 
   return {

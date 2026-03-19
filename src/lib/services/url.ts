@@ -7,6 +7,7 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
   const lon = params.get('lon');
   const day = params.get('day');
   const model = params.get('model');
+  const maxAlt = params.get('maxAlt');
 
   if (!(lat && lon && day && model)) {
     return null;
@@ -21,6 +22,7 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
 
   const selectedDay = day ? Number(day) : defaultDay;
   const selectedModel = model ? (model as WeatherModel) : defaultWeatherModel;
+  const maxAltitude = maxAlt ? Number(maxAlt) : 4500;
 
-  return { location, selectedDay, selectedModel };
+  return { location, selectedDay, selectedModel, maxAltitude };
 }

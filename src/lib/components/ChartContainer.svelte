@@ -7,6 +7,7 @@
   export let weatherData: WeatherDataType;
   export let startDate: Date;
   export let selectedDay: number;
+  export let maxAltitude = 4350;
 
   const dispatch = createEventDispatcher();
 
@@ -70,7 +71,7 @@
       </button>
     </div>
 
-    <WindChart {weatherData} />
+    <WindChart {weatherData} {maxAltitude} />
   </div>
 
   <div class="mt-1">

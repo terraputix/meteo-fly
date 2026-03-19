@@ -40,21 +40,19 @@ function getVariableFromHourly(
     const position = hourlyParams.findIndex((v) => v === variable.apiName);
     return hourlyResponse.variables(position)!.valuesArray()!;
   } else if (isProfile(variable)) {
-    const values = variable.apiNames.map((apiName) => {
+    // Dynamically map each apiName to its hPa key – no hardcoded indices.
+    const result: Partial<VerticalProfile> = {};
+    variable.apiNames.forEach((apiName) => {
       const position = hourlyParams.findIndex((v) => v === apiName);
-      return hourlyResponse.variables(position)!.valuesArray()!;
+      const values = hourlyResponse.variables(position)!.valuesArray()!;
+      // Extract the hPa suffix: e.g. "wind_speed_1000hPa" → key "_1000hPa"
+      const match = apiName.match(/_(\d+hPa)$/);
+      if (match) {
+        const key = `_${match[1]}` as keyof VerticalProfile;
+        (result as Record<string, Float32Array>)[key] = values;
+      }
     });
-    return {
-      _1000hPa: values[0],
-      _975hPa: values[1],
-      _950hPa: values[2],
-      _925hPa: values[3],
-      _900hPa: values[4],
-      _850hPa: values[5],
-      _800hPa: values[6],
-      _700hPa: values[7],
-      _600hPa: values[8],
-    };
+    return result as VerticalProfile;
   } else {
     throw new Error('Unknown variable type');
   }
@@ -68,9 +66,7 @@ const range = (start: number, stop: number, step: number) =>
 
 function formatDateToYYYYMMDD(date: Date): string {
   const year = date.getFullYear();
-  // Month is 0-indexed, so add 1 and pad with '0' if less than 10
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  // Day of the month, pad with '0' if less than 10
   const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
@@ -82,9 +78,7 @@ export function createQueryParams(
   start: Date,
   numberOfDays: number
 ) {
-  // Get the user's local timezone from the browser
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
   const endDate = new Date(start.getTime() + (numberOfDays - 1) * 24 * 60 * 60 * 1000);
 
   return {
@@ -103,18 +97,16 @@ export async function fetchWeatherData(
   location: Location,
   model: WeatherModel = 'icon_d2',
   start: Date,
-  numberOfDays: number = 1
+  numberOfDays: number = 1,
+  maxAltitude: number = 4500
 ): Promise<WeatherDataType> {
-  const modelVariables = getVariablesForModel(model);
+  const modelVariables = getVariablesForModel(model, maxAltitude);
   const hourlyParams = createHourlyParams(modelVariables);
   const params = createQueryParams(location, hourlyParams, model, start, numberOfDays);
 
   const responses = await fetchWeatherApi(url, params);
-  // Process first location. Add a for-loop for multiple locations or weather models
   const response = responses[0];
 
-  // Attributes for timezone and location
-  // const utcOffsetSeconds = response.utcOffsetSeconds();
   const timezone = response.timezoneAbbreviation() ?? 'UTC';
 
   const sunriseInt: number = Number(response.daily()!.variables(0)?.valuesInt64(0));
@@ -122,8 +114,6 @@ export async function fetchWeatherData(
   const sunrise = new Date(sunriseInt * 1000);
   const sunset = new Date(sunsetInt * 1000);
 
-  // const latitude = response.latitude();
-  // const longitude = response.longitude();
   const elevation = response.elevation();
 
   const hourly = response.hourly()!;

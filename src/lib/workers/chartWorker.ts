@@ -73,11 +73,11 @@ function calculateDomains(windData: Array<{ time: Date }>): [Date, Date] {
 }
 
 self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
-  const { weatherData } = e.data;
+  const { weatherData, maxAltitude } = e.data;
 
   try {
-    const cloudData = getCloudCoverData(weatherData);
-    const windData = getWindFieldAllLevels(weatherData);
+    const cloudData = getCloudCoverData(weatherData, maxAltitude);
+    const windData = getWindFieldAllLevels(weatherData, maxAltitude);
     const cloudBase = calculateCloudBaseWeather(weatherData);
 
     const xDomain = calculateDomains(windData);

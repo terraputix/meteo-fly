@@ -1,14 +1,18 @@
 <script lang="ts">
   import * as echarts from 'echarts';
   import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
-  import { buildWindChartOption, TOTAL_HEIGHT } from '$lib/charts/buildWindChartOption';
+  import { buildWindChartOption, getChartHeight } from '$lib/charts/buildWindChartOption';
   import type { WeatherDataType } from '$lib/api/types';
   import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
   import Legend from './Legend.svelte';
 
   export let weatherData: WeatherDataType | null = null;
+  export let maxAltitude = 4350;
 
   let isRendering = false;
+
+  $: windHeight = Math.ceil(maxAltitude / 10);
+  $: totalHeight = getChartHeight(windHeight);
 
   // ─── Worker helper ────────────────────────────────────────────────────────
 
@@ -31,7 +35,13 @@
 
   // ─── Svelte action ────────────────────────────────────────────────────────
 
-  function renderChart(node: HTMLElement, data: WeatherDataType | null) {
+  type RenderChartParams = {
+    data: WeatherDataType | null;
+    windHeight: number;
+    maxAltitude: number;
+  };
+
+  function renderChart(node: HTMLElement, { data }: RenderChartParams) {
     let chart: echarts.ECharts | null = null;
     let resizeObserver: ResizeObserver | null = null;
     let cancellation: { cancelled: boolean } | null = null;
@@ -54,7 +64,7 @@
       cancellation = signal;
 
       try {
-        const response = await runChartWorker({ weatherData: currentData }, signal);
+        const response = await runChartWorker({ weatherData: currentData, maxAltitude }, signal);
         if (signal.cancelled) return;
 
         if (!response.success) {
@@ -74,7 +84,7 @@
         } = response.data;
 
         const canvas = document.createElement('div');
-        canvas.style.cssText = `width:100%;height:${TOTAL_HEIGHT}px;`;
+        canvas.style.cssText = `width:100%;height:${totalHeight}px;`;
         node.appendChild(canvas);
 
         chart = echarts.init(canvas);
@@ -93,7 +103,9 @@
             timezoneAbbr,
             xDomain,
             store,
-            activeState
+            activeState,
+            windHeight,
+            maxAltitude
           )
         );
 
@@ -104,7 +116,7 @@
         // Y-axis → grid mapping:
         //   axisIndex 0 or 1  →  grid 0 (temperature)
         //   axisIndex 2       →  grid 1 (rain / cloud)
-        //   axisIndex 3       →  grid 2 (wind field)
+        //   axisIndex 3 or 4  →  grid 2 (wind field)
         chart.on('updateaxispointer', (event: unknown) => {
           const e = event as { axesInfo?: Array<{ axisDim: string; axisIndex: number; value: number }> };
           const axes = e?.axesInfo;
@@ -126,6 +138,7 @@
             activeState.gridIndex = 1;
             activeState.hoveredWindY = null;
           } else {
+            // axisIndex 3 (wind height left) or 4 (pressure right) → grid 2
             activeState.gridIndex = 2;
             activeState.hoveredWindY = yInfo.value;
           }
@@ -143,7 +156,7 @@
     if (data) draw(data);
 
     return {
-      update(newData: WeatherDataType | null) {
+      update({ data: newData }: RenderChartParams) {
         if (newData) {
           draw(newData);
         } else {
@@ -160,7 +173,7 @@
   }
 </script>
 
-<div class="chart-container" style="min-height: {TOTAL_HEIGHT}px;">
+<div class="chart-container" style="min-height: {totalHeight}px;">
   {#if isRendering}
     <div class="loading-state">
       <div class="loading-spinner"></div>
@@ -170,9 +183,9 @@
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
   <div
-    use:renderChart={weatherData}
+    use:renderChart={{ data: weatherData, windHeight, maxAltitude }}
     class="chart-content"
-    style="opacity: {isRendering ? 0 : 1}; height: {TOTAL_HEIGHT}px;"
+    style="opacity: {isRendering ? 0 : 1}; height: {totalHeight}px;"
   ></div>
 </div>
 

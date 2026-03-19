@@ -24,6 +24,8 @@ export interface VerticalProfile {
   _800hPa: Float32Array;
   _700hPa: Float32Array;
   _600hPa: Float32Array;
+  _500hPa?: Float32Array;
+  _400hPa?: Float32Array;
 }
 
 export interface WeatherDataType {

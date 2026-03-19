@@ -1,73 +1,34 @@
 import type { FlatVariable, ProfileVariables, VariableConfig, WeatherModel } from './types';
 
-// the key is the key in the hourly data object
+// All pressure level definitions aligned with pressureLevels.ts
+const pressureLevelDefs: { hPa: number; heightMeters: number }[] = [
+  { hPa: 1000, heightMeters: 110 },
+  { hPa: 975, heightMeters: 320 },
+  { hPa: 950, heightMeters: 540 },
+  { hPa: 925, heightMeters: 770 },
+  { hPa: 900, heightMeters: 1000 },
+  { hPa: 850, heightMeters: 1500 },
+  { hPa: 800, heightMeters: 2000 },
+  { hPa: 700, heightMeters: 3000 },
+  { hPa: 600, heightMeters: 4200 },
+  { hPa: 500, heightMeters: 5600 },
+  { hPa: 400, heightMeters: 7200 },
+];
 
-export const cloudProfile: ProfileVariables = {
-  key: 'cloudCoverProfile',
-  type: 'Profile',
-  apiNames: [
-    'cloud_cover_1000hPa',
-    'cloud_cover_975hPa',
-    'cloud_cover_950hPa',
-    'cloud_cover_925hPa',
-    'cloud_cover_900hPa',
-    'cloud_cover_850hPa',
-    'cloud_cover_800hPa',
-    'cloud_cover_700hPa',
-    'cloud_cover_600hPa',
-  ],
-};
+function makeProfileVar(key: string, prefix: string, maxAltitude: number): ProfileVariables {
+  const levels = pressureLevelDefs.filter((l) => l.heightMeters <= maxAltitude);
+  return {
+    key,
+    type: 'Profile',
+    apiNames: levels.map((l) => `${prefix}_${l.hPa}hPa`),
+  };
+}
 
-export const windSpeedProfile: ProfileVariables = {
-  key: 'windSpeedProfile',
-  type: 'Profile',
-  apiNames: [
-    'wind_speed_1000hPa',
-    'wind_speed_975hPa',
-    'wind_speed_950hPa',
-    'wind_speed_925hPa',
-    'wind_speed_900hPa',
-    'wind_speed_850hPa',
-    'wind_speed_800hPa',
-    'wind_speed_700hPa',
-    'wind_speed_600hPa',
-  ],
-};
-
-export const windDirectionProfile: ProfileVariables = {
-  key: 'windDirectionProfile',
-  type: 'Profile',
-  apiNames: [
-    'wind_direction_1000hPa',
-    'wind_direction_975hPa',
-    'wind_direction_950hPa',
-    'wind_direction_925hPa',
-    'wind_direction_900hPa',
-    'wind_direction_850hPa',
-    'wind_direction_800hPa',
-    'wind_direction_700hPa',
-    'wind_direction_600hPa',
-  ],
-};
-
-export const verticalVelocityProfile: ProfileVariables = {
-  key: 'verticalVelocityProfile',
-  type: 'Profile',
-  apiNames: [
-    'vertical_velocity_1000hPa',
-    'vertical_velocity_975hPa',
-    'vertical_velocity_950hPa',
-    'vertical_velocity_925hPa',
-    'vertical_velocity_900hPa',
-    'vertical_velocity_850hPa',
-    'vertical_velocity_800hPa',
-    'vertical_velocity_700hPa',
-    'vertical_velocity_600hPa',
-  ],
-};
-
-export const variableConfig: VariableConfig = {
-  default: [
+export function getVariablesForModel(
+  model: WeatherModel,
+  maxAltitude: number = 4500
+): (ProfileVariables | FlatVariable)[] {
+  const flatVars: FlatVariable[] = [
     { apiName: 'precipitation', type: 'Flat', key: 'precipitation' },
     { apiName: 'temperature_2m', type: 'Flat', key: 'temperature_2m' },
     { apiName: 'dew_point_2m', type: 'Flat', key: 'dewpoint_2m' },
@@ -75,18 +36,20 @@ export const variableConfig: VariableConfig = {
     { apiName: 'cloud_cover_low', type: 'Flat', key: 'cloudCoverLow' },
     { apiName: 'cloud_cover_mid', type: 'Flat', key: 'cloudCoverMid' },
     { apiName: 'cloud_cover_high', type: 'Flat', key: 'cloudCoverHigh' },
-    cloudProfile,
-    windSpeedProfile,
-    windDirectionProfile,
-  ],
-  modelSpecific: {
-    icon_d2: [],
-    icon_global: [],
-    gfs_seamless: [verticalVelocityProfile],
-  },
-};
+  ];
 
-export function getVariablesForModel(model: WeatherModel): (ProfileVariables | FlatVariable)[] {
-  const modelSpecific = variableConfig.modelSpecific?.[model] || [];
-  return [...variableConfig.default, ...modelSpecific];
+  const profileVars: ProfileVariables[] = [
+    makeProfileVar('cloudCoverProfile', 'cloud_cover', maxAltitude),
+    makeProfileVar('windSpeedProfile', 'wind_speed', maxAltitude),
+    makeProfileVar('windDirectionProfile', 'wind_direction', maxAltitude),
+  ];
+
+  const modelSpecificVars: (ProfileVariables | FlatVariable)[] = (() => {
+    if (model === 'gfs_seamless') {
+      return [makeProfileVar('verticalVelocityProfile', 'vertical_velocity', maxAltitude)];
+    }
+    return [];
+  })();
+
+  return [...flatVars, ...profileVars, ...modelSpecificVars];
 }

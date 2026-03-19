@@ -4,6 +4,7 @@ import type { WindFieldLevel } from '$lib/charts/wind';
 
 export interface ChartWorkerInput {
   weatherData: WeatherDataType;
+  maxAltitude: number;
 }
 
 export interface TemperatureChartData {
