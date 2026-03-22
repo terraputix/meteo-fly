@@ -1,5 +1,5 @@
 import type { WeatherDataType } from '$lib/api/types';
-import { getPressureLevelsForAltitude, getAtLevel } from './pressureLevels';
+import { getModelPressureLevelsForAltitude, getAtLevel } from './pressureLevels';
 
 export interface CloudCoverData {
   time: Date;
@@ -10,7 +10,7 @@ export interface CloudCoverData {
 export function getCloudCoverData(weatherData: WeatherDataType, maxAltitude: number = 4500): Array<CloudCoverData> {
   const data: CloudCoverData[] = [];
   const times = weatherData.hourly.time;
-  const levels = getPressureLevelsForAltitude(maxAltitude);
+  const levels = getModelPressureLevelsForAltitude(maxAltitude);
 
   levels.forEach((level) => {
     const values = getAtLevel(weatherData.hourly.cloudCoverProfile, level.hPa);

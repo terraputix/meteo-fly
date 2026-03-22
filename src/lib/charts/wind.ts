@@ -1,6 +1,6 @@
 import type { WeatherDataType } from '$lib/api/types';
 import { interpolateWind } from '$lib/meteo/wind';
-import { getPressureLevelsForAltitude, getAllLevelsForAltitude, getAtLevel } from './pressureLevels';
+import { getModelPressureLevelsForAltitude, getAllPressureLevelsForAltitude, getAtLevel } from './pressureLevels';
 
 export interface WindFieldLevel {
   time: Date;
@@ -11,21 +11,26 @@ export interface WindFieldLevel {
 
 export function getWindFieldAllLevels(weatherData: WeatherDataType, maxAltitude: number = 4500): Array<WindFieldLevel> {
   const data: WindFieldLevel[] = [];
-  const pressureLevels = getPressureLevelsForAltitude(maxAltitude);
-  const levels = getAllLevelsForAltitude(maxAltitude);
+  const modelPressureLevels = getModelPressureLevelsForAltitude(maxAltitude);
+  const levels = getAllPressureLevelsForAltitude(maxAltitude);
 
   weatherData.hourly.time.forEach((time: Date, i: number) => {
     levels.forEach((level) => {
       let speed: number | null = null;
       let direction: number | null = null;
 
-      if (level.hPa === -1) {
-        // Interpolated level: find surrounding pressure levels
-        const lowerLevel = pressureLevels
+      const speedArr = getAtLevel(weatherData.hourly.windSpeedProfile, level.hPa);
+      const dirArr = getAtLevel(weatherData.hourly.windDirectionProfile, level.hPa);
+
+      if (speedArr && dirArr) {
+        speed = speedArr[i];
+        direction = dirArr[i];
+      } else {
+        const lowerLevel = modelPressureLevels
           .slice()
           .reverse()
           .find((p) => p.heightMeters <= level.heightMeters);
-        const upperLevel = pressureLevels.find((p) => p.heightMeters > level.heightMeters);
+        const upperLevel = modelPressureLevels.find((p) => p.heightMeters > level.heightMeters);
 
         if (lowerLevel && upperLevel) {
           const lowerSpeedArr = getAtLevel(weatherData.hourly.windSpeedProfile, lowerLevel.hPa);
@@ -44,14 +49,6 @@ export function getWindFieldAllLevels(weatherData: WeatherDataType, maxAltitude:
             speed = interpolated.speed;
             direction = interpolated.direction;
           }
-        }
-      } else {
-        // Direct pressure level
-        const speedArr = getAtLevel(weatherData.hourly.windSpeedProfile, level.hPa);
-        const dirArr = getAtLevel(weatherData.hourly.windDirectionProfile, level.hPa);
-        if (speedArr && dirArr) {
-          speed = speedArr[i];
-          direction = dirArr[i];
         }
       }
 

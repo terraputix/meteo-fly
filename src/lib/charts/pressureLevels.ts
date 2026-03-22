@@ -6,72 +6,62 @@ export function getAtLevel(data: VerticalProfile, pressure: number): Float32Arra
   return data[key];
 }
 
-/** All pressure levels including extended 500/400 hPa range */
-export const allPressureLevels: PressureLevel[] = [
+export const modelPressureLevels: PressureLevel[] = [
   { hPa: 1000, heightMeters: 110 },
   { hPa: 975, heightMeters: 320 },
   { hPa: 950, heightMeters: 540 },
   { hPa: 925, heightMeters: 770 },
   { hPa: 900, heightMeters: 1000 },
   { hPa: 850, heightMeters: 1500 },
-  { hPa: 800, heightMeters: 2000 },
+  { hPa: 800, heightMeters: 1900 },
   { hPa: 700, heightMeters: 3000 },
   { hPa: 600, heightMeters: 4200 },
   { hPa: 500, heightMeters: 5600 },
   { hPa: 400, heightMeters: 7200 },
-  { hPa: 350, heightMeters: 8800 },
+  { hPa: 300, heightMeters: 9200 },
 ];
 
-/** Legacy export – all base pressure levels (used for LEVEL_BANDS in chart) */
-export const pressureLevels = allPressureLevels;
-
-/** Returns pressure levels whose height is ≤ maxAltitude */
-export function getPressureLevelsForAltitude(maxAltitude: number): PressureLevel[] {
-  return allPressureLevels.filter((l) => l.heightMeters <= maxAltitude);
+export function getModelPressureLevelsForAltitude(maxAltitude: number): PressureLevel[] {
+  return modelPressureLevels.filter((level) => level.heightMeters <= maxAltitude);
 }
 
-/** All interpolated levels (covers full altitude range) */
-export const allInterpolatedLevels: PressureLevel[] = [
-  // Between 900hPa (1000m) and 850hPa (1500m)
-  { hPa: -1, heightMeters: 1250 },
-  // Between 850hPa (1500m) and 800hPa (2000m)
-  { hPa: -1, heightMeters: 1750 },
-  // Between 800hPa (2000m) and 700hPa (3000m)
-  { hPa: -1, heightMeters: 2250 },
-  { hPa: -1, heightMeters: 2500 },
-  { hPa: -1, heightMeters: 2750 },
-  // Between 700hPa (3000m) and 600hPa (4200m)
-  { hPa: -1, heightMeters: 3250 },
-  { hPa: -1, heightMeters: 3500 },
-  { hPa: -1, heightMeters: 3750 },
-  { hPa: -1, heightMeters: 4000 },
-  // Between 600hPa (4200m) and 500hPa (5600m) – 250m steps
-  { hPa: -1, heightMeters: 4500 },
-  { hPa: -1, heightMeters: 4750 },
-  { hPa: -1, heightMeters: 5000 },
-  { hPa: -1, heightMeters: 5250 },
-  { hPa: -1, heightMeters: 5500 },
-  // Between 500hPa (5600m) and 400hPa (7200m) – 250m steps
-  { hPa: -1, heightMeters: 5750 },
-  { hPa: -1, heightMeters: 6000 },
-  { hPa: -1, heightMeters: 6250 },
-  { hPa: -1, heightMeters: 6500 },
-  { hPa: -1, heightMeters: 6750 },
-  { hPa: -1, heightMeters: 7000 },
-  { hPa: -1, heightMeters: 7250 },
+function interpolatePressure(lowerLevel: PressureLevel, upperLevel: PressureLevel, heightMeters: number): number {
+  const altitudeSpan = upperLevel.heightMeters - lowerLevel.heightMeters;
+  if (altitudeSpan <= 0) return lowerLevel.hPa;
+
+  const ratio = (heightMeters - lowerLevel.heightMeters) / altitudeSpan;
+  const interpolatedHpa = lowerLevel.hPa + (upperLevel.hPa - lowerLevel.hPa) * ratio;
+
+  return Math.round(interpolatedHpa);
+}
+
+function createInterpolatedLevels(
+  lowerLevel: PressureLevel,
+  upperLevel: PressureLevel,
+  heights: number[]
+): PressureLevel[] {
+  return heights.map((heightMeters) => ({
+    hPa: interpolatePressure(lowerLevel, upperLevel, heightMeters),
+    heightMeters,
+  }));
+}
+
+export const interpolatedPressureLevels: PressureLevel[] = [
+  ...createInterpolatedLevels(modelPressureLevels[4], modelPressureLevels[5], [1250]),
+  ...createInterpolatedLevels(modelPressureLevels[5], modelPressureLevels[6], [1750]),
+  ...createInterpolatedLevels(modelPressureLevels[6], modelPressureLevels[7], [2250, 2500, 2750]),
+  ...createInterpolatedLevels(modelPressureLevels[7], modelPressureLevels[8], [3250, 3500, 3750, 4000]),
+  ...createInterpolatedLevels(modelPressureLevels[8], modelPressureLevels[9], [4500, 4750, 5000, 5250, 5500]),
+  ...createInterpolatedLevels(modelPressureLevels[9], modelPressureLevels[10], [5750, 6000, 6250, 6500, 6750, 7000]),
 ];
 
-/** Legacy export */
-export const interpolatedLevels = allInterpolatedLevels;
-
-/** Returns interpolated levels whose height is ≤ maxAltitude */
-export function getInterpolatedLevelsForAltitude(maxAltitude: number): PressureLevel[] {
-  return allInterpolatedLevels.filter((l) => l.heightMeters <= maxAltitude);
+export function getInterpolatedPressureLevelsForAltitude(maxAltitude: number): PressureLevel[] {
+  return interpolatedPressureLevels.filter((level) => level.heightMeters <= maxAltitude);
 }
 
-/** All levels (pressure + interpolated) sorted by altitude for a given maxAltitude */
-export function getAllLevelsForAltitude(maxAltitude: number): PressureLevel[] {
-  return [...getPressureLevelsForAltitude(maxAltitude), ...getInterpolatedLevelsForAltitude(maxAltitude)].sort(
-    (a, b) => a.heightMeters - b.heightMeters
-  );
+export function getAllPressureLevelsForAltitude(maxAltitude: number): PressureLevel[] {
+  return [
+    ...getModelPressureLevelsForAltitude(maxAltitude),
+    ...getInterpolatedPressureLevelsForAltitude(maxAltitude),
+  ].sort((a, b) => a.heightMeters - b.heightMeters);
 }

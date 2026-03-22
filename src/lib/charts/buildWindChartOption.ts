@@ -16,7 +16,7 @@ import { createTooltipFormatter, type TooltipStore, type ActiveState } from '$li
 import type { TemperatureChartData, RainCloudChartData } from '$lib/workers/chartWorker.types';
 import type { WindFieldLevel } from '$lib/charts/wind';
 import type { CloudCoverData } from '$lib/charts/clouds';
-import { pressureLevels, getPressureLevelsForAltitude } from '$lib/charts/pressureLevels';
+import { modelPressureLevels, getModelPressureLevelsForAltitude } from '$lib/charts/pressureLevels';
 import { fmtTime } from '$lib/helpers';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
@@ -51,12 +51,12 @@ interface LevelBand {
   bandTop: number; // upper altitude boundary of the band (metres)
 }
 
-const CLOUD_Y_FLOOR = pressureLevels[0].heightMeters - 100;
-const CLOUD_Y_CEIL = pressureLevels[pressureLevels.length - 1].heightMeters + 200;
+const CLOUD_Y_FLOOR = modelPressureLevels[0].heightMeters - 100;
+const CLOUD_Y_CEIL = modelPressureLevels[modelPressureLevels.length - 1].heightMeters + 200;
 
-const LEVEL_BANDS: LevelBand[] = pressureLevels.map((lv, i) => {
-  const prev = pressureLevels[i - 1];
-  const next = pressureLevels[i + 1];
+const LEVEL_BANDS: LevelBand[] = modelPressureLevels.map((lv, i) => {
+  const prev = modelPressureLevels[i - 1];
+  const next = modelPressureLevels[i + 1];
   return {
     height: lv.heightMeters,
     bandBottom: prev ? (prev.heightMeters + lv.heightMeters) / 2 : CLOUD_Y_FLOOR,
@@ -529,8 +529,8 @@ export function buildWindChartOption(
   };
 
   // ── Pressure-level markLines (right-side hPa labels) ──────────────────────
-  // Build a height→hPa lookup for all levels visible at this maxAltitude.
-  const visiblePressureLevels = getPressureLevelsForAltitude(maxAltitude);
+  // Only draw lines for pressure levels that come directly from the weather model.
+  const visiblePressureLevels = getModelPressureLevelsForAltitude(maxAltitude);
   const heightToHpa = new Map<number, number>(visiblePressureLevels.map((l) => [l.heightMeters, l.hPa]));
 
   const pressureLabelSeries: LineSeriesOption = {

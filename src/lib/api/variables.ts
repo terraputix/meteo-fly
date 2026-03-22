@@ -1,22 +1,8 @@
-import type { FlatVariable, ProfileVariables, VariableConfig, WeatherModel } from './types';
-
-// All pressure level definitions aligned with pressureLevels.ts
-const pressureLevelDefs: { hPa: number; heightMeters: number }[] = [
-  { hPa: 1000, heightMeters: 110 },
-  { hPa: 975, heightMeters: 320 },
-  { hPa: 950, heightMeters: 540 },
-  { hPa: 925, heightMeters: 770 },
-  { hPa: 900, heightMeters: 1000 },
-  { hPa: 850, heightMeters: 1500 },
-  { hPa: 800, heightMeters: 2000 },
-  { hPa: 700, heightMeters: 3000 },
-  { hPa: 600, heightMeters: 4200 },
-  { hPa: 500, heightMeters: 5600 },
-  { hPa: 400, heightMeters: 7200 },
-];
+import type { FlatVariable, ProfileVariables, WeatherModel } from './types';
+import { getModelPressureLevelsForAltitude } from '$lib/charts/pressureLevels';
 
 function makeProfileVar(key: string, prefix: string, maxAltitude: number): ProfileVariables {
-  const levels = pressureLevelDefs.filter((l) => l.heightMeters <= maxAltitude);
+  const levels = getModelPressureLevelsForAltitude(maxAltitude);
   return {
     key,
     type: 'Profile',
