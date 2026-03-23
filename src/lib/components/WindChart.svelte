@@ -45,10 +45,11 @@
     model: WeatherModel;
   };
 
-  function renderChart(node: HTMLElement, { data }: RenderChartParams) {
+  function renderChart(node: HTMLElement, params: RenderChartParams) {
     let chart: echarts.ECharts | null = null;
     let resizeObserver: ResizeObserver | null = null;
     let cancellation: { cancelled: boolean } | null = null;
+    let prevData = params.data;
 
     function destroyChart() {
       resizeObserver?.disconnect();
@@ -158,17 +159,21 @@
       }
     }
 
-    if (data) draw(data);
+    if (params.data) draw(params.data);
 
     return {
-      update({ data: newData, model: newModel }: RenderChartParams) {
-        model = newModel;
-        if (newData) {
-          draw(newData);
-        } else {
-          if (cancellation) cancellation.cancelled = true;
-          destroyChart();
-          isRendering = false;
+      update(newParams: RenderChartParams) {
+        model = newParams.model;
+        maxAltitude = newParams.maxAltitude;
+        if (newParams.data !== prevData) {
+          prevData = newParams.data;
+          if (newParams.data) {
+            draw(newParams.data);
+          } else {
+            if (cancellation) cancellation.cancelled = true;
+            destroyChart();
+            isRendering = false;
+          }
         }
       },
       destroy() {

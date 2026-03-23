@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { saveLastVisitedURL } from '$lib/services/storage';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
@@ -41,8 +40,6 @@
     clearTimeout(updateTimer);
     updateTimer = setTimeout(updateWeather, 5);
   }
-
-  onMount(updateWeather);
 
   async function updateWeather() {
     try {

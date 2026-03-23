@@ -79,7 +79,7 @@
 
     <!-- Altitude Selection -->
     <div class="flex items-center">
-      <label for="altitude" class="mr-2 text-sm font-medium whitespace-nowrap text-gray-700">Alt:</label>
+      <label for="altitude" class="mr-2 text-sm font-medium whitespace-nowrap text-gray-700">Top Height:</label>
       <select
         id="altitude"
         bind:value={parameters.maxAltitude}
