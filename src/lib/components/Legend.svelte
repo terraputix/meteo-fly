@@ -4,12 +4,12 @@
   const cloudGradient =
     'linear-gradient(to right, rgba(100,120,145,0), rgba(100,120,145,0.45) 50%, rgba(100,120,145,0.85))';
 
-  const step = 100 / (windColors.length - 1);
+  const step = 100 / windColors.length;
   const windGradient = `linear-gradient(to right, ${windColors
     .flatMap((color, i) => {
       const start = (i * step).toFixed(1) + '%';
       const end = ((i + 1) * step).toFixed(1) + '%';
-      return i < windColors.length - 1 ? [`${color} ${start}`, `${color} ${end}`] : [`${color} ${start}`];
+      return [`${color} ${start}`, `${color} ${end}`];
     })
     .join(', ')})`;
 </script>

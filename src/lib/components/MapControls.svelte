@@ -1,5 +1,6 @@
 <script lang="ts">
   import { domainOptions, type Domain } from '@openmeteo/mapbox-layer';
+  import type { MaxAltitude } from '$lib/meteo/types';
   import {
     weatherMapVariables,
     pressureLevels,
@@ -28,6 +29,8 @@
     onLocationChange: (location: Location) => void;
     onSelectedDayChange: (day: number) => void;
     onSelectedModelChange: (model: WeatherModel) => void;
+    maxAltitude: MaxAltitude;
+    onMaxAltitudeChange: (altitude: MaxAltitude) => void;
     onOpenChart: () => void;
   }
 
@@ -48,8 +51,19 @@
     // onLocationChange,
     onSelectedDayChange,
     onSelectedModelChange,
+    maxAltitude,
+    onMaxAltitudeChange,
     onOpenChart,
   }: Props = $props();
+
+  const altitudes: { value: MaxAltitude; name: string }[] = [
+    { value: 3000, name: '3000m (700hPa)' },
+    { value: 4000, name: '4000m (625hPa)' },
+    { value: 5000, name: '5000m (550hPa)' },
+    { value: 6000, name: '6000m (475hPa)' },
+    { value: 7000, name: '7000m (400hPa)' },
+    { value: 8000, name: '8000m (350hPa)' },
+  ];
 
   // Models array from Controls.svelte
   const models: { id: WeatherModel; name: string }[] = [
@@ -88,6 +102,11 @@
   function handleSelectedDayChange(event: Event) {
     const newDay = parseInt((event.target as HTMLInputElement).value, 10);
     onSelectedDayChange(newDay);
+  }
+
+  function handleMaxAltitudeChange(event: Event) {
+    const newAltitude = parseInt((event.target as HTMLSelectElement).value, 10) as MaxAltitude;
+    onMaxAltitudeChange(newAltitude);
   }
 
   function isVariableAvailable(baseVar: string) {
@@ -206,6 +225,20 @@
         max="7"
         min="-14"
       />
+    </div>
+
+    <div class="flex items-center gap-2">
+      <label for="altitude" class="text-sm font-medium text-gray-700 dark:text-gray-300">Top Height</label>
+      <select
+        id="altitude"
+        onchange={handleMaxAltitudeChange}
+        value={maxAltitude}
+        class="rounded-md border-gray-300 bg-white px-2 py-1 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+      >
+        {#each altitudes as alt (alt.value)}
+          <option value={alt.value}>{alt.name}</option>
+        {/each}
+      </select>
     </div>
   </div>
 </div>

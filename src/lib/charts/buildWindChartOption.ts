@@ -16,16 +16,17 @@ import { createTooltipFormatter, type TooltipStore, type ActiveState } from '$li
 import type { TemperatureChartData, RainCloudChartData } from '$lib/workers/chartWorker.types';
 import type { WindFieldLevel } from '$lib/charts/wind';
 import type { CloudCoverData } from '$lib/charts/clouds';
-import { pressureLevels } from '$lib/charts/pressureLevels';
+import type { WeatherModel } from '$lib/api/types';
+import { getNativeLevelsForModel } from '$lib/meteo/pressureLevels';
 import { fmtTime } from '$lib/helpers';
+import type { MaxAltitude } from '$lib/meteo/types';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.
 export const MARGIN_LEFT = 40;
-export const MARGIN_RIGHT = 40;
+export const MARGIN_RIGHT = 25;
 export const TEMP_HEIGHT_PX = 130;
 export const RAIN_HEIGHT_PX = 66;
-export const WIND_HEIGHT_PX = 440;
 
 export const TEMP_TOP = 10;
 const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX;
@@ -34,7 +35,12 @@ export const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
 const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
 const WIND_GAP = 20;
 export const WIND_TOP = RAIN_BOTTOM_PX + WIND_GAP;
-export const TOTAL_HEIGHT = WIND_TOP + WIND_HEIGHT_PX + 42;
+
+export function getChartHeight(windHeight: number = 440) {
+  return WIND_TOP + windHeight + 42;
+}
+
+export const TOTAL_HEIGHT = getChartHeight(440);
 
 // ─── Pre-computed pressure-level band boundaries ─────────────────────────────
 // For each pressure level at index i, the band it paints spans from the
@@ -47,24 +53,10 @@ interface LevelBand {
   bandTop: number; // upper altitude boundary of the band (metres)
 }
 
-const CLOUD_Y_FLOOR = pressureLevels[0].heightMeters - 100;
-const CLOUD_Y_CEIL = pressureLevels[pressureLevels.length - 1].heightMeters + 200;
-
-const LEVEL_BANDS: LevelBand[] = pressureLevels.map((lv, i) => {
-  const prev = pressureLevels[i - 1];
-  const next = pressureLevels[i + 1];
-  return {
-    height: lv.heightMeters,
-    bandBottom: prev ? (prev.heightMeters + lv.heightMeters) / 2 : CLOUD_Y_FLOOR,
-    bandTop: next ? (lv.heightMeters + next.heightMeters) / 2 : CLOUD_Y_CEIL,
-  };
-});
-
-// Map height → band boundaries for O(1) lookup inside renderItem.
-const BAND_BY_HEIGHT = new Map<number, LevelBand>(LEVEL_BANDS.map((b) => [b.height, b]));
+// Canonical arrow path
+const MODEL_ARROW_PATH = 'M 0 7 L 0 -7 L 3.15 -1.54 L 0 -7 L -3.15 -1.54';
 
 // ─── Shared x-axis factory ───────────────────────────────────────────────────
-
 function makeXAxis(gridIndex: number, showLabels: boolean, xMin: number, xMax: number): XAXisComponentOption {
   return {
     type: 'time',
@@ -97,7 +89,7 @@ interface CloudItem {
 
 export function buildWindChartOption(
   tempChartData: TemperatureChartData,
-  rainChartData: RainCloudChartData,
+  rainCloudChartData: RainCloudChartData,
   windData: WindFieldLevel[],
   cloudData: CloudCoverData[],
   cloudBase: Array<{ time: Date; value: number }>,
@@ -105,8 +97,32 @@ export function buildWindChartOption(
   timezoneAbbr: string,
   xDomain: [Date, Date],
   store: TooltipStore,
-  activeState: ActiveState
+  activeState: ActiveState,
+  windHeight: number = 440,
+  maxAltitude: MaxAltitude = 4000,
+  model: WeatherModel = 'icon_d2'
 ): EChartsOption {
+  // ── Model-specific level data ──────────────────────────────────────────────
+  // nativeLevels drives cloud-band geometry and pressure labels.
+  // bandByHeight is keyed by level height for O(1) lookup inside renderItem.
+  const nativeLevels = getNativeLevelsForModel(model, maxAltitude);
+  const cloudFloor = nativeLevels[0].heightMeters - 100;
+  const cloudCeil = nativeLevels[nativeLevels.length - 1].heightMeters + 200;
+  const bandByHeight = new Map<number, LevelBand>(
+    nativeLevels.map((lv, i): [number, LevelBand] => {
+      const prev = nativeLevels[i - 1];
+      const next = nativeLevels[i + 1];
+      return [
+        lv.heightMeters,
+        {
+          height: lv.heightMeters,
+          bandBottom: prev ? (prev.heightMeters + lv.heightMeters) / 2 : cloudFloor,
+          bandTop: next ? (lv.heightMeters + next.heightMeters) / 2 : cloudCeil,
+        },
+      ];
+    })
+  );
+
   const xMin = xDomain[0].getTime();
   const xMax = xDomain[1].getTime();
 
@@ -114,7 +130,7 @@ export function buildWindChartOption(
   const grids: GridComponentOption[] = [
     { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: TEMP_TOP, height: TEMP_HEIGHT_PX },
     { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: RAIN_TOP, height: RAIN_HEIGHT_PX },
-    { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: WIND_TOP, height: WIND_HEIGHT_PX },
+    { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: WIND_TOP, height: windHeight },
   ];
 
   // ── X axes ─────────────────────────────────────────────────────────────────
@@ -131,7 +147,7 @@ export function buildWindChartOption(
 
   // ── Y axes ─────────────────────────────────────────────────────────────────
   const WIND_Y_MIN = 0;
-  const WIND_Y_MAX = 4350;
+  const WIND_Y_MAX = maxAltitude;
 
   const yAxes: YAXisComponentOption[] = [
     // 0 – temperature left
@@ -139,6 +155,7 @@ export function buildWindChartOption(
       type: 'value',
       gridIndex: 0,
       name: '°C',
+      scale: true,
       nameGap: 0,
       offset: 10,
       nameLocation: 'end',
@@ -153,13 +170,14 @@ export function buildWindChartOption(
     {
       type: 'value',
       gridIndex: 0,
-      name: 'Hum %',
+      name: '%',
       nameGap: 0,
-      offset: 10,
+      offset: -5,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
       min: 0,
       max: 100,
+      interval: 25,
       position: 'right',
       axisLabel: { fontSize: 11 },
       splitLine: { show: false },
@@ -191,16 +209,26 @@ export function buildWindChartOption(
     {
       type: 'value',
       gridIndex: 2,
-      name: 'm',
-      nameGap: 0,
-      offset: 10,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
       min: WIND_Y_MIN,
       max: WIND_Y_MAX,
-      axisLabel: { formatter: (v: number) => `${v}`, fontSize: 10 },
-      splitLine: { show: true, lineStyle: { color: CHART_COLORS.gridLine } },
       interval: 500,
+      axisLine: { show: true, lineStyle: { color: CHART_COLORS.axisLine } },
+      axisLabel: { formatter: (v: number) => `${v}m`, fontSize: 10 },
+      splitLine: { show: true, lineStyle: { color: CHART_COLORS.gridLine } },
+    },
+    // 4 – wind height right (pressure labels via markLine, axis provides right border)
+    {
+      type: 'value',
+      gridIndex: 2,
+      position: 'right',
+      min: WIND_Y_MIN,
+      max: WIND_Y_MAX,
+      axisLabel: { show: false },
+      axisTick: { show: false },
+      axisLine: { show: true, lineStyle: { color: CHART_COLORS.axisLine } },
+      splitLine: { show: false },
     },
   ];
 
@@ -253,7 +281,9 @@ export function buildWindChartOption(
     '__anchor_rain',
     1,
     2,
-    rainChartData.cloudRects.filter((r) => r.y1 === 0).map((r) => [r.x1.getTime() + 1_800_000, 1.5] as [number, number])
+    rainCloudChartData.cloudRects
+      .filter((r) => r.y1 === 0)
+      .map((r) => [r.x1.getTime() + 1_800_000, 1.5] as [number, number])
   );
 
   rainAnchorSeries.markLine = {
@@ -272,7 +302,7 @@ export function buildWindChartOption(
     ],
   };
 
-  const cloudItems = rainChartData.cloudRects.map((r) => ({
+  const cloudItems = rainCloudChartData.cloudRects.map((r) => ({
     x1: r.x1.getTime(),
     x2: r.x2.getTime(),
     y1: r.y1,
@@ -308,7 +338,7 @@ export function buildWindChartOption(
   };
 
   type RainDot = { timeMs: number; rain: number };
-  const rainDots: RainDot[] = rainChartData.rainDots.map((d) => ({
+  const rainDots: RainDot[] = rainCloudChartData.rainDots.map((d) => ({
     timeMs: d.time.getTime(),
     rain: d.rain,
   }));
@@ -384,7 +414,7 @@ export function buildWindChartOption(
       const item = cloudItems2[params.dataIndex];
       if (item.value <= 0) return { type: 'group', children: [] };
 
-      const band = BAND_BY_HEIGHT.get(item.height);
+      const band = bandByHeight.get(item.height);
       if (!band) return { type: 'group', children: [] };
 
       // Horizontal: pixel coords of the ±30 min window around this timestamp.
@@ -415,13 +445,15 @@ export function buildWindChartOption(
     tooltip: { show: false },
   };
 
-  // ── Wind arrows ────────────────────────────────────────────────────────────
-  type WindItem = { time: number; height: number; speed: number; direction: number };
+  // Each arrow is a single path element rotated into the wind direction via the
+  // element-level `rotation` transform.
+  type WindItem = { time: number; height: number; speed: number; direction: number; interpolated: boolean };
   const windItems: WindItem[] = windData.map((w) => ({
     time: w.time.getTime(),
     height: w.height,
     speed: w.speed,
     direction: w.direction,
+    interpolated: w.source === 'interpolated',
   }));
 
   const windArrowSeries: CustomSeriesOption = {
@@ -432,40 +464,26 @@ export function buildWindChartOption(
     silent: true,
     renderItem(params, api) {
       const item = windItems[params.dataIndex];
-      const coord = api.coord([item.time, item.height]);
-      const cx = coord[0];
-      const cy = coord[1];
-
-      const arrowLength = 18;
-      const strokeW = strokeWidthScale(item.speed);
-      const color = windColorScale(item.speed);
-
-      const angleDeg = item.direction - 180;
-      const angleRad = (angleDeg * Math.PI) / 180;
-      const dx = Math.sin(angleRad) * arrowLength;
-      const dy = -Math.cos(angleRad) * arrowLength;
-
-      const tailX = cx - dx / 2;
-      const tailY = cy - dy / 2;
-      const headX = cx + dx / 2;
-      const headY = cy + dy / 2;
-
-      const barbLen = Math.min(arrowLength * 0.45, 8);
-      const barbAngle = Math.PI * (5 / 6);
-      const b1x = headX + barbLen * Math.sin(angleRad + barbAngle);
-      const b1y = headY - barbLen * Math.cos(angleRad + barbAngle);
-      const b2x = headX + barbLen * Math.sin(angleRad - barbAngle);
-      const b2y = headY - barbLen * Math.cos(angleRad - barbAngle);
-
-      const lineStyle = { stroke: color, lineWidth: strokeW, lineCap: 'round' as const };
+      const [cx, cy] = api.coord([item.time, item.height]);
+      // Rotate canonical up-pointing path to match wind direction.
+      // direction is meteorological (where wind comes FROM), so subtract 180°
+      // to get the "going-to" bearing, which is what the arrowhead should show.
+      const rotation = (((item.direction - 180) * Math.PI) / 180) * -1;
 
       return {
-        type: 'group',
-        children: [
-          { type: 'line', shape: { x1: tailX, y1: tailY, x2: headX, y2: headY }, style: lineStyle },
-          { type: 'line', shape: { x1: headX, y1: headY, x2: b1x, y2: b1y }, style: lineStyle },
-          { type: 'line', shape: { x1: headX, y1: headY, x2: b2x, y2: b2y }, style: lineStyle },
-        ],
+        type: 'path',
+        shape: { pathData: MODEL_ARROW_PATH },
+        style: {
+          stroke: windColorScale(item.speed),
+          lineWidth: strokeWidthScale(item.speed),
+          lineCap: 'round' as const,
+          lineJoin: 'round' as const,
+          fill: 'none',
+          opacity: item.interpolated ? 0.4 : 1.0,
+        },
+        x: cx,
+        y: cy,
+        rotation,
       };
     },
     data: windItems.map((_, i) => i),
@@ -509,6 +527,42 @@ export function buildWindChartOption(
     tooltip: { show: false },
   };
 
+  // ── Pressure-level markLines (right-side hPa labels) ──────────────────────
+  // Only draw lines for pressure levels that come directly from the weather model.
+  const heightToHpa = new Map<number, number>(nativeLevels.map((l) => [l.heightMeters, l.hPa]));
+
+  const pressureLabelSeries: LineSeriesOption = {
+    name: '_pressureLabels',
+    type: 'line',
+    xAxisIndex: 2,
+    yAxisIndex: 3,
+    silent: true,
+    symbol: 'none',
+    lineStyle: { opacity: 0 },
+    data: [],
+    markLine: {
+      silent: true,
+      symbol: 'none',
+      animation: false,
+      lineStyle: { color: 'rgba(160,160,160,0.35)', type: 'dashed', width: 0.8 },
+      label: {
+        show: true,
+        position: 'insideEndTop',
+        formatter: (params: unknown) => {
+          const p = params as { value?: unknown };
+          const hPa = heightToHpa.get(Number(p.value));
+          return hPa != null ? `${hPa}hPa` : '';
+        },
+        color: '#888',
+        fontSize: 9,
+        padding: [1, 3],
+      },
+      data: nativeLevels.map((l) => ({ yAxis: l.heightMeters })),
+    },
+    z: 2,
+    tooltip: { show: false },
+  };
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Unified tooltip formatter
   // ═══════════════════════════════════════════════════════════════════════════
@@ -535,6 +589,7 @@ export function buildWindChartOption(
     windArrowSeries,
     cloudBaseSeries,
     elevationLineSeries,
+    pressureLabelSeries,
   ];
 
   return {

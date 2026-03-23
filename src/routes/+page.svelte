@@ -17,6 +17,7 @@
   import { addDays } from '$lib/utils/dateExtensions';
   import { WeatherMapManager, type WeatherMapState } from '$lib/services/weatherMap/manager';
   import type { Location, WeatherDataType, WeatherModel } from '$lib/api/types';
+  import type { MaxAltitude } from '$lib/meteo/types';
   import type { Subscriber, Unsubscriber } from 'svelte/store';
 
   const weatherMapManager = new WeatherMapManager($page.url.searchParams);
@@ -30,6 +31,7 @@
   let showChart = false;
   let weatherData: WeatherDataType | null = null;
   let error: string | null = null;
+  let maxAltitude: MaxAltitude = 4000;
 
   let initialOmUrl: string;
   onMount(async () => {
@@ -119,7 +121,13 @@
   async function updateWeather() {
     try {
       error = null;
-      weatherData = await fetchWeatherData($weatherMapStore.location, $weatherMapStore.selectedModel, startDate);
+      weatherData = await fetchWeatherData(
+        $weatherMapStore.location,
+        $weatherMapStore.selectedModel,
+        startDate,
+        1,
+        maxAltitude
+      );
       showChart = true;
     } catch (err) {
       console.error(err);
@@ -134,6 +142,21 @@
   function handleOpenChart() {
     showChart = true;
     updateWeather();
+  }
+
+  function handleSelectedDayChange(day: number) {
+    weatherMapManager.setSelectedDay(day);
+    if (showChart) updateWeather();
+  }
+
+  function handleSelectedModelChange(model: WeatherModel) {
+    weatherMapManager.setSelectedModel(model);
+    if (showChart) updateWeather();
+  }
+
+  function handleMaxAltitudeChange(alt: MaxAltitude) {
+    maxAltitude = alt;
+    if (showChart) updateWeather();
   }
 </script>
 
@@ -154,8 +177,10 @@
         selectedDay={$weatherMapStore.selectedDay}
         selectedModel={$weatherMapStore.selectedModel}
         onLocationChange={(loc: Location) => weatherMapManager.setLocation(loc)}
-        onSelectedDayChange={(day: number) => weatherMapManager.setSelectedDay(day)}
-        onSelectedModelChange={(model: WeatherModel) => weatherMapManager.setSelectedModel(model)}
+        onSelectedDayChange={handleSelectedDayChange}
+        onSelectedModelChange={handleSelectedModelChange}
+        {maxAltitude}
+        onMaxAltitudeChange={handleMaxAltitudeChange}
         onOpenChart={handleOpenChart}
       />
     </div>
@@ -183,7 +208,9 @@
               selectedModel={$weatherMapStore.selectedModel}
               onLocationChange={(loc: Location) => weatherMapManager.setLocation(loc)}
               onSelectedDayChange={(day: number) => weatherMapManager.setSelectedDay(day)}
-              onSelectedModelChange={(model: WeatherModel) => weatherMapManager.setSelectedModel(model)}
+              onSelectedModelChange={handleSelectedModelChange}
+              {maxAltitude}
+              onMaxAltitudeChange={handleMaxAltitudeChange}
               onOpenChart={handleOpenChart}
             />
           </div>
@@ -204,7 +231,9 @@
             {weatherData}
             {startDate}
             selectedDay={$weatherMapStore.selectedDay}
-            onSelectedDayChange={weatherMapManager.setSelectedDay}
+            onSelectedDayChange={handleSelectedDayChange}
+            {maxAltitude}
+            model={$weatherMapStore.selectedModel}
             on:close={handleClose}
           />
         </div>
