@@ -12,6 +12,7 @@ import {
   type WeatherDataType,
 } from './types';
 import { getVariablesForModel } from './variables';
+import type { MaxAltitude } from '$lib/meteo/types';
 
 export interface HourlyParams {
   hourly: string[];
@@ -98,7 +99,7 @@ export async function fetchWeatherData(
   model: WeatherModel = 'icon_d2',
   start: Date,
   numberOfDays: number = 1,
-  maxAltitude: number = 4500
+  maxAltitude: MaxAltitude = 4000
 ): Promise<WeatherDataType> {
   const modelVariables = getVariablesForModel(model, maxAltitude);
   const hourlyParams = createHourlyParams(modelVariables);

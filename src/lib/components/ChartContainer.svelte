@@ -3,11 +3,12 @@
   import WindChart from './WindChart.svelte';
   import { createEventDispatcher } from 'svelte';
   import Footer from './Footer.svelte';
+  import type { MaxAltitude } from '$lib/meteo/types';
 
   export let weatherData: WeatherDataType;
   export let startDate: Date;
   export let selectedDay: number;
-  export let maxAltitude = 4350;
+  export let maxAltitude: MaxAltitude = 4000;
   export let model: WeatherModel = 'icon_d2';
 
   const dispatch = createEventDispatcher();

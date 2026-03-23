@@ -7,9 +7,10 @@
   import Legend from './Legend.svelte';
 
   import type { WeatherModel } from '$lib/api/types';
+  import type { MaxAltitude } from '$lib/meteo/types';
 
   export let weatherData: WeatherDataType | null = null;
-  export let maxAltitude = 4350;
+  export let maxAltitude: MaxAltitude = 4000;
   export let model: WeatherModel = 'icon_d2';
 
   let isRendering = false;
@@ -41,7 +42,7 @@
   type RenderChartParams = {
     data: WeatherDataType | null;
     windHeight: number;
-    maxAltitude: number;
+    maxAltitude: MaxAltitude;
     model: WeatherModel;
   };
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { WeatherModel } from '$lib/api/types';
+  import type { MaxAltitude } from '$lib/meteo/types';
   import type { PageParameters } from '$lib/services/types';
   import { createEventDispatcher } from 'svelte';
 
@@ -17,9 +18,13 @@
     { id: 'cma_grapes_global', name: 'CMA GRAPES' },
   ];
 
-  const altitudes = [
-    { value: 4500, name: '4500m (600hPa)' },
-    { value: 7500, name: '7500m (400hPa)' },
+  const altitudes: { value: MaxAltitude; name: string }[] = [
+    { value: 3000, name: '3000m (700hPa)' },
+    { value: 4000, name: '4000m (625hPa)' },
+    { value: 5000, name: '5000m (550hPa)' },
+    { value: 6000, name: '6000m (475hPa)' },
+    { value: 7000, name: '7000m (400hPa)' },
+    { value: 8000, name: '8000m (350hPa)' },
   ];
 
   const dispatch = createEventDispatcher();

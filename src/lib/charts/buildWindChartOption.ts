@@ -19,6 +19,7 @@ import type { CloudCoverData } from '$lib/charts/clouds';
 import type { WeatherModel } from '$lib/api/types';
 import { getNativeLevelsForModel } from '$lib/meteo/pressureLevels';
 import { fmtTime } from '$lib/helpers';
+import type { MaxAltitude } from '$lib/meteo/types';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.
@@ -98,7 +99,7 @@ export function buildWindChartOption(
   store: TooltipStore,
   activeState: ActiveState,
   windHeight: number = 440,
-  maxAltitude: number = 4350,
+  maxAltitude: MaxAltitude = 4000,
   model: WeatherModel = 'icon_d2'
 ): EChartsOption {
   // ── Model-specific level data ──────────────────────────────────────────────
@@ -212,10 +213,10 @@ export function buildWindChartOption(
       nameTextStyle: { fontSize: 11 },
       min: WIND_Y_MIN,
       max: WIND_Y_MAX,
+      interval: 500,
       axisLine: { show: true, lineStyle: { color: CHART_COLORS.axisLine } },
       axisLabel: { formatter: (v: number) => `${v}m`, fontSize: 10 },
       splitLine: { show: true, lineStyle: { color: CHART_COLORS.gridLine } },
-      interval: 500,
     },
     // 4 – wind height right (pressure labels via markLine, axis provides right border)
     {

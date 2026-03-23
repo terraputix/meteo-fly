@@ -18,6 +18,6 @@ export function getInitialParameters(urlParams: URLSearchParams): PageParameters
     location: defaultLocation,
     selectedModel: defaultWeatherModel,
     selectedDay: defaultDay,
-    maxAltitude: 4500,
+    maxAltitude: 4000,
   };
 }

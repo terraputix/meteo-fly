@@ -28,7 +28,7 @@
       lon: pageParams.location.longitude.toString(),
       day: pageParams.selectedDay.toString(),
       model: pageParams.selectedModel,
-      maxAlt: (pageParams.maxAltitude ?? 4500).toString(),
+      maxAlt: (pageParams.maxAltitude ?? 4000).toString(),
     });
     const newURL = `?${params.toString()}`;
     saveLastVisitedURL(newURL);
@@ -49,7 +49,7 @@
         parameters.selectedModel,
         startDate,
         1,
-        parameters.maxAltitude ?? 4500
+        parameters.maxAltitude ?? 4000
       );
       showChart = true;
     } catch (err) {

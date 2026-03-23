@@ -1,7 +1,8 @@
 import type { WeatherDataType, WeatherModel } from '$lib/api/types';
 import { getAtLevel } from '$lib/api/types';
 import { interpolateWind } from '$lib/meteo/wind';
-import { getAllTaggedLevelsForModel, getNativeLevelsForModel, type LevelSource } from '$lib/meteo/pressureLevels';
+import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, type LevelSource } from '$lib/meteo/pressureLevels';
+import type { MaxAltitude } from '$lib/meteo/types';
 
 export interface WindFieldLevel {
   time: Date;
@@ -14,10 +15,10 @@ export interface WindFieldLevel {
 export function getWindFieldAllLevels(
   weatherData: WeatherDataType,
   model: WeatherModel,
-  maxAltitude: number = 4500
+  maxAltitude: MaxAltitude = 4000
 ): Array<WindFieldLevel> {
   const data: WindFieldLevel[] = [];
-  const nativeLevels = getNativeLevelsForModel(model, maxAltitude);
+  const nativeLevels = getNativeLevelsForFetch(model, maxAltitude);
   const allLevels = getAllTaggedLevelsForModel(model, maxAltitude);
 
   weatherData.hourly.time.forEach((time: Date, i: number) => {

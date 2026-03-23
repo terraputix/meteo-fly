@@ -41,7 +41,21 @@ export const MODEL_NATIVE_LEVELS: Record<WeatherModel, PressureLevel[]> = {
 };
 
 export function getNativeLevelsForModel(model: WeatherModel, maxAltitude: number): PressureLevel[] {
-  return MODEL_NATIVE_LEVELS[model].filter((l) => l.heightMeters <= maxAltitude);
+  // 50m margin to include levels that are very close to the specified top height, e.g. 3012m for 3000m
+  return MODEL_NATIVE_LEVELS[model].filter((l) => l.heightMeters <= maxAltitude + 50);
+}
+
+/**
+ * Like getNativeLevelsForModel, but also includes the first native level above
+ * maxAltitude. This ensures callers always have an upper bracket available for
+ * interpolation up to the ceiling.
+ */
+export function getNativeLevelsForFetch(model: WeatherModel, maxAltitude: number): PressureLevel[] {
+  const levels = MODEL_NATIVE_LEVELS[model];
+  const withinBounds = levels.filter((l) => l.heightMeters <= maxAltitude);
+  const firstAbove = levels.find((l) => l.heightMeters > maxAltitude);
+  if (firstAbove) withinBounds.push(firstAbove);
+  return withinBounds;
 }
 
 function buildInterpolatedLevels(nativeLevels: PressureLevel[]): TaggedPressureLevel[] {
@@ -67,9 +81,13 @@ function buildInterpolatedLevels(nativeLevels: PressureLevel[]): TaggedPressureL
  * distinguish native model data points from interpolated ones.
  */
 export function getAllTaggedLevelsForModel(model: WeatherModel, maxAltitude: number): TaggedPressureLevel[] {
-  const native = getNativeLevelsForModel(model, maxAltitude).map(
+  // Display set — strictly within bounds, tagged as model source
+  const nativeForDisplay = getNativeLevelsForModel(model, maxAltitude).map(
     (l): TaggedPressureLevel => ({ ...l, source: 'model' })
   );
-  const interpolated = buildInterpolatedLevels(native).filter((l) => l.heightMeters <= maxAltitude);
-  return [...native, ...interpolated].sort((a, b) => a.heightMeters - b.heightMeters);
+  // Bracket set — includes the one level above maxAltitude so that
+  // buildInterpolatedLevels can fill the gap right up to the ceiling
+  const nativeForBracket = getNativeLevelsForFetch(model, maxAltitude);
+  const interpolated = buildInterpolatedLevels(nativeForBracket).filter((l) => l.heightMeters <= maxAltitude);
+  return [...nativeForDisplay, ...interpolated].sort((a, b) => a.heightMeters - b.heightMeters);
 }
