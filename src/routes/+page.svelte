@@ -95,6 +95,7 @@
             {startDate}
             bind:selectedDay={parameters.selectedDay}
             maxAltitude={parameters.maxAltitude}
+            model={parameters.selectedModel}
             on:close={() => (showChart = false)}
           />
         </div>

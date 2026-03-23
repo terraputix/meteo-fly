@@ -14,18 +14,11 @@ export type WeatherModel =
   | 'cma_grapes_global'
   | 'gem_seamless';
 
-export interface VerticalProfile {
-  _1000hPa: Float32Array;
-  _975hPa: Float32Array;
-  _950hPa: Float32Array;
-  _925hPa: Float32Array;
-  _900hPa: Float32Array;
-  _850hPa: Float32Array;
-  _800hPa: Float32Array;
-  _700hPa: Float32Array;
-  _600hPa: Float32Array;
-  _500hPa?: Float32Array;
-  _400hPa?: Float32Array;
+export type VerticalProfileKey = `_${number}hPa`;
+export type VerticalProfile = Partial<Record<VerticalProfileKey, Float32Array>>;
+
+export function getAtLevel(data: VerticalProfile, pressure: number): Float32Array | undefined {
+  return data[`_${pressure}hPa` as VerticalProfileKey];
 }
 
 export interface WeatherDataType {
@@ -60,8 +53,6 @@ export interface HourlyData {
 }
 
 export type HourlyKeys = keyof HourlyData;
-type VerticalProfileKeys = keyof VerticalProfile;
-export type VerticalProfileKey = Extract<VerticalProfileKeys, `_${number}hPa`>;
 
 export type ProfileVariables = { key: string; type: string; apiNames: string[] };
 export const isProfile = (variable: ProfileVariables | FlatVariable): variable is ProfileVariables => {
@@ -70,13 +61,4 @@ export const isProfile = (variable: ProfileVariables | FlatVariable): variable i
 export type FlatVariable = { apiName: string; type: string; key: string };
 export const isFlat = (variable: ProfileVariables | FlatVariable): variable is FlatVariable => {
   return variable.type === 'Flat';
-};
-
-export type ModelConfig = {
-  [key in WeatherModel]?: (ProfileVariables | FlatVariable)[];
-};
-
-export type VariableConfig = {
-  default: (ProfileVariables | FlatVariable)[];
-  modelSpecific?: ModelConfig;
 };

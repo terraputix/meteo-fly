@@ -1,10 +1,11 @@
-import type { WeatherDataType } from '$lib/api/types';
+import type { WeatherDataType, WeatherModel } from '$lib/api/types';
 import type { CloudCoverData } from '$lib/charts/clouds';
 import type { WindFieldLevel } from '$lib/charts/wind';
 
 export interface ChartWorkerInput {
   weatherData: WeatherDataType;
   maxAltitude: number;
+  model: WeatherModel;
 }
 
 export interface TemperatureChartData {

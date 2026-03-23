@@ -1,8 +1,8 @@
 import type { FlatVariable, ProfileVariables, WeatherModel } from './types';
-import { getModelPressureLevelsForAltitude } from '$lib/charts/pressureLevels';
+import { getNativeLevelsForModel } from '$lib/meteo/pressureLevels';
 
-function makeProfileVar(key: string, prefix: string, maxAltitude: number): ProfileVariables {
-  const levels = getModelPressureLevelsForAltitude(maxAltitude);
+function makeProfileVar(key: string, prefix: string, model: WeatherModel, maxAltitude: number): ProfileVariables {
+  const levels = getNativeLevelsForModel(model, maxAltitude);
   return {
     key,
     type: 'Profile',
@@ -25,15 +25,15 @@ export function getVariablesForModel(
   ];
 
   const profileVars: ProfileVariables[] = [
-    makeProfileVar('cloudCoverProfile', 'cloud_cover', maxAltitude),
-    makeProfileVar('windSpeedProfile', 'wind_speed', maxAltitude),
-    makeProfileVar('windDirectionProfile', 'wind_direction', maxAltitude),
+    makeProfileVar('cloudCoverProfile', 'cloud_cover', model, maxAltitude),
+    makeProfileVar('windSpeedProfile', 'wind_speed', model, maxAltitude),
+    makeProfileVar('windDirectionProfile', 'wind_direction', model, maxAltitude),
   ];
 
   const modelSpecificVars: (ProfileVariables | FlatVariable)[] = (() => {
-    if (model === 'gfs_seamless') {
-      return [makeProfileVar('verticalVelocityProfile', 'vertical_velocity', maxAltitude)];
-    }
+    // if (model === 'gfs_seamless') {
+    //   return [makeProfileVar('verticalVelocityProfile', 'vertical_velocity', model, maxAltitude)];
+    // }
     return [];
   })();
 

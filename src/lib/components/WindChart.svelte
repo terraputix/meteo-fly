@@ -6,8 +6,11 @@
   import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
   import Legend from './Legend.svelte';
 
+  import type { WeatherModel } from '$lib/api/types';
+
   export let weatherData: WeatherDataType | null = null;
   export let maxAltitude = 4350;
+  export let model: WeatherModel = 'icon_d2';
 
   let isRendering = false;
 
@@ -39,6 +42,7 @@
     data: WeatherDataType | null;
     windHeight: number;
     maxAltitude: number;
+    model: WeatherModel;
   };
 
   function renderChart(node: HTMLElement, { data }: RenderChartParams) {
@@ -64,7 +68,7 @@
       cancellation = signal;
 
       try {
-        const response = await runChartWorker({ weatherData: currentData, maxAltitude }, signal);
+        const response = await runChartWorker({ weatherData: currentData, maxAltitude, model }, signal);
         if (signal.cancelled) return;
 
         if (!response.success) {
@@ -105,7 +109,8 @@
             store,
             activeState,
             windHeight,
-            maxAltitude
+            maxAltitude,
+            model
           )
         );
 
@@ -156,7 +161,8 @@
     if (data) draw(data);
 
     return {
-      update({ data: newData }: RenderChartParams) {
+      update({ data: newData, model: newModel }: RenderChartParams) {
+        model = newModel;
         if (newData) {
           draw(newData);
         } else {
@@ -183,7 +189,7 @@
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
   <div
-    use:renderChart={{ data: weatherData, windHeight, maxAltitude }}
+    use:renderChart={{ data: weatherData, windHeight, maxAltitude, model }}
     class="chart-content"
     style="opacity: {isRendering ? 0 : 1}; height: {totalHeight}px;"
   ></div>

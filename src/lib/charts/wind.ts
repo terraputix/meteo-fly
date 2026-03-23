@@ -1,36 +1,41 @@
-import type { WeatherDataType } from '$lib/api/types';
+import type { WeatherDataType, WeatherModel } from '$lib/api/types';
+import { getAtLevel } from '$lib/api/types';
 import { interpolateWind } from '$lib/meteo/wind';
-import { getModelPressureLevelsForAltitude, getAllPressureLevelsForAltitude, getAtLevel } from './pressureLevels';
+import { getAllTaggedLevelsForModel, getNativeLevelsForModel, type LevelSource } from '$lib/meteo/pressureLevels';
 
 export interface WindFieldLevel {
   time: Date;
   height: number;
   speed: number;
   direction: number;
+  source: LevelSource;
 }
 
-export function getWindFieldAllLevels(weatherData: WeatherDataType, maxAltitude: number = 4500): Array<WindFieldLevel> {
+export function getWindFieldAllLevels(
+  weatherData: WeatherDataType,
+  model: WeatherModel,
+  maxAltitude: number = 4500
+): Array<WindFieldLevel> {
   const data: WindFieldLevel[] = [];
-  const modelPressureLevels = getModelPressureLevelsForAltitude(maxAltitude);
-  const levels = getAllPressureLevelsForAltitude(maxAltitude);
+  const nativeLevels = getNativeLevelsForModel(model, maxAltitude);
+  const allLevels = getAllTaggedLevelsForModel(model, maxAltitude);
 
   weatherData.hourly.time.forEach((time: Date, i: number) => {
-    levels.forEach((level) => {
+    allLevels.forEach((level) => {
       let speed: number | null = null;
       let direction: number | null = null;
 
-      const speedArr = getAtLevel(weatherData.hourly.windSpeedProfile, level.hPa);
-      const dirArr = getAtLevel(weatherData.hourly.windDirectionProfile, level.hPa);
-
-      if (speedArr && dirArr) {
-        speed = speedArr[i];
-        direction = dirArr[i];
+      if (level.source === 'model') {
+        const speedArr = getAtLevel(weatherData.hourly.windSpeedProfile, level.hPa);
+        const dirArr = getAtLevel(weatherData.hourly.windDirectionProfile, level.hPa);
+        if (speedArr && dirArr) {
+          speed = speedArr[i];
+          direction = dirArr[i];
+        }
       } else {
-        const lowerLevel = modelPressureLevels
-          .slice()
-          .reverse()
-          .find((p) => p.heightMeters <= level.heightMeters);
-        const upperLevel = modelPressureLevels.find((p) => p.heightMeters > level.heightMeters);
+        // Interpolated level: bracket with the two nearest native levels.
+        const lowerLevel = [...nativeLevels].reverse().find((p) => p.heightMeters <= level.heightMeters);
+        const upperLevel = nativeLevels.find((p) => p.heightMeters > level.heightMeters);
 
         if (lowerLevel && upperLevel) {
           const lowerSpeedArr = getAtLevel(weatherData.hourly.windSpeedProfile, lowerLevel.hPa);
@@ -39,15 +44,15 @@ export function getWindFieldAllLevels(weatherData: WeatherDataType, maxAltitude:
           const upperDirArr = getAtLevel(weatherData.hourly.windDirectionProfile, upperLevel.hPa);
 
           if (lowerSpeedArr && lowerDirArr && upperSpeedArr && upperDirArr) {
-            const interpolated = interpolateWind(
+            const result = interpolateWind(
               level.heightMeters,
               lowerLevel,
               upperLevel,
               { speed: lowerSpeedArr[i], direction: lowerDirArr[i] },
               { speed: upperSpeedArr[i], direction: upperDirArr[i] }
             );
-            speed = interpolated.speed;
-            direction = interpolated.direction;
+            speed = result.speed;
+            direction = result.direction;
           }
         }
       }
@@ -58,6 +63,7 @@ export function getWindFieldAllLevels(weatherData: WeatherDataType, maxAltitude:
           height: level.heightMeters,
           speed: parseFloat(speed.toFixed(2)),
           direction: parseFloat(direction.toFixed(0)),
+          source: level.source,
         });
       }
     });
