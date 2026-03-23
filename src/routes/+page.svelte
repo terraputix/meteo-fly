@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { saveLastVisitedURL } from '$lib/services/storage';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
@@ -18,7 +17,7 @@
   let showChart = false;
   let weatherData: WeatherDataType | null = null;
   let error: string | null = null;
-  let updateTimer: number;
+  let updateTimer: ReturnType<typeof setTimeout>;
 
   $: startDate = addDays(new Date(), parameters.selectedDay - 1);
 
@@ -29,6 +28,7 @@
       lon: pageParams.location.longitude.toString(),
       day: pageParams.selectedDay.toString(),
       model: pageParams.selectedModel,
+      maxAlt: (pageParams.maxAltitude ?? 4000).toString(),
     });
     const newURL = `?${params.toString()}`;
     saveLastVisitedURL(newURL);
@@ -41,12 +41,16 @@
     updateTimer = setTimeout(updateWeather, 5);
   }
 
-  onMount(updateWeather);
-
   async function updateWeather() {
     try {
       error = null;
-      weatherData = await fetchWeatherData(parameters.location, parameters.selectedModel, startDate);
+      weatherData = await fetchWeatherData(
+        parameters.location,
+        parameters.selectedModel,
+        startDate,
+        1,
+        parameters.maxAltitude ?? 4000
+      );
       showChart = true;
     } catch (err) {
       console.error(err);
@@ -87,6 +91,8 @@
             {weatherData}
             {startDate}
             bind:selectedDay={parameters.selectedDay}
+            maxAltitude={parameters.maxAltitude}
+            model={parameters.selectedModel}
             on:close={() => (showChart = false)}
           />
         </div>

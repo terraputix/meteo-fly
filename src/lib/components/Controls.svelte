@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { WeatherModel } from '$lib/api/types';
+  import type { MaxAltitude } from '$lib/meteo/types';
   import type { PageParameters } from '$lib/services/types';
   import { createEventDispatcher } from 'svelte';
 
@@ -15,6 +16,15 @@
     { id: 'ukmo_seamless', name: 'UKMO' },
     { id: 'gem_seamless', name: 'GEM' },
     { id: 'cma_grapes_global', name: 'CMA GRAPES' },
+  ];
+
+  const altitudes: { value: MaxAltitude; name: string }[] = [
+    { value: 3000, name: '3000m (700hPa)' },
+    { value: 4000, name: '4000m (625hPa)' },
+    { value: 5000, name: '5000m (550hPa)' },
+    { value: 6000, name: '6000m (475hPa)' },
+    { value: 7000, name: '7000m (400hPa)' },
+    { value: 8000, name: '8000m (350hPa)' },
   ];
 
   const dispatch = createEventDispatcher();
@@ -70,6 +80,20 @@
         max="7"
         min="-14"
       />
+    </div>
+
+    <!-- Altitude Selection -->
+    <div class="flex items-center">
+      <label for="altitude" class="mr-2 text-sm font-medium whitespace-nowrap text-gray-700">Top Height:</label>
+      <select
+        id="altitude"
+        bind:value={parameters.maxAltitude}
+        class="rounded-sm bg-white px-2 py-1 text-sm focus:outline-indigo-500"
+      >
+        {#each altitudes as alt}
+          <option value={alt.value}>{alt.name}</option>
+        {/each}
+      </select>
     </div>
   </div>
 </div>

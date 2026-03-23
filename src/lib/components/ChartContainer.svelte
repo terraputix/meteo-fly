@@ -1,12 +1,15 @@
 <script lang="ts">
-  import type { WeatherDataType } from '$lib/api/types';
+  import type { WeatherDataType, WeatherModel } from '$lib/api/types';
   import WindChart from './WindChart.svelte';
   import { createEventDispatcher } from 'svelte';
   import Footer from './Footer.svelte';
+  import type { MaxAltitude } from '$lib/meteo/types';
 
   export let weatherData: WeatherDataType;
   export let startDate: Date;
   export let selectedDay: number;
+  export let maxAltitude: MaxAltitude = 4000;
+  export let model: WeatherModel = 'icon_d2';
 
   const dispatch = createEventDispatcher();
 
@@ -27,7 +30,7 @@
   }
 </script>
 
-<div class="relative mx-auto max-w-2xl min-w-lg bg-white p-0 sm:overflow-y-auto">
+<div class="relative mx-auto max-w-2xl min-w-md bg-white p-0 sm:overflow-y-auto">
   <button
     on:click={close}
     class="absolute top-2 right-2 border-none bg-transparent text-gray-500 hover:text-gray-800"
@@ -70,7 +73,7 @@
       </button>
     </div>
 
-    <WindChart {weatherData} />
+    <WindChart {weatherData} {maxAltitude} {model} />
   </div>
 
   <div class="mt-1">
