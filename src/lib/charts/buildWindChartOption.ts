@@ -23,7 +23,7 @@ import { fmtTime } from '$lib/helpers';
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.
 export const MARGIN_LEFT = 40;
-export const MARGIN_RIGHT = 40;
+export const MARGIN_RIGHT = 25;
 export const TEMP_HEIGHT_PX = 130;
 export const RAIN_HEIGHT_PX = 66;
 
@@ -52,13 +52,10 @@ interface LevelBand {
   bandTop: number; // upper altitude boundary of the band (metres)
 }
 
-// ─── Canonical arrow paths ────────────────────────────────────────────────────
-
-const MODEL_ARROW_PATH = 'M 0 9 L 0 -9 L 4 -2.07 L 0 -9 L -4 -2.07';
-const INTERP_ARROW_PATH = 'M 0 7 L 0 -7 L 3.15 -1.54 L 0 -7 L -3.15 -1.54';
+// Canonical arrow path
+const MODEL_ARROW_PATH = 'M 0 7 L 0 -7 L 3.15 -1.54 L 0 -7 L -3.15 -1.54';
 
 // ─── Shared x-axis factory ───────────────────────────────────────────────────
-
 function makeXAxis(gridIndex: number, showLabels: boolean, xMin: number, xMax: number): XAXisComponentOption {
   return {
     type: 'time',
@@ -172,13 +169,14 @@ export function buildWindChartOption(
     {
       type: 'value',
       gridIndex: 0,
-      name: 'Hum %',
+      name: '%',
       nameGap: 0,
-      offset: 10,
+      offset: -5,
       nameLocation: 'end',
       nameTextStyle: { fontSize: 11 },
       min: 0,
       max: 100,
+      interval: 25,
       position: 'right',
       axisLabel: { fontSize: 11 },
       splitLine: { show: false },
@@ -473,7 +471,7 @@ export function buildWindChartOption(
 
       return {
         type: 'path',
-        shape: { pathData: item.interpolated ? INTERP_ARROW_PATH : MODEL_ARROW_PATH },
+        shape: { pathData: MODEL_ARROW_PATH },
         style: {
           stroke: windColorScale(item.speed),
           lineWidth: strokeWidthScale(item.speed),

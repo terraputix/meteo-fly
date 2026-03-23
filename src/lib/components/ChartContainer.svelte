@@ -29,7 +29,7 @@
   }
 </script>
 
-<div class="relative mx-auto max-w-2xl min-w-lg bg-white p-0 sm:overflow-y-auto">
+<div class="relative mx-auto max-w-2xl min-w-md bg-white p-0 sm:overflow-y-auto">
   <button
     on:click={close}
     class="absolute top-2 right-2 border-none bg-transparent text-gray-500 hover:text-gray-800"
