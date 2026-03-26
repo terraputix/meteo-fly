@@ -27,7 +27,14 @@ function pickLevels(hPaValues: number[]): PressureLevel[] {
 
 // ─── Per-model native level sets ──────────────────────────────────────────────
 const ICON_HEIGHT_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300];
-const UKMO_HEIGHT_LEVELS = [1000, 950, 900, 850, 800, 700, 600, 500, 400, 300];
+const UKMO_HEIGHT_LEVELS = [
+  1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 375, 350, 325, 300,
+];
+const ECMWF_HEIGHT_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300];
+const CMA_HEIGHT_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300];
+const GEM_HEIGHT_LEVELS = [
+  1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300,
+];
 export const MODEL_NATIVE_LEVELS: Record<WeatherModel, PressureLevel[]> = {
   icon_seamless: pickLevels(ICON_HEIGHT_LEVELS),
   icon_d2: pickLevels(ICON_HEIGHT_LEVELS),
@@ -35,9 +42,11 @@ export const MODEL_NATIVE_LEVELS: Record<WeatherModel, PressureLevel[]> = {
   icon_global: pickLevels(ICON_HEIGHT_LEVELS),
   gfs_seamless: pickLevels(ALL_PRESSURE_LEVELS),
   meteofrance_seamless: pickLevels(ICON_HEIGHT_LEVELS),
+  ecmwf_ifs025: pickLevels(ECMWF_HEIGHT_LEVELS),
+  ecmwf_aifs025_single: pickLevels(ECMWF_HEIGHT_LEVELS),
   ukmo_seamless: pickLevels(UKMO_HEIGHT_LEVELS),
-  cma_grapes_global: pickLevels(ICON_HEIGHT_LEVELS),
-  gem_seamless: pickLevels(ICON_HEIGHT_LEVELS),
+  cma_grapes_global: pickLevels(CMA_HEIGHT_LEVELS),
+  gem_seamless: pickLevels(GEM_HEIGHT_LEVELS),
 };
 
 export function getNativeLevelsForModel(model: WeatherModel, maxAltitude: number): PressureLevel[] {

@@ -12,7 +12,9 @@ export type WeatherModel =
   | 'gfs_seamless'
   | 'ukmo_seamless'
   | 'cma_grapes_global'
-  | 'gem_seamless';
+  | 'gem_seamless'
+  | 'ecmwf_ifs025'
+  | 'ecmwf_aifs025_single';
 
 export type VerticalProfileKey = `_${number}hPa`;
 export type VerticalProfile = Partial<Record<VerticalProfileKey, Float32Array>>;

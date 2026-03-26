@@ -13,6 +13,8 @@
     { id: 'icon_global', name: 'ICON Global' },
     { id: 'gfs_seamless', name: 'GFS Seamless' },
     { id: 'meteofrance_seamless', name: 'MeteoFrance' },
+    { id: 'ecmwf_ifs025', name: 'ECMWF IFS 0.25°' },
+    { id: 'ecmwf_aifs025_single', name: 'ECMWF AIFS 0.25°' },
     { id: 'ukmo_seamless', name: 'UKMO' },
     { id: 'gem_seamless', name: 'GEM' },
     { id: 'cma_grapes_global', name: 'CMA GRAPES' },
