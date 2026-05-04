@@ -62,7 +62,7 @@
   }
 </script>
 
-<div class="h-screen w-full bg-slate-100">
+<div class="h-screen w-full overflow-hidden bg-slate-100">
   <ResizablePaneGroup direction={$isMobile ? 'vertical' : 'horizontal'}>
     <ResizablePane defaultSize={showChart ? ($isMobile ? 15 : 50) : 100} minSize={$isMobile ? 10 : 30}>
       <div class="relative h-full w-full overflow-hidden bg-slate-200">

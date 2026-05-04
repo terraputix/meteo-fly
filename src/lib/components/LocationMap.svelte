@@ -21,23 +21,6 @@
   let marker: Marker;
   let unsubscribe: () => void;
   let isTerrainEnabled = true;
-  let resizeTimeout: ReturnType<typeof setTimeout> | undefined;
-
-  function scheduleMapResize() {
-    if (!map) {
-      return;
-    }
-
-    map.resize();
-
-    if (resizeTimeout) {
-      clearTimeout(resizeTimeout);
-    }
-
-    resizeTimeout = setTimeout(() => {
-      map.resize();
-    }, 180);
-  }
 
   function updatePosition(lat: number, lng: number) {
     latitude = parseFloat(lat.toFixed(5));
@@ -131,7 +114,6 @@
     });
 
     map.on('load', () => {
-      scheduleMapResize();
       map.addSource(terrainSourceId, {
         type: 'raster-dem',
         url: 'https://tiles.mapterhorn.com/tilejson.json',
@@ -159,15 +141,7 @@
     });
   });
 
-  $: if (map) {
-    chartOpen;
-    scheduleMapResize();
-  }
-
   onDestroy(() => {
-    if (resizeTimeout) {
-      clearTimeout(resizeTimeout);
-    }
     if (unsubscribe) {
       unsubscribe();
     }
@@ -180,7 +154,7 @@
 <div class="relative h-full w-full">
   <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
 
-  <div class="pointer-events-none absolute top-3 left-[4.65rem] z-10 md:left-[4.9rem]">
+  <div class="chart-toggle-anchor pointer-events-none absolute left-[4.65rem] z-10 md:left-[4.9rem]">
     <button
       type="button"
       class:chart-open={chartOpen}
@@ -211,8 +185,8 @@
 
 <style>
   :global(.maplibregl-ctrl-top-left) {
-    top: 0.75rem;
-    left: 0.75rem;
+    top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+    left: calc(env(safe-area-inset-left, 0px) + 0.75rem);
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -299,6 +273,10 @@
 
   :global(.location-spinner) {
     animation: spin 1s linear infinite;
+  }
+
+  .chart-toggle-anchor {
+    top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
   }
 
   button.chart-open {
