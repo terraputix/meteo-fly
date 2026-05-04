@@ -4,7 +4,6 @@
   import { page } from '$app/stores';
   import { isMobile } from '$lib/stores/media';
   import LocationMap from '$lib/components/LocationMap.svelte';
-  import Controls from '$lib/components/Controls.svelte';
   import ChartContainer from '$lib/components/ChartContainer.svelte';
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
   import { getInitialParameters } from '$lib/services/defaults';
@@ -35,6 +34,10 @@
     history.replaceState({}, '', newURL);
   }
 
+  function toggleChartPanel() {
+    showChart = !showChart;
+  }
+
   $: {
     updateURLParams(parameters);
     clearTimeout(updateTimer);
@@ -59,29 +62,23 @@
   }
 </script>
 
-<div class="h-screen w-full">
-  {#if $isMobile}
-    <div class="z-10 w-full bg-white/80 p-2 shadow-sm">
-      <Controls bind:parameters on:openChart={() => (showChart = true)} />
-    </div>
-  {/if}
-
+<div class="h-screen w-full overflow-hidden bg-slate-100">
   <ResizablePaneGroup direction={$isMobile ? 'vertical' : 'horizontal'}>
     <ResizablePane defaultSize={showChart ? ($isMobile ? 15 : 50) : 100} minSize={$isMobile ? 10 : 30}>
-      <div class="relative h-full w-full">
-        <LocationMap bind:latitude={parameters.location.latitude} bind:longitude={parameters.location.longitude} />
-        {#if !$isMobile}
-          <div class="absolute inset-x-0 top-0 bg-white/80 p-4 shadow-sm">
-            <Controls bind:parameters on:openChart={() => (showChart = true)} />
-          </div>
-        {/if}
+      <div class="relative h-full w-full overflow-hidden bg-slate-200">
+        <LocationMap
+          bind:latitude={parameters.location.latitude}
+          bind:longitude={parameters.location.longitude}
+          bind:chartOpen={showChart}
+          onToggleChart={toggleChartPanel}
+        />
       </div>
     </ResizablePane>
 
     {#if showChart && weatherData}
       <ResizableHandle withHandle />
       <ResizablePane defaultSize={50} minSize={$isMobile ? 10 : 30}>
-        <div class="h-full overflow-y-auto bg-white p-2 sm:p-4">
+        <div class="h-full overflow-y-auto bg-white p-0 sm:p-0">
           {#if error}
             <div class="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
               {error}
@@ -91,8 +88,10 @@
             {weatherData}
             {startDate}
             bind:selectedDay={parameters.selectedDay}
-            maxAltitude={parameters.maxAltitude}
-            model={parameters.selectedModel}
+            bind:maxAltitude={parameters.maxAltitude}
+            bind:model={parameters.selectedModel}
+            bind:latitude={parameters.location.latitude}
+            bind:longitude={parameters.location.longitude}
             on:close={() => (showChart = false)}
           />
         </div>

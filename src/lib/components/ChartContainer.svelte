@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import type { WeatherDataType, WeatherModel } from '$lib/api/types';
   import WindChart from './WindChart.svelte';
   import { createEventDispatcher } from 'svelte';
@@ -10,17 +11,66 @@
   export let selectedDay: number;
   export let maxAltitude: MaxAltitude = 4000;
   export let model: WeatherModel = 'icon_d2';
+  export let latitude: number;
+  export let longitude: number;
+
+  const models: { id: WeatherModel; name: string }[] = [
+    { id: 'icon_seamless', name: 'ICON Seamless' },
+    { id: 'icon_d2', name: 'ICON D2' },
+    { id: 'icon_eu', name: 'ICON EU' },
+    { id: 'icon_global', name: 'ICON Global' },
+    { id: 'gfs_seamless', name: 'GFS Seamless' },
+    { id: 'meteofrance_seamless', name: 'MeteoFrance' },
+    { id: 'ecmwf_ifs025', name: 'ECMWF IFS 0.25°' },
+    { id: 'ecmwf_aifs025_single', name: 'ECMWF AIFS 0.25°' },
+    { id: 'ukmo_seamless', name: 'UKMO' },
+    { id: 'gem_seamless', name: 'GEM' },
+    { id: 'cma_grapes_global', name: 'CMA GRAPES' },
+  ];
+
+  const altitudes: { value: MaxAltitude; name: string }[] = [
+    { value: 3000, name: '3000m (700hPa)' },
+    { value: 4000, name: '4000m (625hPa)' },
+    { value: 5000, name: '5000m (550hPa)' },
+    { value: 6000, name: '6000m (475hPa)' },
+    { value: 7000, name: '7000m (400hPa)' },
+    { value: 8000, name: '8000m (350hPa)' },
+  ];
 
   const dispatch = createEventDispatcher();
+  let showMobileSettings = false;
+  let scrollContainer: HTMLDivElement | undefined;
+
+  function getDayLabel(day: number) {
+    if (day === 1) return 'Today';
+    if (day === 2) return 'Tomorrow';
+    if (day === 0) return 'Yesterday';
+    return day > 1 ? `+${day - 1} days` : `${day - 1} days`;
+  }
+
+  function scrollToBottom() {
+    if (!scrollContainer) {
+      return;
+    }
+
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  }
+
+  async function refreshScrollPosition() {
+    await tick();
+    scrollToBottom();
+  }
 
   function handleNextDay(e: MouseEvent) {
     e.preventDefault();
-    selectedDay += 1;
+    if (selectedDay < 8) {
+      selectedDay += 1;
+    }
   }
 
   function handlePreviousDay(e: MouseEvent) {
     e.preventDefault();
-    if (selectedDay > -14) {
+    if (selectedDay > -13) {
       selectedDay -= 1;
     }
   }
@@ -28,55 +78,217 @@
   function close() {
     dispatch('close');
   }
+
+  $: (weatherData, refreshScrollPosition());
+  $: (selectedDay, refreshScrollPosition());
+  $: (maxAltitude, refreshScrollPosition());
+  $: (model, refreshScrollPosition());
+  $: (showMobileSettings, refreshScrollPosition());
 </script>
 
-<div class="relative mx-auto max-w-2xl min-w-md bg-white p-0 sm:overflow-y-auto">
-  <button
-    on:click={close}
-    class="absolute top-2 right-2 border-none bg-transparent text-gray-500 hover:text-gray-800"
-    aria-label="Close chart"
-  >
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  </button>
-
-  <!-- Date display above chart -->
-  <div class="mb-4 text-center font-semibold text-gray-700">
-    {startDate.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })}
-  </div>
-
-  <!-- Chart container with navigation buttons -->
-  <div class="relative flex flex-col">
-    <div class="mb-3 flex justify-between gap-4">
+<div
+  bind:this={scrollContainer}
+  class="relative mx-auto flex h-full max-w-3xl flex-col overflow-y-auto rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
+>
+  <div class="border-b border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 py-3 sm:px-5 sm:py-4">
+    <div
+      class="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 shadow-inner shadow-slate-100 sm:flex sm:gap-3 sm:p-2.5"
+    >
       <button
         on:click={handlePreviousDay}
-        disabled={selectedDay <= -14}
-        class="flex-1 rounded bg-indigo-500 p-2 text-sm text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-300"
-        aria-label="Previous Day"
+        disabled={selectedDay <= -13}
+        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        aria-label="Previous day"
       >
-        &larr; Previous Day
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <div class="min-w-0 flex-1">
+        <div class="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase">Forecast</div>
+        <div class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-semibold text-slate-800">
+          <span class="truncate">{getDayLabel(selectedDay)}</span>
+          <span class="text-slate-300">•</span>
+          <span class="truncate text-slate-600">
+            {startDate.toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
+        </div>
+      </div>
+
+      <button
+        on:click={handleNextDay}
+        disabled={selectedDay >= 8}
+        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        aria-label="Next day"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
+      <button
+        on:click={close}
+        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm transition hover:bg-white hover:text-slate-800"
+        aria-label="Close chart panel"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="mt-0 hidden sm:grid sm:grid-cols-2 sm:gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <label class="flex min-w-0 flex-col gap-1.5">
+        <span class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Model</span>
+        <select
+          id="model"
+          bind:value={model}
+          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+        >
+          {#each models as weatherModel (weatherModel.id)}
+            <option value={weatherModel.id}>{weatherModel.name}</option>
+          {/each}
+        </select>
+      </label>
+
+      <label class="flex min-w-0 flex-col gap-1.5">
+        <span class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Top height</span>
+        <select
+          id="altitude"
+          bind:value={maxAltitude}
+          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+        >
+          {#each altitudes as alt}
+            <option value={alt.value}>{alt.name}</option>
+          {/each}
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="bg-white px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
+    <WindChart {weatherData} {maxAltitude} {model} />
+
+    <div class="mt-0.5 sm:mt-1">
+      <Footer />
+    </div>
+  </div>
+
+  <div class="mt-auto border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 py-2 sm:hidden">
+    <div
+      class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 shadow-inner shadow-slate-100"
+    >
+      <button
+        on:click={handlePreviousDay}
+        disabled={selectedDay <= -13}
+        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        aria-label="Previous day"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-3.5 w-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <div class="min-w-0 flex-1">
+        <div class="text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase">Forecast</div>
+        <div class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-semibold text-slate-800">
+          <span class="truncate">{getDayLabel(selectedDay)}</span>
+          <span class="text-slate-300">•</span>
+          <span class="truncate text-slate-600">
+            {startDate.toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+        on:click={() => (showMobileSettings = !showMobileSettings)}
+        aria-expanded={showMobileSettings}
+        aria-controls="chart-mobile-settings"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M7 12h10M10 18h4" />
+        </svg>
+        Settings
       </button>
 
       <button
         on:click={handleNextDay}
-        disabled={selectedDay >= 7}
-        class="flex-1 rounded bg-indigo-500 p-2 text-sm text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-300"
-        aria-label="Next Day"
+        disabled={selectedDay >= 8}
+        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        aria-label="Next day"
       >
-        Next Day &rarr;
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-3.5 w-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
+      <button
+        on:click={close}
+        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm transition hover:bg-white hover:text-slate-800"
+        aria-label="Close chart panel"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
       </button>
     </div>
 
-    <WindChart {weatherData} {maxAltitude} {model} />
-  </div>
+    {#if showMobileSettings}
+      <div id="chart-mobile-settings" class="mt-2 grid grid-cols-1 gap-2">
+        <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase">Location</div>
+          <div class="mt-1 text-sm font-medium text-slate-800">{latitude.toFixed(4)}°, {longitude.toFixed(4)}°</div>
+        </div>
 
-  <div class="mt-1">
-    <Footer />
+        <label class="flex min-w-0 flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <span class="text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase">Model</span>
+          <select
+            id="model-mobile"
+            bind:value={model}
+            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+          >
+            {#each models as weatherModel (weatherModel.id)}
+              <option value={weatherModel.id}>{weatherModel.name}</option>
+            {/each}
+          </select>
+        </label>
+
+        <label class="flex min-w-0 flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <span class="text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase">Top height</span>
+          <select
+            id="altitude-mobile"
+            bind:value={maxAltitude}
+            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+          >
+            {#each altitudes as alt}
+              <option value={alt.value}>{alt.name}</option>
+            {/each}
+          </select>
+        </label>
+      </div>
+    {/if}
   </div>
 </div>
