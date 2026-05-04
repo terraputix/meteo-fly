@@ -50,7 +50,7 @@
     // Initialize the map
     map = new maplibregl.Map({
       container: mapContainer,
-      style: 'https://maptiler.servert.nl/styles/minimal-world-maps/style.json',
+      style: 'https://tiles.openfreemap.org/styles/positron',
       center: [longitude, latitude],
       zoom: 8,
     });
