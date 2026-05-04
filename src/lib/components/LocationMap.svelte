@@ -21,6 +21,23 @@
   let marker: Marker;
   let unsubscribe: () => void;
   let isTerrainEnabled = true;
+  let resizeTimeout: ReturnType<typeof setTimeout> | undefined;
+
+  function scheduleMapResize() {
+    if (!map) {
+      return;
+    }
+
+    map.resize();
+
+    if (resizeTimeout) {
+      clearTimeout(resizeTimeout);
+    }
+
+    resizeTimeout = setTimeout(() => {
+      map.resize();
+    }, 180);
+  }
 
   function updatePosition(lat: number, lng: number) {
     latitude = parseFloat(lat.toFixed(5));
@@ -114,6 +131,7 @@
     });
 
     map.on('load', () => {
+      scheduleMapResize();
       map.addSource(terrainSourceId, {
         type: 'raster-dem',
         url: 'https://tiles.mapterhorn.com/tilejson.json',
@@ -141,7 +159,15 @@
     });
   });
 
+  $: if (map) {
+    chartOpen;
+    scheduleMapResize();
+  }
+
   onDestroy(() => {
+    if (resizeTimeout) {
+      clearTimeout(resizeTimeout);
+    }
     if (unsubscribe) {
       unsubscribe();
     }
