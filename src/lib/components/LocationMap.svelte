@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import maplibregl, { NavigationControl, type Map, type Marker } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
+  import type { LngLatLike } from 'maplibre-gl';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
@@ -9,24 +10,57 @@
   export let latitude: number;
   export let longitude: number;
   export let chartOpen = false;
+  export let selectedGridCell: Location | null = null;
+  export let onLocationChange: ((location: Location) => void) | undefined = undefined;
   export let onToggleChart: (() => void) | undefined = undefined;
 
   const terrainSourceId = 'terrainSource';
   const hillshadeSourceId = 'hillshadeSource';
   const hillshadeLayerId = 'hills';
+  const gridCellConnectorSourceId = 'grid-cell-connector';
+  const gridCellConnectorLayerId = 'grid-cell-connector-line';
   const defaultTerrainExaggeration = 1;
-
+  const earthRadiusMeters = 6371000;
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
+  let selectedGridCellMarker: Marker | null = null;
+  let distanceMarker: Marker | null = null;
   let unsubscribe: () => void;
   let isTerrainEnabled = true;
 
+  function toRadians(value: number) {
+    return (value * Math.PI) / 180;
+  }
+
+  function getHaversineDistanceMeters(a: Location, b: Location) {
+    const dLat = toRadians(b.latitude - a.latitude);
+    const dLon = toRadians(b.longitude - a.longitude);
+    const lat1 = toRadians(a.latitude);
+    const lat2 = toRadians(b.latitude);
+
+    const sinLat = Math.sin(dLat / 2);
+    const sinLon = Math.sin(dLon / 2);
+    const haversine = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
+    const arc = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+
+    return earthRadiusMeters * arc;
+  }
+
+  function formatDistance(distanceMeters: number) {
+    return distanceMeters >= 1000
+      ? `${(distanceMeters / 1000).toFixed(distanceMeters >= 10000 ? 0 : 1)} km`
+      : `${Math.round(distanceMeters)} m`;
+  }
+
   function updatePosition(lat: number, lng: number) {
-    latitude = parseFloat(lat.toFixed(5));
-    longitude = parseFloat(lng.toFixed(5));
+    const nextLatitude = parseFloat(lat.toFixed(5));
+    const nextLongitude = parseFloat(lng.toFixed(5));
+    latitude = nextLatitude;
+    longitude = nextLongitude;
+    onLocationChange?.({ latitude: nextLatitude, longitude: nextLongitude });
     if (marker) {
-      marker.setLngLat([longitude, latitude]);
+      marker.setLngLat([nextLongitude, nextLatitude]);
     }
   }
 
@@ -36,6 +70,103 @@
     if (map) {
       map.flyTo({ center: [lng, lat], zoom: 10 });
     }
+  }
+
+  function updateGridCellConnector() {
+    if (!map || !map.getSource(gridCellConnectorSourceId)) {
+      return;
+    }
+
+    const source = map.getSource(gridCellConnectorSourceId) as maplibregl.GeoJSONSource;
+    const selectedLocation = { latitude, longitude };
+
+    if (!selectedGridCell) {
+      source.setData({
+        type: 'FeatureCollection',
+        features: [],
+      });
+      distanceMarker?.remove();
+      distanceMarker = null;
+      return;
+    }
+
+    const gridCellLongitude = selectedGridCell.longitude;
+    const gridCellLatitude = selectedGridCell.latitude;
+    const selectedLocationPixel = map.project([longitude, latitude]);
+    const gridCellPixel = map.project([gridCellLongitude, gridCellLatitude]);
+    const lineLengthPixels = Math.hypot(
+      gridCellPixel.x - selectedLocationPixel.x,
+      gridCellPixel.y - selectedLocationPixel.y
+    );
+
+    source.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [longitude, latitude],
+              [gridCellLongitude, gridCellLatitude],
+            ],
+          },
+          properties: {},
+        },
+      ],
+    });
+
+    if (lineLengthPixels < 72) {
+      distanceMarker?.remove();
+      distanceMarker = null;
+      return;
+    }
+
+    const midpoint: LngLatLike = [(longitude + gridCellLongitude) / 2, (latitude + gridCellLatitude) / 2];
+    const distanceLabel = formatDistance(getHaversineDistanceMeters(selectedLocation, selectedGridCell));
+
+    if (!distanceMarker) {
+      const element = document.createElement('div');
+      element.className = 'grid-cell-distance-badge';
+      distanceMarker = new maplibregl.Marker({ element, anchor: 'center' }).setLngLat(midpoint).addTo(map);
+    } else {
+      distanceMarker.setLngLat(midpoint);
+    }
+
+    distanceMarker.getElement().textContent = distanceLabel;
+  }
+
+  function updateSelectedGridCellMarker() {
+    if (!map) {
+      return;
+    }
+
+    if (!selectedGridCell) {
+      selectedGridCellMarker?.remove();
+      selectedGridCellMarker = null;
+      updateGridCellConnector();
+      return;
+    }
+
+    const lngLat: LngLatLike = [selectedGridCell.longitude, selectedGridCell.latitude];
+
+    if (!selectedGridCellMarker) {
+      const element = document.createElement('div');
+      element.className = 'selected-grid-cell-marker';
+      element.innerHTML =
+        '<span class="selected-grid-cell-marker__ring"></span><span class="selected-grid-cell-marker__dot"></span><span class="selected-grid-cell-marker__badge">Grid cell</span>';
+
+      selectedGridCellMarker = new maplibregl.Marker({
+        element,
+        anchor: 'center',
+      })
+        .setLngLat(lngLat)
+        .addTo(map);
+    } else {
+      selectedGridCellMarker.setLngLat(lngLat);
+    }
+
+    updateGridCellConnector();
   }
 
   function setTerrainVisibility(enabled: boolean) {
@@ -64,6 +195,12 @@
     const newPos = { lat: latitude, lng: longitude };
     marker.setLngLat(newPos);
     map.setCenter(newPos);
+  }
+
+  $: (selectedGridCell, latitude, longitude, map, updateSelectedGridCellMarker());
+
+  function handleMapViewChange() {
+    updateGridCellConnector();
   }
 
   onMount(async () => {
@@ -98,16 +235,30 @@
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
 
-    marker = new maplibregl.Marker({ draggable: true }).setLngLat([longitude, latitude]).addTo(map);
+    const selectedLocationElement = document.createElement('div');
+    selectedLocationElement.className = 'selected-location-marker';
+    selectedLocationElement.innerHTML =
+      '<span class="selected-location-marker__outer"></span><span class="selected-location-marker__inner"></span><span class="selected-location-marker__core"></span>';
+
+    marker = new maplibregl.Marker({
+      element: selectedLocationElement,
+      draggable: true,
+      anchor: 'center',
+    })
+      .setLngLat([longitude, latitude])
+      .addTo(map);
     marker.on('dragend', () => {
       const pos = marker.getLngLat();
       updatePosition(pos.lat, pos.lng);
     });
+    updateSelectedGridCellMarker();
 
     map.on('click', (e: maplibregl.MapMouseEvent) => {
       const { lat, lng } = e.lngLat;
       updatePosition(lat, lng);
     });
+    map.on('zoom', handleMapViewChange);
+    map.on('move', handleMapViewChange);
 
     unsubscribe = locationStore.subscribe((state: LocationState) => {
       locationControlManager.updateState(state);
@@ -121,6 +272,13 @@
       map.addSource(hillshadeSourceId, {
         type: 'raster-dem',
         url: 'https://tiles.mapterhorn.com/tilejson.json',
+      });
+      map.addSource(gridCellConnectorSourceId, {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [],
+        },
       });
       map.addLayer(
         {
@@ -136,8 +294,18 @@
         },
         'waterway_line_label'
       );
+      map.addLayer({
+        id: gridCellConnectorLayerId,
+        type: 'line',
+        source: gridCellConnectorSourceId,
+        paint: {
+          'line-color': 'rgba(99, 102, 241, 0.32)',
+          'line-width': 1.5,
+        },
+      });
       setTerrainVisibility(isTerrainEnabled);
       terrainControl.setEnabled(isTerrainEnabled);
+      updateSelectedGridCellMarker();
     });
   });
 
@@ -145,7 +313,15 @@
     if (unsubscribe) {
       unsubscribe();
     }
+    if (selectedGridCellMarker) {
+      selectedGridCellMarker.remove();
+    }
+    if (distanceMarker) {
+      distanceMarker.remove();
+    }
     if (map) {
+      map.off('zoom', handleMapViewChange);
+      map.off('move', handleMapViewChange);
       map.remove();
     }
   });
@@ -236,6 +412,107 @@
 
   :global(.maplibregl-ctrl-group button:active) {
     transform: translateY(0);
+  }
+
+  :global(.selected-location-marker) {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    cursor: grab;
+  }
+
+  :global(.selected-location-marker:active) {
+    cursor: grabbing;
+  }
+
+  :global(.selected-location-marker__outer) {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: rgba(37, 99, 235, 0.18);
+    border: 1.5px solid rgba(59, 130, 246, 0.95);
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.18);
+  }
+
+  :global(.selected-location-marker__inner) {
+    position: absolute;
+    inset: 4px;
+    border-radius: 9999px;
+    border: 1px solid rgba(191, 219, 254, 0.95);
+    background: rgba(125, 211, 252, 0.12);
+  }
+
+  :global(.selected-location-marker__core) {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: rgba(224, 242, 254, 0.95);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.24);
+  }
+
+  :global(.selected-grid-cell-marker) {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  :global(.selected-grid-cell-marker__ring) {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.04);
+    border: 1.5px solid rgba(71, 85, 105, 0.72);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  }
+
+  :global(.selected-grid-cell-marker__dot) {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    border-radius: 9999px;
+    background: rgba(51, 65, 85, 0.88);
+    transform: translate(-50%, -50%);
+  }
+
+  :global(.selected-grid-cell-marker__badge) {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 0.4rem);
+    transform: translateY(-50%);
+    padding: 0.14rem 0.38rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    color: rgb(51, 65, 85);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(6px);
+  }
+
+  :global(.grid-cell-distance-badge) {
+    padding: 0.18rem 0.45rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    color: rgb(51, 65, 85);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(6px);
+    pointer-events: none;
   }
 
   :global(.maplibregl-ctrl-geolocate.loading) {

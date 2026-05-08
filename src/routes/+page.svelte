@@ -9,7 +9,7 @@
   import { getInitialParameters } from '$lib/services/defaults';
   import { type PageParameters } from '$lib/services/types';
   import { fetchWeatherData } from '$lib/api/api';
-  import type { WeatherDataType } from '$lib/api/types';
+  import type { Location, WeatherDataType } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
 
   let parameters = getInitialParameters($page.url.searchParams);
@@ -38,6 +38,17 @@
 
   function toggleChartPanel() {
     showChart = !showChart;
+  }
+
+  function updateLocation(location: Location) {
+    parameters.location = location;
+
+    if (weatherData) {
+      weatherData = {
+        ...weatherData,
+        selectedGridCell: null,
+      };
+    }
   }
 
   $: {
@@ -74,10 +85,12 @@
     <ResizablePane defaultSize={showChart ? ($isMobile ? 15 : 50) : 100} minSize={$isMobile ? 10 : 30}>
       <div class="relative h-full w-full overflow-hidden bg-slate-200">
         <LocationMap
-          bind:latitude={parameters.location.latitude}
-          bind:longitude={parameters.location.longitude}
+          latitude={parameters.location.latitude}
+          longitude={parameters.location.longitude}
           bind:chartOpen={showChart}
+          selectedGridCell={weatherData?.selectedGridCell ?? null}
           onToggleChart={toggleChartPanel}
+          onLocationChange={updateLocation}
         />
       </div>
     </ResizablePane>

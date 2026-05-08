@@ -31,6 +31,7 @@ export interface WeatherDataType {
   timezoneAbbr: string;
   sunrise: Date;
   sunset: Date;
+  selectedGridCell: Location | null;
 }
 
 export interface HourlyData {

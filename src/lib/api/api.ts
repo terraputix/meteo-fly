@@ -113,6 +113,10 @@ export async function fetchWeatherData(
   const response = responses[0];
 
   const timezone = response.timezoneAbbreviation() ?? 'UTC';
+  const selectedGridCell: Location = {
+    latitude: response.latitude(),
+    longitude: response.longitude(),
+  };
 
   const sunriseInt: number = Number(response.daily()!.variables(0)?.valuesInt64(0));
   const sunsetInt: number = Number(response.daily()!.variables(1)?.valuesInt64(0));
@@ -136,6 +140,7 @@ export async function fetchWeatherData(
     timezoneAbbr: timezone,
     sunrise: sunrise,
     sunset: sunset,
+    selectedGridCell,
   };
 
   return weatherData;
