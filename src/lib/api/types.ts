@@ -16,6 +16,8 @@ export type WeatherModel =
   | 'ecmwf_ifs025'
   | 'ecmwf_aifs025_single';
 
+export type CellSelection = 'land' | 'nearest';
+
 export type VerticalProfileKey = `_${number}hPa`;
 export type VerticalProfile = Partial<Record<VerticalProfileKey, Float32Array>>;
 

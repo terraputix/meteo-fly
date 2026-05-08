@@ -3,6 +3,7 @@ import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
 import {
   type VerticalProfile,
   type WeatherModel,
+  type CellSelection,
   type Location,
   isFlat,
   isProfile,
@@ -76,6 +77,7 @@ export function createQueryParams(
   location: Location,
   hourlyParams: HourlyParams,
   model: WeatherModel,
+  cellSelection: CellSelection,
   start: Date,
   numberOfDays: number
 ) {
@@ -90,6 +92,7 @@ export function createQueryParams(
     start_date: formatDateToYYYYMMDD(start),
     end_date: formatDateToYYYYMMDD(endDate),
     models: model,
+    cell_selection: cellSelection,
     timezone: localTimezone,
   };
 }
@@ -99,11 +102,12 @@ export async function fetchWeatherData(
   model: WeatherModel = 'icon_d2',
   start: Date,
   numberOfDays: number = 1,
-  maxAltitude: MaxAltitude = 4000
+  maxAltitude: MaxAltitude = 4000,
+  cellSelection: CellSelection = 'nearest'
 ): Promise<WeatherDataType> {
   const modelVariables = getVariablesForModel(model, maxAltitude);
   const hourlyParams = createHourlyParams(modelVariables);
-  const params = createQueryParams(location, hourlyParams, model, start, numberOfDays);
+  const params = createQueryParams(location, hourlyParams, model, cellSelection, start, numberOfDays);
 
   const responses = await fetchWeatherApi(url, params);
   const response = responses[0];

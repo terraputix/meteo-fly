@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { WeatherDataType, WeatherModel } from '$lib/api/types';
+  import type { CellSelection, WeatherDataType, WeatherModel } from '$lib/api/types';
   import WindChart from './WindChart.svelte';
   import { createEventDispatcher } from 'svelte';
   import Footer from './Footer.svelte';
@@ -12,6 +12,7 @@
   export let selectedDay: number;
   export let maxAltitude: MaxAltitude = 4000;
   export let model: WeatherModel = 'icon_d2';
+  export let cellSelection: CellSelection = 'nearest';
   export let latitude: number;
   export let longitude: number;
 
@@ -36,6 +37,11 @@
     { value: 6000, name: '6000m (475hPa)' },
     { value: 7000, name: '7000m (400hPa)' },
     { value: 8000, name: '8000m (350hPa)' },
+  ];
+
+  const cellSelectionOptions: { value: CellSelection; label: string }[] = [
+    { value: 'land', label: 'Terrain-aware' },
+    { value: 'nearest', label: 'Nearest' },
   ];
 
   const dispatch = createEventDispatcher();
@@ -84,6 +90,7 @@
   $: (selectedDay, refreshScrollPosition());
   $: (maxAltitude, refreshScrollPosition());
   $: (model, refreshScrollPosition());
+  $: (cellSelection, refreshScrollPosition());
   $: (showMobileSettings, refreshScrollPosition());
 </script>
 
@@ -143,7 +150,7 @@
       </button>
     </div>
 
-    <div class="mt-0 hidden sm:grid sm:grid-cols-2 sm:gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+    <div class="mt-0 hidden sm:grid sm:grid-cols-3 sm:gap-3">
       <label class="flex min-w-0 flex-col gap-1.5">
         <span class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Model</span>
         <select
@@ -169,6 +176,26 @@
           {/each}
         </select>
       </label>
+
+      <div class="flex min-w-0 flex-col gap-1.5">
+        <div class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Grid cell selection</div>
+        <div class="grid grid-cols-2 gap-1 rounded-xl bg-slate-50/70 p-1">
+          {#each cellSelectionOptions as option (option.value)}
+            <button
+              type="button"
+              class={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                cellSelection === option.value
+                  ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+              aria-pressed={cellSelection === option.value}
+              on:click={() => (cellSelection = option.value)}
+            >
+              {option.label}
+            </button>
+          {/each}
+        </div>
+      </div>
     </div>
   </div>
 
@@ -276,6 +303,26 @@
             {/each}
           </select>
         </label>
+
+        <div class="flex min-w-0 flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase">Grid cell selection</div>
+          <div class="mt-2 grid grid-cols-2 gap-1 rounded-xl bg-slate-50/70 p-1">
+            {#each cellSelectionOptions as option (option.value)}
+              <button
+                type="button"
+                class={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                  cellSelection === option.value
+                    ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                    : 'text-slate-500 active:text-slate-700'
+                }`}
+                aria-pressed={cellSelection === option.value}
+                on:click={() => (cellSelection = option.value)}
+              >
+                {option.label}
+              </button>
+            {/each}
+          </div>
+        </div>
 
         <label class="flex min-w-0 flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
           <span class="text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase">Top height</span>

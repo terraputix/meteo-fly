@@ -29,6 +29,7 @@
       day: pageParams.selectedDay.toString(),
       model: pageParams.selectedModel,
       maxAlt: (pageParams.maxAltitude ?? 4000).toString(),
+      cellSelection: pageParams.cellSelection,
     });
     const newURL = `?${params.toString()}`;
     saveLastVisitedURL(newURL);
@@ -55,7 +56,8 @@
         parameters.selectedModel,
         startDate,
         1,
-        parameters.maxAltitude ?? 4000
+        parameters.maxAltitude ?? 4000,
+        parameters.cellSelection
       );
       showChart = true;
     } catch (err) {
@@ -96,6 +98,7 @@
             bind:selectedDay={parameters.selectedDay}
             bind:maxAltitude={parameters.maxAltitude}
             bind:model={parameters.selectedModel}
+            bind:cellSelection={parameters.cellSelection}
             bind:latitude={parameters.location.latitude}
             bind:longitude={parameters.location.longitude}
             on:close={() => (showChart = false)}

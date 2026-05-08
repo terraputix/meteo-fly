@@ -1,4 +1,4 @@
-import type { Location, WeatherModel } from '$lib/api/types';
+import type { CellSelection, Location, WeatherModel } from '$lib/api/types';
 import type { MaxAltitude } from '$lib/meteo/types';
 
 export interface PageParameters {
@@ -6,5 +6,6 @@ export interface PageParameters {
   selectedDay: number;
   selectedModel: WeatherModel;
   maxAltitude?: MaxAltitude;
+  cellSelection: CellSelection;
   // lastUpdated: string;
 }
