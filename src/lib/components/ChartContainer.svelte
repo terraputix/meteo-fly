@@ -8,6 +8,7 @@
 
   export let weatherData: WeatherDataType;
   export let startDate: Date;
+  export let isWeatherLoading = false;
   export let selectedDay: number;
   export let maxAltitude: MaxAltitude = 4000;
   export let model: WeatherModel = 'icon_d2';
@@ -172,7 +173,7 @@
   </div>
 
   <div class="bg-white px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
-    <WindChart {weatherData} {maxAltitude} {model} />
+    <WindChart {weatherData} {maxAltitude} {model} isLoading={isWeatherLoading} />
 
     <div class="mt-0.5 sm:mt-1">
       <Footer />

@@ -15,6 +15,7 @@
   let parameters = getInitialParameters($page.url.searchParams);
   let showChart = false;
   let weatherData: WeatherDataType | null = null;
+  let isWeatherLoading = false;
   let error: string | null = null;
   let updateTimer: ReturnType<typeof setTimeout>;
 
@@ -45,6 +46,8 @@
   }
 
   async function updateWeather() {
+    isWeatherLoading = true;
+
     try {
       error = null;
       weatherData = await fetchWeatherData(
@@ -58,6 +61,8 @@
     } catch (err) {
       console.error(err);
       error = 'Failed to fetch weather data. Please try again.';
+    } finally {
+      isWeatherLoading = false;
     }
   }
 </script>
@@ -87,6 +92,7 @@
           <ChartContainer
             {weatherData}
             {startDate}
+            {isWeatherLoading}
             bind:selectedDay={parameters.selectedDay}
             bind:maxAltitude={parameters.maxAltitude}
             bind:model={parameters.selectedModel}

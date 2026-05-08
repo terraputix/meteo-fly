@@ -12,8 +12,11 @@
   export let weatherData: WeatherDataType | null = null;
   export let maxAltitude: MaxAltitude = 4000;
   export let model: WeatherModel = 'icon_d2';
+  export let isLoading = false;
 
   let isRendering = false;
+
+  $: isBusy = isLoading || isRendering;
 
   $: windHeight = Math.ceil(maxAltitude / 10);
   $: totalHeight = getChartHeight(windHeight);
@@ -186,18 +189,16 @@
 </script>
 
 <div class="chart-container" style="min-height: {totalHeight}px;">
-  {#if isRendering}
-    <div class="loading-state">
-      <div class="loading-spinner"></div>
-      <p>Processing weather data…</p>
-    </div>
-  {/if}
+  <div class="loading-state" class:loading-state--visible={isBusy} aria-hidden={!isBusy}>
+    <div class="loading-spinner"></div>
+    <p>Loading weather data…</p>
+  </div>
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
   <div
     use:renderChart={{ data: weatherData, windHeight, maxAltitude, model }}
     class="chart-content"
-    style="opacity: {isRendering ? 0 : 1}; height: {totalHeight}px;"
+    style="opacity: {isBusy ? 0 : 1}; height: {totalHeight}px;"
   ></div>
 </div>
 
@@ -232,6 +233,12 @@
     gap: 12px;
     z-index: 10;
     pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .loading-state--visible {
+    opacity: 1;
   }
 
   .loading-spinner {
