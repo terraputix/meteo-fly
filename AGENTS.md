@@ -5,6 +5,7 @@
 
 - **Framework**: SvelteKit with Svelte 5 and TypeScript
 - **Styling**: Tailwind CSS v4
+- **UI primitives**: `shadcn-svelte` for some more complex UI components built on reusable primitives
 - **Charts**: ECharts rendered from pure chart-preparation helpers
 - **Map**: MapLibre GL
 - **PWA**: `vite-plugin-pwa` with generated service worker and runtime caching for Open-Meteo requests
@@ -22,6 +23,7 @@
 - `src/lib/charts/`: pure chart data preparation and ECharts option building
 - `src/lib/workers/`: Web Worker for off-main-thread chart data processing
 - `src/lib/components/`: UI components including map, chart, legend, footer, and layout pieces
+- `src/lib/components/ui/`: shared `shadcn-svelte`-style UI primitives such as `switch` and `resizable`
 - `src/lib/services/`: defaults, URL/storage persistence, and location/geolocation state
 - `src/lib/stores/`: lightweight app stores such as media-query state
 - `src/lib/utils/`: general utility helpers such as date manipulation
@@ -53,7 +55,7 @@
 ### Coding Style
 - **Svelte 5**: Prefer runes-style APIs for new or refactored Svelte code when consistent with the file.
 - **TypeScript**: No `any`. Reuse existing domain types from `src/lib/api/types.ts`, `src/lib/meteo/types.ts`, and service types.
-- **Styling**: Prefer Tailwind utility classes. Avoid adding `<style>` blocks unless an existing component already uses one and a utility-only approach is impractical.
+- **Styling**: Prefer Tailwind utility classes. For more complex UI building blocks, prefer existing `shadcn-svelte` components in `src/lib/components/ui/` before creating custom primitives. Avoid adding `<style>` blocks unless an existing component already uses one and a utility-only approach is impractical.
 - **Imports**: Use `$lib/` aliases for project imports. Avoid relative parent imports.
 - **Worker-safe purity**: Anything in `src/lib/meteo/` and `src/lib/charts/` should stay free of browser globals and side effects.
 - **Charts**: Extend existing ECharts option/data factories instead of introducing a second charting system.
@@ -82,6 +84,12 @@
 - Rendering and worker orchestration: `src/lib/components/WindChart.svelte`
 - Worker entrypoint: `src/lib/workers/chartWorker.ts`
 - Pure chart builders/helpers: `src/lib/charts/`
+
+### Shared UI Primitives
+- For some more complex UI components, use `shadcn-svelte` primitives from `src/lib/components/ui/`.
+- Existing examples include `src/lib/components/ui/switch/switch.svelte` and the resizable panel components in `src/lib/components/ui/resizable/`.
+- When adding a new `shadcn-svelte` component, use the library CLI to generate it into `src/lib/components/ui/`, then adapt the generated files to the project's conventions such as `$lib/` imports, existing styling patterns, and Svelte 5 usage where appropriate.
+- Prefer extending generated `shadcn-svelte` primitives locally instead of duplicating or reimplementing the same component patterns elsewhere in the app.
 
 ### PWA / Metadata
 - Manifest and service worker caching are configured in `vite.config.ts`.
