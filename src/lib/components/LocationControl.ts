@@ -1,4 +1,5 @@
-import type { IControl, Map } from 'maplibre-gl';
+import maplibregl, { type IControl, type Map } from 'maplibre-gl';
+import { Protocol } from 'pmtiles';
 import { locationActions } from '$lib/services/location/store';
 import type { LocationState } from '$lib/services/location/store';
 import type { Location } from '$lib/api/types';
@@ -10,6 +11,11 @@ interface BaseControlOptions {
 
 interface LocationControlOptions extends BaseControlOptions {
   onLocationDetected?: (location: Location) => void;
+}
+
+interface ModelTerrainControlOptions extends BaseControlOptions {
+  onToggle?: (enabled: boolean) => void;
+  initialEnabled?: boolean;
 }
 
 interface TerrainControlOptions extends BaseControlOptions {
@@ -157,6 +163,47 @@ export class LocationControlManager extends BaseButtonControl {
         <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke-width="2" stroke-linecap="round"/>
       </svg>
     `;
+  }
+}
+
+export function registerPmtilesProtocol() {
+  const protocol = new Protocol();
+  maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
+}
+
+export class ModelTerrainControl extends BaseButtonControl {
+  private enabled: boolean;
+
+  constructor(private modelTerrainOptions: ModelTerrainControlOptions) {
+    super(modelTerrainOptions);
+    this.enabled = modelTerrainOptions.initialEnabled ?? false;
+  }
+
+  protected onButtonClick() {
+    this.enabled = !this.enabled;
+    this.render();
+    this.modelTerrainOptions.onToggle?.(this.enabled);
+  }
+
+  setEnabled(enabled: boolean) {
+    this.enabled = enabled;
+    if (this.button) {
+      this.render();
+    }
+  }
+
+  protected render() {
+    this.button.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/>
+        <path d="M8 21h8M12 17v4" stroke-width="2" stroke-linecap="round"/>
+        <path d="M6 10l3-4 3 3 2-2 4 4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    this.button.classList.toggle('is-active', this.enabled);
+    const title = this.enabled ? 'Disable model surface elevation' : 'Enable model surface elevation';
+    this.button.title = title;
+    this.button.setAttribute('aria-label', title);
   }
 }
 

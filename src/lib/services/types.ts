@@ -7,5 +7,6 @@ export interface PageParameters {
   selectedModel: WeatherModel;
   maxAltitude?: MaxAltitude;
   cellSelection: CellSelection;
-  // lastUpdated: string;
+  terrain: boolean;
+  modelTerrain: boolean;
 }

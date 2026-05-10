@@ -30,6 +30,8 @@
       model: pageParams.selectedModel,
       maxAlt: (pageParams.maxAltitude ?? 4000).toString(),
       cellSelection: pageParams.cellSelection,
+      terrain: pageParams.terrain ? '1' : '0',
+      modelTerrain: pageParams.modelTerrain ? '1' : '0',
     });
     const newURL = `?${params.toString()}`;
     saveLastVisitedURL(newURL);
@@ -91,6 +93,8 @@
           selectedGridCell={weatherData?.selectedGridCell ?? null}
           onToggleChart={toggleChartPanel}
           onLocationChange={updateLocation}
+          bind:terrain={parameters.terrain}
+          bind:modelTerrain={parameters.modelTerrain}
         />
       </div>
     </ResizablePane>

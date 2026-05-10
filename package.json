@@ -49,5 +49,8 @@
     "vite-plugin-pwa": {
       "vite": "$vite"
     }
+  },
+  "dependencies": {
+    "pmtiles": "^4.4.1"
   }
 }

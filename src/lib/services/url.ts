@@ -10,23 +10,29 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
   const model = params.get('model');
   const maxAlt = params.get('maxAlt');
   const cellSelection = params.get('cellSelection');
+  const terrainParam = params.get('terrain');
+  const modelTerrainParam = params.get('modelTerrain');
 
   if (!(lat && lon && day && model)) {
     return null;
   }
 
-  let location: Location;
-  if (lat && lon) {
-    location = { latitude: Number(lat), longitude: Number(lon) };
-  } else {
-    location = defaultLocation;
-  }
-
-  const selectedDay = day ? Number(day) : defaultDay;
+  const location: Location = { latitude: Number(lat), longitude: Number(lon) };
+  const selectedDay = Number(day) || defaultDay;
   const selectedModel = model ? (model as WeatherModel) : defaultWeatherModel;
   const maxAltitude: MaxAltitude = maxAlt ? (Number(maxAlt) as MaxAltitude) : 4000;
   const selectedCellSelection: CellSelection =
     cellSelection === 'nearest' || cellSelection === 'land' ? cellSelection : defaultCellSelection;
+  const terrain = terrainParam !== null ? terrainParam === '1' : true;
+  const modelTerrain = modelTerrainParam === '1';
 
-  return { location, selectedDay, selectedModel, maxAltitude, cellSelection: selectedCellSelection };
+  return {
+    location,
+    selectedDay,
+    selectedModel,
+    maxAltitude,
+    cellSelection: selectedCellSelection,
+    terrain,
+    modelTerrain,
+  };
 }
