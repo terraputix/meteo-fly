@@ -25,8 +25,8 @@
         <h1 class="mt-2 text-3xl font-semibold text-slate-900 sm:text-4xl">About Meteo-Fly</h1>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           Meteo-Fly is built for transparent, model-aware weather interpretation for paragliding and hang gliding. It
-          combines an interactive map with detailed meteogram panels for wind, cloud, rain, humidity, and cloud-base
-          analysis.
+          combines an interactive map with detailed meteogram panels for wind, cloud, rain, humidity, and lifted
+          condensation level analysis.
         </p>
       </div>
       <a
@@ -38,21 +38,26 @@
     </div>
 
     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-xl font-semibold text-slate-900">What Meteo-Fly focuses on</h2>
-      <ul class="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-600 sm:text-base">
-        <li>Transparent communication of available meteorological data for free flight.</li>
-        <li>Side-by-side multi-model comparisons to spot consensus and uncertainty.</li>
-        <li>A practical workflow for planning launches and cross-country routes.</li>
-      </ul>
+      <h2 class="text-xl font-semibold text-slate-900">Why was Meteo-Fly created</h2>
+      <p class="mt-3 text-sm text-slate-600 sm:text-base">
+        I wanted a single chart that brings together all the information needed to assess a flight day: wind, cloud,
+        rain, humidity, and the lifted condensation level, while letting me pick the forecast models I trust. That
+        combination was missing from the tools available for paragliding and hang gliding. Additionally, most projects
+        in this space come with some plan for monetization and transparency is limited because their code cannot be
+        accessed. In comparison, Meteo-Fly is and will stay free and open-source. Meteo-Fly is a pet project I wanted to
+        share, and Open-Meteo makes it possible.
+      </p>
+      <p class="mt-4 text-sm text-slate-600 sm:text-base">
+        <strong>Full disclosure:</strong> I work for Open-Meteo in my day job.
+      </p>
     </section>
 
     <section class="space-y-6">
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="text-xl font-semibold text-slate-900">The meteogram panel</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
-          Below the map, the meteogram panel shows a stack of charts covering wind, cloud cover, precipitation,
-          humidity, and cloud-base altitude. Each layer is toggleable so you can focus on the conditions most relevant
-          to your flight planning.
+          The meteogram panel shows a stack of charts covering wind, cloud cover, precipitation, humidity, and the
+          lifted condensation level. You can show or hide the panel from the map view.
         </p>
       </div>
 
@@ -66,18 +71,18 @@
       </div>
 
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 class="text-xl font-semibold text-slate-900">Cloud base (LCL estimate)</h2>
+        <h2 class="text-xl font-semibold text-slate-900">Lifted Condensation Level (LCL)</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
-          The cloud-base line is calculated from surface temperature and dewpoint using Espy's approximation for the
-          lifting condensation level (LCL): <strong>LCL ≈ 125 × (T − Td)</strong> meters. The chart adds local terrain elevation
-          to express the result as an altitude above sea level.
+          The LCL line is calculated from surface temperature and dewpoint using Espy's approximation: <strong
+            >LCL ≈ 125 × (T − Td)</strong
+          > meters. The chart adds local terrain elevation to express the result as an altitude above sea level.
         </p>
         <div class="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600 sm:text-base">
           <p class="font-semibold text-slate-700">When is this valid?</p>
           <ul class="mt-2 list-disc space-y-2 pl-5">
             <li>Best for a well-mixed boundary layer on convective days.</li>
             <li>Less reliable with inversions, frontal layers, or widespread stratiform cloud.</li>
-            <li>Local moisture sources, terrain flows, and valley inversions can shift the real cloud base.</li>
+            <li>Convective effects such as upvalley flows or thermal plumes are not captured by this estimate.</li>
           </ul>
         </div>
       </div>
@@ -86,7 +91,8 @@
         <h2 class="text-xl font-semibold text-slate-900">Grid cell selection</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           Models provide data on a grid. Meteo-Fly lets you decide how to choose the grid cell when your location sits
-          between land and water or rugged terrain.
+          between land and water or rugged terrain. The selected grid cell is shown on the map with a label, connected
+          to your chosen location by a line that displays the distance between them.
         </p>
         <ul class="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-600 sm:text-base">
           <li><strong>Terrain-aware</strong> favors land grid cells around the selected point.</li>
@@ -110,7 +116,7 @@
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="text-xl font-semibold text-slate-900">Data source</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
-          Meteo-Fly uses open meteorological data from
+          Meteo-Fly uses meteorological data from
           <a href="https://open-meteo.com/" class="underline" target="_blank" rel="noopener noreferrer">Open-Meteo</a>.
           All forecast data is fetched directly in the browser and cached locally for offline access via the service
           worker.
@@ -121,7 +127,9 @@
         <h2 class="text-xl font-semibold text-slate-900">Limitations</h2>
         <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600 sm:text-base">
           <li>Mountain meteorology, valley circulations, and rotor effects are not resolved by global models.</li>
-          <li>Cloud cover is derived from model humidity profiles; thin orographic cloud can be missed.</li>
+          <li>
+            For some models, cloud cover is derived from model humidity profiles; thin orographic cloud can be missed.
+          </li>
           <li>All forecasts are guidance only. Always combine with live observations and local knowledge.</li>
         </ul>
       </div>

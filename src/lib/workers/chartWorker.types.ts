@@ -36,7 +36,7 @@ export interface ChartWorkerSuccessOutput {
   data: {
     cloudData: CloudCoverData[];
     windData: WindFieldLevel[];
-    cloudBase: Array<{ time: Date; value: number }>;
+    lcl: Array<{ time: Date; value: number }>;
     elevation: number;
     timezoneAbbr: string;
     temperatureChartData: TemperatureChartData;

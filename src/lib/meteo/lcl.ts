@@ -1,12 +1,12 @@
 import type { WeatherDataType } from '$lib/api/types';
 
 /**
- * Calculates the Lifting Condensation Level (cloud base) height using Espy's equation
+ * Calculates the Lifting Condensation Level (LCL) height using Espy's equation
  * @param temperature Temperature in degrees Celsius
  * @param dewpoint Dewpoint temperature in degrees Celsius
- * @returns Height of cloud base in meters
+ * @returns Height of LCL in meters
  */
-function calculateCloudBase(temperature: number, dewpoint: number): number {
+function calculateLcl(temperature: number, dewpoint: number): number {
   // Input validation
   if (isNaN(temperature) || isNaN(dewpoint)) {
     throw new Error('Temperature and dewpoint must be valid numbers');
@@ -20,13 +20,13 @@ function calculateCloudBase(temperature: number, dewpoint: number): number {
   }
 
   // Espy's equation: LCL ≈ 125 * (T - Td) meters
-  const cloudBaseHeight = 125 * (temperature - dewpoint);
+  const lclHeight = 125 * (temperature - dewpoint);
 
-  return Math.round(cloudBaseHeight);
+  return Math.round(lclHeight);
 }
 
-export function calculateCloudBaseWeather(data: WeatherDataType): { time: Date; value: number }[] {
-  const cloudBases: { time: Date; value: number }[] = [];
+export function calculateLclWeather(data: WeatherDataType): { time: Date; value: number }[] {
+  const lcls: { time: Date; value: number }[] = [];
 
   const times = data.hourly.time;
   const temperatures = data.hourly.temperature_2m;
@@ -36,9 +36,9 @@ export function calculateCloudBaseWeather(data: WeatherDataType): { time: Date; 
     const temperature = temperatures[i];
     const dewpoint = dewpoints[i];
 
-    const cloudBase = calculateCloudBase(temperature, dewpoint);
-    cloudBases.push({ time: times[i], value: cloudBase + data.elevation });
+    const lcl = calculateLcl(temperature, dewpoint);
+    lcls.push({ time: times[i], value: lcl + data.elevation });
   }
 
-  return cloudBases;
+  return lcls;
 }
