@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
   import { saveLastVisitedURL } from '$lib/services/storage';
   import { page } from '$app/stores';
-  import { replaceState } from '$app/navigation';
+  import { afterNavigate, replaceState } from '$app/navigation';
   import { isMobile } from '$lib/stores/media';
   import LocationMap from '$lib/components/LocationMap.svelte';
   import ChartContainer from '$lib/components/ChartContainer.svelte';
@@ -36,18 +35,24 @@
     return `?${params.toString()}`;
   });
 
-  $effect(() => {
+  function syncURL() {
     const search = urlSearch;
-    const currentSearch = untrack(() => $page.url.search);
-    if (currentSearch === search) {
-      return;
-    }
-
-    const pathname = untrack(() => $page.url.pathname);
-    const pageState = untrack(() => $page.state);
-    const newURL = `${pathname}${search}`;
+    const currentSearch = window.location.search;
+    if (currentSearch === search) return;
+    const newURL = `${window.location.pathname}${search}`;
     saveLastVisitedURL(newURL);
-    replaceState(newURL, pageState);
+    replaceState(newURL, window.history.state);
+  }
+
+  afterNavigate(syncURL);
+
+  $effect(() => {
+    urlSearch;
+    try {
+      syncURL();
+    } catch {
+      // Router not ready yet on initial mount; afterNavigate handles it
+    }
   });
 
   function toggleChartPanel() {
