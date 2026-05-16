@@ -18,7 +18,7 @@ interface TerrainControlOptions extends BaseControlOptions {
   initialEnabled?: boolean;
 }
 
-interface HelpControlOptions extends BaseControlOptions {
+interface AboutControlOptions extends BaseControlOptions {
   url: string;
 }
 
@@ -199,24 +199,23 @@ export class TerrainControl extends BaseButtonControl {
   }
 }
 
-export class HelpControl extends BaseButtonControl {
-  constructor(private helpOptions: HelpControlOptions) {
-    super(helpOptions);
+export class AboutControl extends BaseButtonControl {
+  constructor(private aboutOptions: AboutControlOptions) {
+    super(aboutOptions);
   }
 
   protected onButtonClick() {
-    goto(this.helpOptions.url);
+    goto(this.aboutOptions.url);
   }
 
   protected render() {
     this.button.innerHTML = `
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <circle cx="12" cy="12" r="9" stroke-width="2" />
-        <path d="M9.5 9a2.5 2.5 0 015 0c0 2-2.5 2-2.5 4" stroke-width="2" stroke-linecap="round" />
-        <circle cx="12" cy="17" r="1" fill="currentColor" />
+        <path d="M12 16v-4M12 9h.01" stroke-width="2" stroke-linecap="round" />
       </svg>
     `;
-    this.button.title = this.helpOptions.title;
-    this.button.setAttribute('aria-label', this.helpOptions.title);
+    this.button.title = this.aboutOptions.title;
+    this.button.setAttribute('aria-label', this.aboutOptions.title);
   }
 }

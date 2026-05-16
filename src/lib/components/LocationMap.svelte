@@ -7,7 +7,7 @@
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
-  import { HelpControl, LocationControlManager, TerrainControl } from './Controls';
+  import { AboutControl, LocationControlManager, TerrainControl } from './Controls';
   export let latitude: number;
   export let longitude: number;
   export let chartOpen = false;
@@ -22,7 +22,7 @@
   const gridCellConnectorLayerId = 'grid-cell-connector-line';
   const defaultTerrainExaggeration = 1;
   const earthRadiusMeters = 6371000;
-  const helpUrl = `${base}/help`;
+  const aboutUrl = `${base}/about`;
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
@@ -233,15 +233,15 @@
       initialEnabled: isTerrainEnabled,
       onToggle: setTerrainVisibility,
     });
-    const helpControl = new HelpControl({
-      title: 'Help',
-      className: 'maplibregl-ctrl-help',
-      url: helpUrl,
+    const aboutControl = new AboutControl({
+      title: 'About',
+      className: 'maplibregl-ctrl-about',
+      url: aboutUrl,
     });
 
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
-    map.addControl(helpControl, 'top-left');
+    map.addControl(aboutControl, 'top-left');
 
     const selectedLocationElement = document.createElement('div');
     selectedLocationElement.className = 'selected-location-marker';
