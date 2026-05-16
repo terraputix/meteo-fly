@@ -68,13 +68,6 @@
 
   function handleViewChange(view: ChartView) {
     chartView = view;
-    if (view === 'skewt' && skewTWeatherData) {
-      skewTData = buildSkewTData(skewTWeatherData, model, maxAltitude);
-      traceHours = skewTData?.traces.map((t) => t.time) ?? [];
-      if (selectedTraceIndex >= traceHours.length) {
-        selectedTraceIndex = 0;
-      }
-    }
   }
 
   function formatHour(date: Date): string {

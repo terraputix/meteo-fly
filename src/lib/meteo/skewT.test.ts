@@ -57,8 +57,6 @@ function createMockSkewTData(): SkewTWeatherData {
     },
     elevation: 500,
     timezoneAbbr: 'UTC',
-    sunrise: new Date(2024, 5, 15, 5),
-    sunset: new Date(2024, 5, 15, 21),
   };
 }
 

@@ -13,8 +13,7 @@ import {
   type WeatherDataType,
   type SkewTWeatherData,
 } from './types';
-import { getVariablesForModel } from './variables';
-import { getNativeLevelsForFetch } from '$lib/meteo/pressureLevels';
+import { getVariablesForModel, makeProfileVar } from './variables';
 import type { MaxAltitude } from '$lib/meteo/types';
 
 export interface HourlyParams {
@@ -150,42 +149,12 @@ export async function fetchWeatherData(
 
 // ─── Skew-T data fetching ────────────────────────────────────────────────────
 
-type SkewTProfileKey = 'temperatureProfile' | 'dewpointProfile' | 'windSpeedProfile' | 'windDirectionProfile';
-
-interface SkewTVariableConfig {
-  key: SkewTProfileKey;
-  prefix: string;
-  type: 'Profile';
-  apiNames: string[];
-}
-
-function getSkewTVariablesForModel(model: WeatherModel, maxAltitude: MaxAltitude): SkewTVariableConfig[] {
-  const levels = getNativeLevelsForFetch(model, maxAltitude);
+function getSkewTVariablesForModel(model: WeatherModel, maxAltitude: MaxAltitude): ProfileVariables[] {
   return [
-    {
-      key: 'temperatureProfile',
-      prefix: 'temperature',
-      type: 'Profile',
-      apiNames: levels.map((l) => `temperature_${l.hPa}hPa`),
-    },
-    {
-      key: 'dewpointProfile',
-      prefix: 'dew_point',
-      type: 'Profile',
-      apiNames: levels.map((l) => `dew_point_${l.hPa}hPa`),
-    },
-    {
-      key: 'windSpeedProfile',
-      prefix: 'wind_speed',
-      type: 'Profile',
-      apiNames: levels.map((l) => `wind_speed_${l.hPa}hPa`),
-    },
-    {
-      key: 'windDirectionProfile',
-      prefix: 'wind_direction',
-      type: 'Profile',
-      apiNames: levels.map((l) => `wind_direction_${l.hPa}hPa`),
-    },
+    makeProfileVar('temperatureProfile', 'temperature', model, maxAltitude),
+    makeProfileVar('dewpointProfile', 'dew_point', model, maxAltitude),
+    makeProfileVar('windSpeedProfile', 'wind_speed', model, maxAltitude),
+    makeProfileVar('windDirectionProfile', 'wind_direction', model, maxAltitude),
   ];
 }
 
@@ -194,15 +163,13 @@ export async function fetchSkewTData(
   model: WeatherModel = 'icon_d2',
   start: Date,
   maxAltitude: MaxAltitude = 4000,
-  cellSelection: CellSelection = 'nearest',
-  hourlyCount = 24
+  cellSelection: CellSelection = 'nearest'
 ): Promise<SkewTWeatherData> {
   const variables = getSkewTVariablesForModel(model, maxAltitude);
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const params = {
     hourly: [...variables.flatMap((v) => v.apiNames), 'temperature_2m', 'dew_point_2m'],
-    daily: ['sunrise', 'sunset'],
     latitude: location.latitude,
     longitude: location.longitude,
     start_date: formatDateToYYYYMMDD(start),
@@ -217,11 +184,6 @@ export async function fetchSkewTData(
 
   const timezone = response.timezoneAbbreviation() ?? 'UTC';
   const elevation = response.elevation();
-
-  const sunriseInt: number = Number(response.daily()!.variables(0)?.valuesInt64(0));
-  const sunsetInt: number = Number(response.daily()!.variables(1)?.valuesInt64(0));
-  const sunrise = new Date(sunriseInt * 1000);
-  const sunset = new Date(sunsetInt * 1000);
 
   const hourly = response.hourly()!;
   const times = range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
@@ -248,7 +210,7 @@ export async function fetchSkewTData(
       const match = apiName.match(/_(\d+hPa)$/);
       if (!match) return;
       const levelKey = `_${match[1]}`;
-      (result[v.key] as Record<string, Float32Array>)[levelKey] = values;
+      (result as unknown as Record<string, Record<string, Float32Array>>)[v.key][levelKey] = values;
     });
   });
 
@@ -261,7 +223,5 @@ export async function fetchSkewTData(
     hourly: result,
     elevation,
     timezoneAbbr: timezone,
-    sunrise,
-    sunset,
   };
 }

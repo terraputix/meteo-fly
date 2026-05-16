@@ -9,6 +9,4 @@ export interface PageParameters {
   selectedModel: WeatherModel;
   maxAltitude?: MaxAltitude;
   cellSelection: CellSelection;
-  chartView: ChartView;
-  selectedTraceIndex: number;
 }

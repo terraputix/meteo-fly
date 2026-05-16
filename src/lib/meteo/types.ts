@@ -36,7 +36,5 @@ export interface SkewTData {
   traces: SkewTTrace[];
   elevation: number;
   timezoneAbbr: string;
-  sunrise: Date;
-  sunset: Date;
   pressureLevels: number[];
 }

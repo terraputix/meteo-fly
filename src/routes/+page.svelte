@@ -15,6 +15,8 @@
 
   let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
   let showChart = $state(false);
+  let chartView: 'wind' | 'skewt' = $state('wind');
+  let selectedTraceIndex = $state(0);
   let weatherData = $state.raw<WeatherDataType | null>(null);
   let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
   let isWeatherLoading = $state(false);
@@ -26,8 +28,7 @@
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
 
   const urlSearch = $derived.by(() => {
-    const { location, selectedDay, selectedModel, maxAltitude, cellSelection, chartView, selectedTraceIndex } =
-      parameters;
+    const { location, selectedDay, selectedModel, maxAltitude, cellSelection } = parameters;
     const params = new URLSearchParams({
       lat: location.latitude.toString(),
       lon: location.longitude.toString(),
@@ -35,8 +36,6 @@
       model: selectedModel,
       maxAlt: (maxAltitude ?? 4000).toString(),
       cellSelection,
-      chartView,
-      traceIndex: selectedTraceIndex.toString(),
     });
     return `?${params.toString()}`;
   });
@@ -82,6 +81,18 @@
 
     clearTimeout(updateTimer ?? undefined);
     updateTimer = setTimeout(updateWeather, 5);
+  });
+
+  $effect(() => {
+    if (!showChart || chartView !== 'skewt') return;
+
+    parameters.location.latitude;
+    parameters.location.longitude;
+    parameters.selectedModel;
+    parameters.maxAltitude;
+    parameters.cellSelection;
+    startDate;
+
     updateSkewTData();
   });
 
@@ -178,8 +189,8 @@
             bind:cellSelection={parameters.cellSelection}
             bind:latitude={parameters.location.latitude}
             bind:longitude={parameters.location.longitude}
-            bind:chartView={parameters.chartView}
-            bind:selectedTraceIndex={parameters.selectedTraceIndex}
+            bind:chartView
+            bind:selectedTraceIndex
             on:close={() => (showChart = false)}
           />
         </div>

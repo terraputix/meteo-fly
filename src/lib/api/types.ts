@@ -69,8 +69,6 @@ export interface SkewTWeatherData {
   };
   elevation: number;
   timezoneAbbr: string;
-  sunrise: Date;
-  sunset: Date;
 }
 
 export type HourlyKeys = keyof HourlyData;

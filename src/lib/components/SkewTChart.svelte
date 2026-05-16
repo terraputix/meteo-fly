@@ -26,7 +26,6 @@
     { label: 'LCL', color: CHART_COLORS.lcl, dash: true },
     { label: 'Dry adiabat', color: '#e55', dash: false },
     { label: 'Moist adiabat', color: '#55e', dash: true },
-    { label: 'Mixing ratio', color: '#2a7', dash: true },
     { label: 'Wind (native)', color: windColorScale(20), dash: false, opacity: 1 },
     { label: 'Wind (interp.)', color: windColorScale(20), dash: false, opacity: 0.4 },
   ];

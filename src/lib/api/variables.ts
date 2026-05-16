@@ -2,7 +2,12 @@ import type { FlatVariable, ProfileVariables, WeatherModel } from './types';
 import { getNativeLevelsForFetch } from '$lib/meteo/pressureLevels';
 import type { MaxAltitude } from '$lib/meteo/types';
 
-function makeProfileVar(key: string, prefix: string, model: WeatherModel, maxAltitude: number): ProfileVariables {
+export function makeProfileVar(
+  key: string,
+  prefix: string,
+  model: WeatherModel,
+  maxAltitude: number
+): ProfileVariables {
   const levels = getNativeLevelsForFetch(model, maxAltitude);
   return {
     key,

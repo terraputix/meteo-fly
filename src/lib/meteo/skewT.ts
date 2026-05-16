@@ -179,8 +179,6 @@ export function buildSkewTData(
     traces,
     elevation: weatherData.elevation,
     timezoneAbbr: weatherData.timezoneAbbr,
-    sunrise: weatherData.sunrise,
-    sunset: weatherData.sunset,
     pressureLevels: allLevels.map((l) => l.hPa),
   };
 }
