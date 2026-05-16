@@ -1,14 +1,7 @@
 <script lang="ts">
-  import { base } from '$app/paths';
-  import { browser } from '$app/environment';
   import { getLastVisitedURL } from '$lib/services/storage';
 
-  const fallbackUrl = `${base}/`;
-  let returnUrl = fallbackUrl;
-
-  if (browser) {
-    returnUrl = getLastVisitedURL() ?? fallbackUrl;
-  }
+  const returnUrl = getLastVisitedURL() ?? '/';
 </script>
 
 <svelte:head>
@@ -17,7 +10,11 @@
     name="description"
     content="Help and interpretation notes for Meteo-Fly wind, cloud, and meteogram visualizations for paragliding and hang gliding."
   />
-  <link rel="canonical" href="https://meteo-fly.com/help" />
+  <meta property="og:title" content="Meteo-Fly Help - How to Read the Forecast" />
+  <meta
+    property="og:description"
+    content="Help and interpretation notes for Meteo-Fly wind, cloud, and meteogram visualizations for paragliding and hang gliding."
+  />
 </svelte:head>
 
 <div class="bg-slate-50 text-slate-900">

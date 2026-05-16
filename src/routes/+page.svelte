@@ -1,7 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { saveLastVisitedURL } from '$lib/services/storage';
-  import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { replaceState } from '$app/navigation';
   import { isMobile } from '$lib/stores/media';
@@ -38,10 +37,6 @@
   });
 
   $effect(() => {
-    if (!browser) {
-      return;
-    }
-
     const search = urlSearch;
     const currentSearch = untrack(() => $page.url.search);
     if (currentSearch === search) {
@@ -78,16 +73,8 @@
     parameters.maxAltitude;
     parameters.cellSelection;
 
-    if (updateTimer) {
-      clearTimeout(updateTimer);
-    }
+    clearTimeout(updateTimer ?? undefined);
     updateTimer = setTimeout(updateWeather, 5);
-
-    return () => {
-      if (updateTimer) {
-        clearTimeout(updateTimer);
-      }
-    };
   });
 
   async function updateWeather() {
@@ -114,32 +101,17 @@
 </script>
 
 <svelte:head>
-  <title>Meteo-Fly - Wind Forecast for Paragliding & Hang Gliding</title>
+  <title>Meteo-Fly - Wind & Weather Forecast for Paragliding & Hang Gliding</title>
   <meta
     name="description"
-    content="Professional wind forecast visualization for paragliders and hang gliders. Interactive wind charts for multiple meteorological models including ICON, GFS, UKMO, and MeteoFrance."
+    content="Professional wind & weather forecast visualization for paragliding and hang gliding. Interactive wind charts for multiple meteorological models including ICON, ECMWF, GFS, UKMO, and MeteoFrance."
   />
-  <meta
-    name="keywords"
-    content="paragliding wind forecast, hang gliding weather, wind speed chart, meteorological data, aviation weather"
-  />
-  <meta property="og:title" content="Meteo-Fly - Wind Forecast for Paragliding & Hang Gliding" />
+  <meta name="robots" content="index, follow" />
+  <meta property="og:title" content="Meteo-Fly - Wind & Weather Forecast for Paragliding & Hang Gliding" />
   <meta
     property="og:description"
-    content="Professional wind forecast visualization for paragliders and hang gliders. Interactive wind charts for multiple meteorological models including ICON, GFS, UKMO, and MeteoFrance."
+    content="Professional wind & weather forecast visualization for paragliding and hang gliding. Interactive wind charts for multiple meteorological models including ICON, ECMWF, GFS, UKMO, and MeteoFrance."
   />
-  <meta property="og:url" content="https://meteo-fly.com/" />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="https://meteo-fly.com/icons/icon-512x512.png" />
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Meteo-Fly - Wind Forecast for Paragliding & Hang Gliding" />
-  <meta
-    name="twitter:description"
-    content="Professional wind forecast visualization for paragliders and hang gliders. Interactive wind charts for multiple meteorological models including ICON, GFS, UKMO, and MeteoFrance."
-  />
-  <meta name="twitter:image" content="https://meteo-fly.com/icons/icon-512x512.png" />
-
-  <link rel="canonical" href="https://meteo-fly.com/" />
 </svelte:head>
 
 <div class="h-screen w-full overflow-hidden bg-slate-100">

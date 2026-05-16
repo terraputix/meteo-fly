@@ -25,6 +25,10 @@
 
 <svelte:head>
   {@html webManifest}
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Meteo-Fly" />
+  <meta property="og:image" content="https://meteo-fly.com/icons/icon-512x512.png" />
+  <meta name="twitter:card" content="summary" />
 </svelte:head>
 
 <div class="flex min-h-screen flex-col">

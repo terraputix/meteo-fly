@@ -1,3 +1,4 @@
+import { goto } from '$app/navigation';
 import type { IControl, Map } from 'maplibre-gl';
 import { locationActions } from '$lib/services/location/store';
 import type { LocationState } from '$lib/services/location/store';
@@ -204,7 +205,7 @@ export class HelpControl extends BaseButtonControl {
   }
 
   protected onButtonClick() {
-    window.location.href = this.helpOptions.url;
+    goto(this.helpOptions.url);
   }
 
   protected render() {
