@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { saveLastVisitedURL } from '$lib/services/storage';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
+  import { replaceState } from '$app/navigation';
   import { isMobile } from '$lib/stores/media';
   import LocationMap from '$lib/components/LocationMap.svelte';
   import ChartContainer from '$lib/components/ChartContainer.svelte';
@@ -12,29 +14,46 @@
   import type { Location, WeatherDataType } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
 
-  let parameters = getInitialParameters($page.url.searchParams);
-  let showChart = false;
-  let weatherData: WeatherDataType | null = null;
-  let isWeatherLoading = false;
-  let error: string | null = null;
-  let updateTimer: ReturnType<typeof setTimeout>;
+  let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
+  let showChart = $state(false);
+  let weatherData = $state.raw<WeatherDataType | null>(null);
+  let isWeatherLoading = $state(false);
+  let error: string | null = $state(null);
 
-  $: startDate = addDays(new Date(), parameters.selectedDay - 1);
+  let updateTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function updateURLParams(pageParams: PageParameters) {
-    if (!browser) return;
+  const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
+
+  const urlSearch = $derived.by(() => {
+    const { location, selectedDay, selectedModel, maxAltitude, cellSelection } = parameters;
     const params = new URLSearchParams({
-      lat: pageParams.location.latitude.toString(),
-      lon: pageParams.location.longitude.toString(),
-      day: pageParams.selectedDay.toString(),
-      model: pageParams.selectedModel,
-      maxAlt: (pageParams.maxAltitude ?? 4000).toString(),
-      cellSelection: pageParams.cellSelection,
+      lat: location.latitude.toString(),
+      lon: location.longitude.toString(),
+      day: selectedDay.toString(),
+      model: selectedModel,
+      maxAlt: (maxAltitude ?? 4000).toString(),
+      cellSelection,
     });
-    const newURL = `?${params.toString()}`;
+    return `?${params.toString()}`;
+  });
+
+  $effect(() => {
+    if (!browser) {
+      return;
+    }
+
+    const search = urlSearch;
+    const currentSearch = untrack(() => $page.url.search);
+    if (currentSearch === search) {
+      return;
+    }
+
+    const pathname = untrack(() => $page.url.pathname);
+    const pageState = untrack(() => $page.state);
+    const newURL = `${pathname}${search}`;
     saveLastVisitedURL(newURL);
-    history.replaceState({}, '', newURL);
-  }
+    replaceState(newURL, pageState);
+  });
 
   function toggleChartPanel() {
     showChart = !showChart;
@@ -51,11 +70,25 @@
     }
   }
 
-  $: {
-    updateURLParams(parameters);
-    clearTimeout(updateTimer);
+  $effect(() => {
+    parameters.location.latitude;
+    parameters.location.longitude;
+    parameters.selectedDay;
+    parameters.selectedModel;
+    parameters.maxAltitude;
+    parameters.cellSelection;
+
+    if (updateTimer) {
+      clearTimeout(updateTimer);
+    }
     updateTimer = setTimeout(updateWeather, 5);
-  }
+
+    return () => {
+      if (updateTimer) {
+        clearTimeout(updateTimer);
+      }
+    };
+  });
 
   async function updateWeather() {
     isWeatherLoading = true;
@@ -79,6 +112,35 @@
     }
   }
 </script>
+
+<svelte:head>
+  <title>Meteo-Fly - Wind Forecast for Paragliding & Hang Gliding</title>
+  <meta
+    name="description"
+    content="Professional wind forecast visualization for paragliders and hang gliders. Interactive wind charts for multiple meteorological models including ICON, GFS, UKMO, and MeteoFrance."
+  />
+  <meta
+    name="keywords"
+    content="paragliding wind forecast, hang gliding weather, wind speed chart, meteorological data, aviation weather"
+  />
+  <meta property="og:title" content="Meteo-Fly - Wind Forecast for Paragliding & Hang Gliding" />
+  <meta
+    property="og:description"
+    content="Professional wind forecast visualization for paragliders and hang gliders. Interactive wind charts for multiple meteorological models including ICON, GFS, UKMO, and MeteoFrance."
+  />
+  <meta property="og:url" content="https://meteo-fly.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://meteo-fly.com/icons/icon-512x512.png" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Meteo-Fly - Wind Forecast for Paragliding & Hang Gliding" />
+  <meta
+    name="twitter:description"
+    content="Professional wind forecast visualization for paragliders and hang gliders. Interactive wind charts for multiple meteorological models including ICON, GFS, UKMO, and MeteoFrance."
+  />
+  <meta name="twitter:image" content="https://meteo-fly.com/icons/icon-512x512.png" />
+
+  <link rel="canonical" href="https://meteo-fly.com/" />
+</svelte:head>
 
 <div class="h-screen w-full overflow-hidden bg-slate-100">
   <ResizablePaneGroup direction={$isMobile ? 'vertical' : 'horizontal'}>

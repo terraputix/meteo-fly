@@ -17,6 +17,10 @@ interface TerrainControlOptions extends BaseControlOptions {
   initialEnabled?: boolean;
 }
 
+interface HelpControlOptions extends BaseControlOptions {
+  url: string;
+}
+
 abstract class BaseButtonControl implements IControl {
   protected button!: HTMLButtonElement;
   protected container!: HTMLDivElement;
@@ -191,5 +195,27 @@ export class TerrainControl extends BaseButtonControl {
     const title = this.enabled ? 'Disable terrain and hillshade' : 'Enable terrain and hillshade';
     this.button.title = title;
     this.button.setAttribute('aria-label', title);
+  }
+}
+
+export class HelpControl extends BaseButtonControl {
+  constructor(private helpOptions: HelpControlOptions) {
+    super(helpOptions);
+  }
+
+  protected onButtonClick() {
+    window.location.href = this.helpOptions.url;
+  }
+
+  protected render() {
+    this.button.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="9" stroke-width="2" />
+        <path d="M9.5 9a2.5 2.5 0 015 0c0 2-2.5 2-2.5 4" stroke-width="2" stroke-linecap="round" />
+        <circle cx="12" cy="17" r="1" fill="currentColor" />
+      </svg>
+    `;
+    this.button.title = this.helpOptions.title;
+    this.button.setAttribute('aria-label', this.helpOptions.title);
   }
 }

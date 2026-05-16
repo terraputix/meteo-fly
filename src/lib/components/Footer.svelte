@@ -1,7 +1,7 @@
-<div class="flex items-center justify-between px-4 text-xs text-gray-600 hover:text-gray-900">
-  <p>
+<div class="flex flex-wrap items-center justify-between gap-3 px-4 text-xs text-gray-600 hover:text-gray-900">
+  <div class="flex flex-wrap items-center gap-2">
     <a href="https://open-meteo.com/" target="_blank" class="underline">Weather data by Open-Meteo.com</a>
-  </p>
+  </div>
 
   <a
     href="https://github.com/terraputix/meteo-fly"

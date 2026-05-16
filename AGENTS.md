@@ -76,7 +76,7 @@
 4. Verify any model-specific chart or data assumptions still hold.
 
 ### Map & Location
-- Map UI lives primarily in `src/lib/components/LocationMap.svelte` and `src/lib/components/LocationControl.ts`.
+- Map UI lives primarily in `src/lib/components/LocationMap.svelte` and `src/lib/components/Controls.ts`.
 - Location state and geolocation behavior live in `src/lib/services/location/`.
 
 ### Charting

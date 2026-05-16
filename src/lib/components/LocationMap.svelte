@@ -3,10 +3,11 @@
   import maplibregl, { NavigationControl, type Map, type Marker } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { LngLatLike } from 'maplibre-gl';
+  import { base } from '$app/paths';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
-  import { LocationControlManager, TerrainControl } from './LocationControl';
+  import { HelpControl, LocationControlManager, TerrainControl } from './Controls';
   export let latitude: number;
   export let longitude: number;
   export let chartOpen = false;
@@ -21,6 +22,7 @@
   const gridCellConnectorLayerId = 'grid-cell-connector-line';
   const defaultTerrainExaggeration = 1;
   const earthRadiusMeters = 6371000;
+  const helpUrl = `${base}/help`;
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
@@ -231,9 +233,15 @@
       initialEnabled: isTerrainEnabled,
       onToggle: setTerrainVisibility,
     });
+    const helpControl = new HelpControl({
+      title: 'Help',
+      className: 'maplibregl-ctrl-help',
+      url: helpUrl,
+    });
 
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
+    map.addControl(helpControl, 'top-left');
 
     const selectedLocationElement = document.createElement('div');
     selectedLocationElement.className = 'selected-location-marker';
