@@ -13,7 +13,7 @@ export interface TooltipStore {
   cloudLowByTime: Map<number, number>;
   cloudMidByTime: Map<number, number>;
   cloudHighByTime: Map<number, number>;
-  cloudBaseByTime: Map<number, number>;
+  lclByTime: Map<number, number>;
   windByTimeHeight: Map<string, { speed: number; direction: number }>;
   sortedWindTimes: number[];
   sortedWindHeights: number[];
@@ -47,8 +47,8 @@ export function buildTooltipStore(
     else cloudHighByTime.set(mid, r.cloudCover);
   });
 
-  const cloudBaseByTime = new Map<number, number>();
-  cloudBase.forEach((d) => cloudBaseByTime.set(d.time.getTime(), d.value));
+  const lclByTime = new Map<number, number>();
+  cloudBase.forEach((d) => lclByTime.set(d.time.getTime(), d.value));
 
   const windByTimeHeight = new Map<string, { speed: number; direction: number }>();
   const windTimesSet = new Set<number>();
@@ -66,7 +66,7 @@ export function buildTooltipStore(
     cloudLowByTime,
     cloudMidByTime,
     cloudHighByTime,
-    cloudBaseByTime,
+    lclByTime,
     windByTimeHeight,
     sortedWindTimes: Array.from(windTimesSet).sort((a, b) => a - b),
     sortedWindHeights: Array.from(windHeightsSet).sort((a, b) => a - b),
@@ -212,13 +212,13 @@ export function createTooltipFormatter(
 
     // ── Grid 2 – Wind field ─────────────────────────────────────────────────
     if (gridIndex === 2 || gridIndex === -1) {
-      // Cloud base line lives in the wind grid.
-      const cb = store.cloudBaseByTime.get(snap);
+      // LCL line lives in the wind grid.
+      const cb = store.lclByTime.get(snap);
       if (cb != null) {
         html +=
           `<div style="margin-bottom:3px">` +
-          swatch(CHART_COLORS.cloudBase) +
-          `Cloud base:&nbsp;<b>${Math.round(cb)}&nbsp;m</b></div>`;
+          swatch(CHART_COLORS.lcl) +
+          `LCL:&nbsp;<b>${Math.round(cb)}&nbsp;m</b></div>`;
       }
 
       if (gridIndex === 2 && hoveredWindY != null) {

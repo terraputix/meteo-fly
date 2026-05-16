@@ -1,6 +1,6 @@
 import { getCloudCoverData } from '$lib/charts/clouds';
 import { getWindFieldAllLevels } from '$lib/charts/wind';
-import { calculateCloudBaseWeather } from '$lib/meteo/cloudBase';
+import { calculateLclWeather } from '$lib/meteo/lcl';
 
 import type { WeatherDataType } from '$lib/api/types';
 import type {
@@ -78,7 +78,7 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
   try {
     const cloudData = getCloudCoverData(weatherData, model, maxAltitude);
     const windData = getWindFieldAllLevels(weatherData, model, maxAltitude);
-    const cloudBase = calculateCloudBaseWeather(weatherData);
+    const lcl = calculateLclWeather(weatherData);
 
     const xDomain = calculateDomains(windData);
 
@@ -90,7 +90,7 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
       data: {
         cloudData,
         windData,
-        cloudBase,
+        lcl,
         elevation: weatherData.elevation,
         timezoneAbbr: weatherData.timezoneAbbr,
         temperatureChartData,

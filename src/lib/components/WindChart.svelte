@@ -81,16 +81,8 @@
           return;
         }
 
-        const {
-          cloudData,
-          windData,
-          cloudBase,
-          elevation,
-          timezoneAbbr,
-          temperatureChartData,
-          rainCloudChartData,
-          xDomain,
-        } = response.data;
+        const { cloudData, windData, lcl, elevation, timezoneAbbr, temperatureChartData, rainCloudChartData, xDomain } =
+          response.data;
 
         const canvas = document.createElement('div');
         canvas.style.cssText = `width:100%;height:${totalHeight}px;`;
@@ -98,7 +90,7 @@
 
         chart = echarts.init(canvas);
 
-        const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, cloudBase);
+        const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
         const activeState: ActiveState = createActiveState();
 
         chart.setOption(
@@ -107,7 +99,7 @@
             rainCloudChartData,
             windData,
             cloudData,
-            cloudBase,
+            lcl,
             elevation,
             timezoneAbbr,
             xDomain,

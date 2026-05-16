@@ -25,17 +25,10 @@
 
 <svelte:head>
   {@html webManifest}
-  <title>Meteo-Fly - Wind Forecast for Paragliding & Hang Gliding</title>
-  <meta
-    name="description"
-    content="Professional wind forecast visualization for paragliders and hang gliders. Interactive wind charts for multiple meteorological models including ICON, GFS, UKMO, and MeteoFrance."
-  />
-  <meta
-    name="keywords"
-    content="paragliding wind forecast, hang gliding weather, wind speed chart, meteorological data, aviation weather"
-  />
-
-  <link rel="canonical" href="https://meteo-fly.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Meteo-Fly" />
+  <meta property="og:image" content="https://meteo-fly.com/icons/icon-512x512.png" />
+  <meta name="twitter:card" content="summary" />
 </svelte:head>
 
 <div class="flex min-h-screen flex-col">

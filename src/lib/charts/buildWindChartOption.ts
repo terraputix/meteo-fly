@@ -491,11 +491,11 @@ export function buildWindChartOption(
     tooltip: { show: false },
   };
 
-  const cloudBaseSeries = makeLineSeries({
-    name: 'Cloud Base',
+  const lclSeries = makeLineSeries({
+    name: 'LCL',
     xAxisIndex: 2,
     yAxisIndex: 3,
-    color: CHART_COLORS.cloudBase,
+    color: CHART_COLORS.lcl,
     data: cloudBase.map((d) => [d.time.getTime(), d.value] as [number, number]),
     z: 4,
   });
@@ -587,7 +587,7 @@ export function buildWindChartOption(
     windAnchorSeries,
     windCloudSeries,
     windArrowSeries,
-    cloudBaseSeries,
+    lclSeries,
     elevationLineSeries,
     pressureLabelSeries,
   ];
