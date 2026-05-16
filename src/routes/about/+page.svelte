@@ -114,6 +114,17 @@
       </div>
 
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-semibold text-slate-900">Map tiles</h2>
+        <p class="mt-3 text-sm text-slate-600 sm:text-base">
+          Map tiles are served by two awesome projects: the base map uses
+          <a href="https://openfreemap.com/" class="underline" target="_blank" rel="noopener noreferrer">OpenFreeMap</a
+          >, while terrain and hillshade overlays come from
+          <a href="https://mapterhorn.com/" class="underline" target="_blank" rel="noopener noreferrer">Mapterhorn</a>,
+          an open-data project hosting high-resolution terrain tiles. Go check them out.
+        </p>
+      </div>
+
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="text-xl font-semibold text-slate-900">Data source</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           Meteo-Fly uses meteorological data from
