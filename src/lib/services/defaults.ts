@@ -1,5 +1,5 @@
 import type { CellSelection, Location, WeatherModel } from '$lib/api/types';
-import type { PageParameters } from './types';
+import type { PageParameters, ChartView } from './types';
 import { readURLParams } from './url';
 
 export const defaultLocation: Location = { latitude: 46.41526, longitude: 8.10828 };
@@ -21,5 +21,7 @@ export function getInitialParameters(urlParams: URLSearchParams): PageParameters
     selectedDay: defaultDay,
     maxAltitude: 4000,
     cellSelection: defaultCellSelection,
+    chartView: 'wind' as ChartView,
+    selectedTraceIndex: 0,
   };
 }

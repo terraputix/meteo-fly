@@ -11,8 +11,10 @@ import {
   type FlatVariable,
   type HourlyData,
   type WeatherDataType,
+  type SkewTWeatherData,
 } from './types';
 import { getVariablesForModel } from './variables';
+import { getNativeLevelsForFetch } from '$lib/meteo/pressureLevels';
 import type { MaxAltitude } from '$lib/meteo/types';
 
 export interface HourlyParams {
@@ -144,4 +146,122 @@ export async function fetchWeatherData(
   };
 
   return weatherData;
+}
+
+// ─── Skew-T data fetching ────────────────────────────────────────────────────
+
+type SkewTProfileKey = 'temperatureProfile' | 'dewpointProfile' | 'windSpeedProfile' | 'windDirectionProfile';
+
+interface SkewTVariableConfig {
+  key: SkewTProfileKey;
+  prefix: string;
+  type: 'Profile';
+  apiNames: string[];
+}
+
+function getSkewTVariablesForModel(model: WeatherModel, maxAltitude: MaxAltitude): SkewTVariableConfig[] {
+  const levels = getNativeLevelsForFetch(model, maxAltitude);
+  return [
+    {
+      key: 'temperatureProfile',
+      prefix: 'temperature',
+      type: 'Profile',
+      apiNames: levels.map((l) => `temperature_${l.hPa}hPa`),
+    },
+    {
+      key: 'dewpointProfile',
+      prefix: 'dew_point',
+      type: 'Profile',
+      apiNames: levels.map((l) => `dew_point_${l.hPa}hPa`),
+    },
+    {
+      key: 'windSpeedProfile',
+      prefix: 'wind_speed',
+      type: 'Profile',
+      apiNames: levels.map((l) => `wind_speed_${l.hPa}hPa`),
+    },
+    {
+      key: 'windDirectionProfile',
+      prefix: 'wind_direction',
+      type: 'Profile',
+      apiNames: levels.map((l) => `wind_direction_${l.hPa}hPa`),
+    },
+  ];
+}
+
+export async function fetchSkewTData(
+  location: Location,
+  model: WeatherModel = 'icon_d2',
+  start: Date,
+  maxAltitude: MaxAltitude = 4000,
+  cellSelection: CellSelection = 'nearest',
+  hourlyCount = 24
+): Promise<SkewTWeatherData> {
+  const variables = getSkewTVariablesForModel(model, maxAltitude);
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const params = {
+    hourly: [...variables.flatMap((v) => v.apiNames), 'temperature_2m', 'dew_point_2m'],
+    daily: ['sunrise', 'sunset'],
+    latitude: location.latitude,
+    longitude: location.longitude,
+    start_date: formatDateToYYYYMMDD(start),
+    end_date: formatDateToYYYYMMDD(start),
+    models: model,
+    cell_selection: cellSelection,
+    timezone: localTimezone,
+  };
+
+  const responses = await fetchWeatherApi(url, params);
+  const response = responses[0];
+
+  const timezone = response.timezoneAbbreviation() ?? 'UTC';
+  const elevation = response.elevation();
+
+  const sunriseInt: number = Number(response.daily()!.variables(0)?.valuesInt64(0));
+  const sunsetInt: number = Number(response.daily()!.variables(1)?.valuesInt64(0));
+  const sunrise = new Date(sunriseInt * 1000);
+  const sunset = new Date(sunsetInt * 1000);
+
+  const hourly = response.hourly()!;
+  const times = range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
+    (t) => new Date(t * 1000)
+  );
+
+  const hourlyParams = params.hourly as string[];
+
+  const result: SkewTWeatherData['hourly'] = {
+    time: times,
+    temperatureProfile: {},
+    dewpointProfile: {},
+    windSpeedProfile: {},
+    windDirectionProfile: {},
+    temperature_2m: new Float32Array(times.length),
+    dewpoint_2m: new Float32Array(times.length),
+  };
+
+  variables.forEach((v) => {
+    v.apiNames.forEach((apiName) => {
+      const position = hourlyParams.findIndex((p) => p === apiName);
+      if (position === -1) return;
+      const values = hourly.variables(position)!.valuesArray()!;
+      const match = apiName.match(/_(\d+hPa)$/);
+      if (!match) return;
+      const levelKey = `_${match[1]}`;
+      (result[v.key] as Record<string, Float32Array>)[levelKey] = values;
+    });
+  });
+
+  const temp2mPos = hourlyParams.findIndex((p) => p === 'temperature_2m');
+  const dew2mPos = hourlyParams.findIndex((p) => p === 'dew_point_2m');
+  if (temp2mPos >= 0) result.temperature_2m = hourly.variables(temp2mPos)!.valuesArray()!;
+  if (dew2mPos >= 0) result.dewpoint_2m = hourly.variables(dew2mPos)!.valuesArray()!;
+
+  return {
+    hourly: result,
+    elevation,
+    timezoneAbbr: timezone,
+    sunrise,
+    sunset,
+  };
 }

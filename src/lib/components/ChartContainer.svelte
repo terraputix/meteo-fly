@@ -1,20 +1,30 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { CellSelection, WeatherDataType, WeatherModel } from '$lib/api/types';
+  import type { CellSelection, WeatherDataType, WeatherModel, SkewTWeatherData } from '$lib/api/types';
   import WindChart from './WindChart.svelte';
+  import SkewTChart from './SkewTChart.svelte';
+  import { buildSkewTData } from '$lib/meteo/skewT';
   import { createEventDispatcher } from 'svelte';
   import Footer from './Footer.svelte';
-  import type { MaxAltitude } from '$lib/meteo/types';
+  import type { MaxAltitude, SkewTData } from '$lib/meteo/types';
+  import type { ChartView } from '$lib/services/types';
 
   export let weatherData: WeatherDataType;
+  export let skewTWeatherData: SkewTWeatherData | null = null;
   export let startDate: Date;
   export let isWeatherLoading = false;
+  export let isSkewTLoading = false;
   export let selectedDay: number;
   export let maxAltitude: MaxAltitude = 4000;
   export let model: WeatherModel = 'icon_d2';
   export let cellSelection: CellSelection = 'nearest';
   export let latitude: number;
   export let longitude: number;
+  export let chartView: ChartView = 'wind';
+  export let selectedTraceIndex = 0;
+
+  let skewTData: SkewTData | null = null;
+  let traceHours: Date[] = [];
 
   const models: { id: WeatherModel; name: string }[] = [
     { id: 'icon_seamless', name: 'ICON Seamless' },
@@ -47,6 +57,29 @@
   const dispatch = createEventDispatcher();
   let showMobileSettings = false;
   let scrollContainer: HTMLDivElement | undefined;
+
+  $: if (skewTWeatherData && chartView === 'skewt') {
+    skewTData = buildSkewTData(skewTWeatherData, model, maxAltitude);
+    traceHours = skewTData?.traces.map((t) => t.time) ?? [];
+    if (selectedTraceIndex >= traceHours.length) {
+      selectedTraceIndex = 0;
+    }
+  }
+
+  function handleViewChange(view: ChartView) {
+    chartView = view;
+    if (view === 'skewt' && skewTWeatherData) {
+      skewTData = buildSkewTData(skewTWeatherData, model, maxAltitude);
+      traceHours = skewTData?.traces.map((t) => t.time) ?? [];
+      if (selectedTraceIndex >= traceHours.length) {
+        selectedTraceIndex = 0;
+      }
+    }
+  }
+
+  function formatHour(date: Date): string {
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
 
   function getDayLabel(day: number) {
     if (day === 1) return 'Today';
@@ -200,7 +233,61 @@
   </div>
 
   <div class="bg-white px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
-    <WindChart {weatherData} {maxAltitude} {model} isLoading={isWeatherLoading} />
+    <div class="mb-2 flex items-center justify-center">
+      <div class="inline-flex rounded-xl bg-slate-100 p-1">
+        <button
+          type="button"
+          class={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${
+            chartView === 'wind'
+              ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+          on:click={() => handleViewChange('wind')}
+        >
+          Wind Chart
+        </button>
+        <button
+          type="button"
+          class={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${
+            chartView === 'skewt'
+              ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+          on:click={() => handleViewChange('skewt')}
+        >
+          Skew-T
+        </button>
+      </div>
+    </div>
+
+    {#if chartView === 'wind'}
+      <WindChart {weatherData} {maxAltitude} {model} isLoading={isWeatherLoading} />
+    {:else if skewTData && traceHours.length > 0}
+      <div class="mb-3">
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-slate-500">Time:</span>
+          <input
+            type="range"
+            min="0"
+            max={traceHours.length - 1}
+            bind:value={selectedTraceIndex}
+            class="h-2 flex-1 cursor-pointer rounded-lg bg-slate-200 accent-indigo-600"
+          />
+          <span class="min-w-[50px] text-right text-xs font-medium text-slate-700">
+            {formatHour(traceHours[selectedTraceIndex] ?? new Date())}
+          </span>
+        </div>
+      </div>
+      <SkewTChart {skewTData} {selectedTraceIndex} isLoading={isSkewTLoading} />
+    {:else if isSkewTLoading}
+      <div class="flex h-64 items-center justify-center">
+        <div class="text-sm text-slate-500">Loading sounding data...</div>
+      </div>
+    {:else}
+      <div class="flex h-64 items-center justify-center">
+        <div class="text-sm text-slate-500">No sounding data available</div>
+      </div>
+    {/if}
 
     <div class="mt-0.5 sm:mt-1">
       <Footer />

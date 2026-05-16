@@ -9,14 +9,16 @@
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
   import { getInitialParameters } from '$lib/services/defaults';
   import { type PageParameters } from '$lib/services/types';
-  import { fetchWeatherData } from '$lib/api/api';
-  import type { Location, WeatherDataType } from '$lib/api/types';
+  import { fetchWeatherData, fetchSkewTData } from '$lib/api/api';
+  import type { Location, WeatherDataType, SkewTWeatherData } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
 
   let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
   let showChart = $state(false);
   let weatherData = $state.raw<WeatherDataType | null>(null);
+  let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
   let isWeatherLoading = $state(false);
+  let isSkewTLoading = $state(false);
   let error: string | null = $state(null);
 
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -24,7 +26,8 @@
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
 
   const urlSearch = $derived.by(() => {
-    const { location, selectedDay, selectedModel, maxAltitude, cellSelection } = parameters;
+    const { location, selectedDay, selectedModel, maxAltitude, cellSelection, chartView, selectedTraceIndex } =
+      parameters;
     const params = new URLSearchParams({
       lat: location.latitude.toString(),
       lon: location.longitude.toString(),
@@ -32,6 +35,8 @@
       model: selectedModel,
       maxAlt: (maxAltitude ?? 4000).toString(),
       cellSelection,
+      chartView,
+      traceIndex: selectedTraceIndex.toString(),
     });
     return `?${params.toString()}`;
   });
@@ -77,6 +82,7 @@
 
     clearTimeout(updateTimer ?? undefined);
     updateTimer = setTimeout(updateWeather, 5);
+    updateSkewTData();
   });
 
   async function updateWeather() {
@@ -98,6 +104,26 @@
       error = 'Failed to fetch weather data. Please try again.';
     } finally {
       isWeatherLoading = false;
+    }
+  }
+
+  async function updateSkewTData() {
+    if (!showChart) return;
+
+    isSkewTLoading = true;
+
+    try {
+      skewTWeatherData = await fetchSkewTData(
+        parameters.location,
+        parameters.selectedModel,
+        startDate,
+        parameters.maxAltitude ?? 4000,
+        parameters.cellSelection
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      isSkewTLoading = false;
     }
   }
 </script>
@@ -142,14 +168,18 @@
           {/if}
           <ChartContainer
             {weatherData}
+            {skewTWeatherData}
             {startDate}
             {isWeatherLoading}
+            {isSkewTLoading}
             bind:selectedDay={parameters.selectedDay}
             bind:maxAltitude={parameters.maxAltitude}
             bind:model={parameters.selectedModel}
             bind:cellSelection={parameters.cellSelection}
             bind:latitude={parameters.location.latitude}
             bind:longitude={parameters.location.longitude}
+            bind:chartView={parameters.chartView}
+            bind:selectedTraceIndex={parameters.selectedTraceIndex}
             on:close={() => (showChart = false)}
           />
         </div>

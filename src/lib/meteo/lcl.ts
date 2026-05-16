@@ -6,7 +6,7 @@ import type { WeatherDataType } from '$lib/api/types';
  * @param dewpoint Dewpoint temperature in degrees Celsius
  * @returns Height of LCL in meters
  */
-function calculateLcl(temperature: number, dewpoint: number): number {
+export function calculateLcl(temperature: number, dewpoint: number): number {
   // Input validation
   if (isNaN(temperature) || isNaN(dewpoint)) {
     throw new Error('Temperature and dewpoint must be valid numbers');

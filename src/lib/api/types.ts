@@ -57,6 +57,22 @@ export interface HourlyData {
   // windDirection180m: Float32Array;
 }
 
+export interface SkewTWeatherData {
+  hourly: {
+    time: Date[];
+    temperatureProfile: VerticalProfile;
+    dewpointProfile: VerticalProfile;
+    windSpeedProfile: VerticalProfile;
+    windDirectionProfile: VerticalProfile;
+    temperature_2m: Float32Array;
+    dewpoint_2m: Float32Array;
+  };
+  elevation: number;
+  timezoneAbbr: string;
+  sunrise: Date;
+  sunset: Date;
+}
+
 export type HourlyKeys = keyof HourlyData;
 
 export type ProfileVariables = { key: string; type: string; apiNames: string[] };
