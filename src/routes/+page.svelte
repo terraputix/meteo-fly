@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { saveLastVisitedURL } from '$lib/services/storage';
   import { page } from '$app/stores';
-  import { replaceState } from '$app/navigation';
+  import { afterNavigate, replaceState } from '$app/navigation';
   import { isMobile } from '$lib/stores/media';
   import LocationMap from '$lib/components/LocationMap.svelte';
   import ChartContainer from '$lib/components/ChartContainer.svelte';
@@ -47,7 +47,9 @@
     const pageState = untrack(() => $page.state);
     const newURL = `${pathname}${search}`;
     saveLastVisitedURL(newURL);
-    replaceState(newURL, pageState);
+    afterNavigate(() => {
+      replaceState(newURL, pageState);
+    });
   });
 
   function toggleChartPanel() {
