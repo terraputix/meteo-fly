@@ -1,5 +1,12 @@
 import { metersToHPa } from '$lib/meteo/pressureLevels';
-import { RD, CP, EPS, inverseSaturationVaporPressure, moistAdiabaticLapseRate, saturationVaporPressure } from '$lib/meteo/thermo';
+import {
+  RD,
+  CP,
+  EPS,
+  inverseSaturationVaporPressure,
+  moistAdiabaticLapseRate,
+  saturationVaporPressure,
+} from '$lib/meteo/thermo';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
 import { SKEWT_PRESSURE_LEVELS, type SkewTData, type SkewTLevelData, type SkewTTrace } from '$lib/meteo/types';
@@ -191,6 +198,20 @@ function drawLine(
   ctx.restore();
 }
 
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
 function drawText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -209,8 +230,6 @@ function drawText(
   ctx.fillText(text, x, y);
   ctx.restore();
 }
-
-// ─── Dry adiabats ──────────────────────────────────────────────────────────────
 
 function drawDryAdiabat(ctx: CanvasRenderingContext2D, layout: PlotLayout, thetaC: number) {
   const thetaK = thetaC + 273.15;
@@ -418,10 +437,10 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
   );
   drawText(ctx, 'LCL', plotLeft + plotWidth - 4, lclY - 4, CHART_COLORS.lcl, 'right', 'bottom');
 
-  const arrowX = plotLeft + plotWidth + 38;
+  const arrowX = plotLeft + plotWidth + 50;
   for (const level of trace.levels) {
     const y = pressureToCanvasY(layout, level.pressure);
-    const rotation = (((level.windDirection - 180) * Math.PI) / 180) * -1;
+    const rotation = ((level.windDirection - 180) * Math.PI) / 180;
     ctx.save();
     ctx.translate(arrowX, y);
     ctx.rotate(rotation);
@@ -473,21 +492,6 @@ function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout
   ctx.restore();
 }
 
-// ─── Height labels ─────────────────────────────────────────────────────────────
-
-function drawHeightLabels(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout) {
-  const { plotLeft, plotWidth } = layout;
-  const labelX = plotLeft + plotWidth + 4;
-
-  for (const p of layout.pressureLevels) {
-    const y = pressureToCanvasY(layout, p);
-    const level = trace.levels.find((l) => l.pressure === p);
-    if (level) {
-      drawText(ctx, `${level.heightMeters}`, labelX, y, '#888', 'left', 'middle', '10px sans-serif');
-    }
-  }
-}
-
 // ─── Hover overlay ─────────────────────────────────────────────────────────────
 
 function interpolateAtPressure(
@@ -513,43 +517,109 @@ export function renderHoverOverlay(
   ctx: CanvasRenderingContext2D,
   layout: PlotLayout,
   trace: SkewTTrace,
-  hitResult: HitTestResult
+  hitResult: HitTestResult,
+  canvasWidth: number
 ): void {
   const { plotLeft, plotTop, plotWidth, plotHeight } = layout;
   const mouseY = pressureToCanvasY(layout, hitResult.pressure);
 
   ctx.save();
 
-  // ── Left-side: pressure / altitude label ────────────────────────────────────
+  // ── Left-side: pressure / altitude box ─────────────────────────────────────
   {
-    const label = `${Math.round(hitResult.pressure)} hPa / ${Math.round(hitResult.heightMeters)} m`;
-    const tickX = plotLeft;
-    const labelX = tickX - 6;
+    ctx.save();
+    ctx.font = 'bold 11px sans-serif';
+    const line1 = `${Math.round(hitResult.pressure)} hPa`;
+    const line2 = `${Math.round(hitResult.heightMeters)} m`;
+    const w1 = ctx.measureText(line1).width;
+    const w2 = ctx.measureText(line2).width;
+    ctx.restore();
+
+    const lineHeight = 14;
+    const padX = 8;
+    const padY = 4;
+    const boxW = Math.max(w1, w2) + padX * 2;
+    const boxH = lineHeight * 2 + padY * 2;
+    const boxX = 4;
+    const boxY = mouseY - boxH / 2;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeStyle = '#bbb';
+    ctx.lineWidth = 1;
+    roundRect(ctx, boxX, boxY, boxW, boxH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Tick from plot edge to box
     ctx.save();
     ctx.strokeStyle = '#999';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(tickX - 4, mouseY);
-    ctx.lineTo(tickX, mouseY);
+    ctx.moveTo(boxX + boxW + 2, mouseY);
+    ctx.lineTo(plotLeft, mouseY);
     ctx.stroke();
     ctx.restore();
-    drawText(ctx, label, labelX, mouseY, '#333', 'right', 'middle', 'bold 11px sans-serif');
+
+    drawText(
+      ctx,
+      line1,
+      boxX + boxW / 2,
+      boxY + padY + lineHeight * 0.5,
+      '#333',
+      'center',
+      'middle',
+      'bold 11px sans-serif'
+    );
+    drawText(
+      ctx,
+      line2,
+      boxX + boxW / 2,
+      boxY + padY + lineHeight * 1.5,
+      '#888',
+      'center',
+      'middle',
+      '11px sans-serif'
+    );
   }
 
-  // ── Right-side: wind label ──────────────────────────────────────────────────
+  // ── Right-side: wind box ─────────────────────────────────────────────────────
   {
+    ctx.save();
+    ctx.font = 'bold 11px sans-serif';
     const label = `${hitResult.windSpeed.toFixed(1)} km/h @ ${hitResult.windDirection}°`;
-    const tickX = plotLeft + plotWidth;
-    const labelX = tickX + 6;
+    const textW = ctx.measureText(label).width;
+    ctx.restore();
+
+    const lineHeight = 16;
+    const padX = 8;
+    const padY = 4;
+    const boxW = textW + padX * 2;
+    const boxH = lineHeight + padY * 2;
+    const boxX = canvasWidth - boxW - 4;
+    const boxY = mouseY - boxH / 2;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeStyle = '#bbb';
+    ctx.lineWidth = 1;
+    roundRect(ctx, boxX, boxY, boxW, boxH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Tick from plot edge to box
     ctx.save();
     ctx.strokeStyle = '#999';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(tickX, mouseY);
-    ctx.lineTo(tickX + 4, mouseY);
+    ctx.moveTo(plotLeft + plotWidth, mouseY);
+    ctx.lineTo(boxX - 2, mouseY);
     ctx.stroke();
     ctx.restore();
-    drawText(ctx, label, labelX, mouseY, '#333', 'left', 'middle', 'bold 11px sans-serif');
+
+    drawText(ctx, label, boxX + boxW / 2, boxY + boxH / 2, '#333', 'center', 'middle', 'bold 11px sans-serif');
   }
 
   // Collect x-axis labels to draw after clip restore
@@ -721,7 +791,7 @@ export function renderSkewT(
   width: number,
   height: number
 ): SkewTRenderResult | null {
-  const margin = { top: 30, right: 60, bottom: 50, left: 60 };
+  const margin = { top: 30, right: 70, bottom: 50, left: 60 };
   const plotLeft = margin.left;
   const plotTop = margin.top;
   const plotWidth = Math.max(width - margin.left - margin.right, 100);
@@ -736,7 +806,6 @@ export function renderSkewT(
   drawGrid(ctx, layout);
   drawCloudCover(ctx, trace, layout);
   drawAxis(ctx, layout);
-  drawHeightLabels(ctx, trace, layout);
   drawTraces(ctx, trace, layout);
   drawAnnotations(ctx, trace, layout);
 

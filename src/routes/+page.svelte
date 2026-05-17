@@ -14,7 +14,7 @@
 
   let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
   let showChart = $state(false);
-  let chartView: 'wind' | 'skewt' = $state('wind');
+  let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
   let selectedTraceIndex = $state(0);
   let weatherData = $state.raw<WeatherDataType | null>(null);
   let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
@@ -35,6 +35,7 @@
       model: selectedModel,
       maxAlt: (maxAltitude ?? 4000).toString(),
       cellSelection,
+      view: chartView,
     });
     return `?${params.toString()}`;
   });

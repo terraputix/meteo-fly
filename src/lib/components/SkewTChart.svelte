@@ -2,7 +2,6 @@
   import { onMount, onDestroy } from 'svelte';
   import { renderSkewT, renderHoverOverlay, type HitTestResult, type PlotLayout } from '$lib/charts/skewTRenderer';
   import { CHART_COLORS } from '$lib/charts/chartColors';
-  import { windColorScale } from '$lib/charts/scales';
   import type { SkewTData } from '$lib/meteo/types';
 
   export let skewTData: SkewTData | null = null;
@@ -28,11 +27,8 @@
   const legendItems = [
     { label: 'Temperature', color: CHART_COLORS.temperature, dash: false },
     { label: 'Dewpoint', color: CHART_COLORS.dewpoint, dash: false },
-    { label: 'LCL', color: CHART_COLORS.lcl, dash: true },
-    { label: 'Dry adiabat', color: '#e55', dash: false },
-    { label: 'Moist adiabat', color: '#55e', dash: true },
-    { label: 'Wind (native)', color: windColorScale(20), dash: false, opacity: 1 },
-    { label: 'Wind (interp.)', color: windColorScale(20), dash: false, opacity: 0.4 },
+    { label: 'Dry adiabat', color: '#e4a017', dash: true },
+    { label: 'Moist adiabat', color: '#2e7d32', dash: true, opacity: 0.55 },
   ];
 
   function render() {
@@ -91,7 +87,7 @@
     overlayCtx.save();
     overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     overlayCtx.clearRect(0, 0, width, totalHeight);
-    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result);
+    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width);
     overlayCtx.restore();
   }
 

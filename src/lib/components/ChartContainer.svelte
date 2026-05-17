@@ -74,6 +74,23 @@
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   }
 
+  function formatDayHour(date: Date): string {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
+
+  function prevTrace() {
+    if (selectedTraceIndex > 0) selectedTraceIndex--;
+  }
+
+  function nextTrace() {
+    if (selectedTraceIndex < traceHours.length - 1) selectedTraceIndex++;
+  }
+
   function getDayLabel(day: number) {
     if (day === 1) return 'Today';
     if (day === 2) return 'Tomorrow';
@@ -257,8 +274,24 @@
       <WindChart {weatherData} {maxAltitude} {model} isLoading={isWeatherLoading} />
     {:else if skewTData && traceHours.length > 0}
       <div class="mb-3">
-        <div class="flex items-center gap-3">
-          <span class="text-xs text-slate-500">Time:</span>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-medium text-slate-500">Time</span>
+          <button
+            on:click={prevTrace}
+            disabled={selectedTraceIndex <= 0}
+            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Previous hour"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
           <input
             type="range"
             min="0"
@@ -266,8 +299,25 @@
             bind:value={selectedTraceIndex}
             class="h-2 flex-1 cursor-pointer rounded-lg bg-slate-200 accent-indigo-600"
           />
-          <span class="min-w-[50px] text-right text-xs font-medium text-slate-700">
-            {formatHour(traceHours[selectedTraceIndex] ?? new Date())}
+          <button
+            on:click={nextTrace}
+            disabled={selectedTraceIndex >= traceHours.length - 1}
+            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Next hour"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          <span class="min-w-[120px] text-right text-xs font-medium text-slate-700">
+            {formatDayHour(traceHours[selectedTraceIndex] ?? new Date())}
+            <span class="text-slate-400"> {skewTData?.timezoneAbbr ?? ''}</span>
           </span>
         </div>
       </div>
