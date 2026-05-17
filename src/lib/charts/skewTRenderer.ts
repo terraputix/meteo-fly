@@ -2,7 +2,7 @@ import { metersToHPa } from '$lib/meteo/pressureLevels';
 import { RD, CP, moistAdiabaticLapseRate } from '$lib/meteo/thermo';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
-import { SKEWT_PRESSURE_LEVELS, type SkewTData, type SkewTLevelData } from '$lib/meteo/types';
+import { SKEWT_PRESSURE_LEVELS, type SkewTData, type SkewTLevelData, type SkewTTrace } from '$lib/meteo/types';
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
 
@@ -20,11 +20,11 @@ const DRY_ADIABAT_COLOR = '#e4a017';
 const MOIST_ADIABAT_COLOR = '#2e7d32';
 
 const DRY_THETAS = [-20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80];
-const MOIST_STARTS = [0, 5, 10, 15, 20, 25, 30, 35, 40];
+const MOIST_STARTS = [-30, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40];
 
 // ─── Coordinate helpers ────────────────────────────────────────────────────────
 
-interface PlotLayout {
+export interface PlotLayout {
   plotLeft: number;
   plotTop: number;
   plotWidth: number;
@@ -109,15 +109,6 @@ function computeTempRange(trace: SkewTData['traces'][number], padding: number): 
     }
     if (isFinite(level.dewpoint)) {
       const skewed = level.dewpoint + SKEW_OFFSET * (1 - yn);
-      lo = Math.min(lo, skewed);
-      hi = Math.max(hi, skewed);
-    }
-  }
-  for (let i = 0; i < trace.parcelTrace.length; i++) {
-    const pt = trace.parcelTrace[i];
-    if (isFinite(pt)) {
-      const yn = yNorm(trace.levels[i].pressure, minP, maxP);
-      const skewed = pt + SKEW_OFFSET * (1 - yn);
       lo = Math.min(lo, skewed);
       hi = Math.max(hi, skewed);
     }
@@ -387,11 +378,6 @@ function drawTraces(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'][nu
     }
   }
   ctx.restore();
-
-  const parcelPts: [number, number][] = trace.levels.map((l, i) =>
-    tempPressureToCanvas(layout, trace.parcelTrace[i], l.pressure)
-  );
-  drawLine(ctx, parcelPts, '#f80', 1.5, [6, 4]);
 }
 
 // ─── Annotations ───────────────────────────────────────────────────────────────
@@ -483,6 +469,172 @@ function drawHeightLabels(ctx: CanvasRenderingContext2D, trace: SkewTData['trace
   }
 }
 
+// ─── Hover overlay ─────────────────────────────────────────────────────────────
+
+function interpolateAtPressure(
+  levels: SkewTLevelData[],
+  targetPressure: number,
+  field: 'temperature' | 'dewpoint'
+): number | null {
+  for (let i = 0; i < levels.length - 1; i++) {
+    const a = levels[i];
+    const b = levels[i + 1];
+    if (a.pressure >= targetPressure && b.pressure <= targetPressure) {
+      const t = (targetPressure - a.pressure) / (b.pressure - a.pressure);
+      return a[field] + (b[field] - a[field]) * t;
+    }
+  }
+  const nearest = levels.reduce((best, l) =>
+    Math.abs(l.pressure - targetPressure) < Math.abs(best.pressure - targetPressure) ? l : best
+  );
+  return nearest[field];
+}
+
+export function renderHoverOverlay(
+  ctx: CanvasRenderingContext2D,
+  layout: PlotLayout,
+  trace: SkewTTrace,
+  hitResult: HitTestResult
+): void {
+  const { plotLeft, plotTop, plotWidth, plotHeight } = layout;
+  const mouseY = pressureToCanvasY(layout, hitResult.pressure);
+
+  ctx.save();
+
+  // ── Left-side: pressure / altitude label ────────────────────────────────────
+  {
+    const label = `${Math.round(hitResult.pressure)} hPa / ${Math.round(hitResult.heightMeters)} m`;
+    const tickX = plotLeft;
+    const labelX = tickX - 6;
+    ctx.save();
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(tickX - 4, mouseY);
+    ctx.lineTo(tickX, mouseY);
+    ctx.stroke();
+    ctx.restore();
+    drawText(ctx, label, labelX, mouseY, '#333', 'right', 'middle', 'bold 11px sans-serif');
+  }
+
+  // ── Right-side: wind label ──────────────────────────────────────────────────
+  {
+    const label = `${hitResult.windSpeed.toFixed(1)} km/h @ ${hitResult.windDirection}°`;
+    const tickX = plotLeft + plotWidth;
+    const labelX = tickX + 6;
+    ctx.save();
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(tickX, mouseY);
+    ctx.lineTo(tickX + 4, mouseY);
+    ctx.stroke();
+    ctx.restore();
+    drawText(ctx, label, labelX, mouseY, '#333', 'left', 'middle', 'bold 11px sans-serif');
+  }
+
+  // Clip to plot area for all internal elements
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(plotLeft, plotTop, plotWidth, plotHeight);
+  ctx.clip();
+
+  // ── Horizontal crosshair ────────────────────────────────────────────────────
+  drawLine(
+    ctx,
+    [
+      [plotLeft, mouseY],
+      [plotLeft + plotWidth, mouseY],
+    ],
+    '#999',
+    0.5,
+    [3, 3]
+  );
+
+  // ── Temperature/dewpoint trace labels ─────────────────────────────────────────────────────────
+  {
+    const interpTemp = interpolateAtPressure(trace.levels, hitResult.pressure, 'temperature');
+    const interpDew = interpolateAtPressure(trace.levels, hitResult.pressure, 'dewpoint');
+    if (interpTemp != null) {
+      const [tx] = tempPressureToCanvas(layout, interpTemp, hitResult.pressure);
+      ctx.save();
+      ctx.fillStyle = CHART_COLORS.temperature;
+      ctx.beginPath();
+      ctx.arc(tx, mouseY, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      drawText(
+        ctx,
+        `${interpTemp.toFixed(1)}°C`,
+        tx - 8,
+        mouseY - 10,
+        CHART_COLORS.temperature,
+        'right',
+        'bottom',
+        '12px sans-serif'
+      );
+    }
+    if (interpDew != null) {
+      const [dx] = tempPressureToCanvas(layout, interpDew, hitResult.pressure);
+      ctx.save();
+      ctx.fillStyle = CHART_COLORS.dewpoint;
+      ctx.beginPath();
+      ctx.arc(dx, mouseY, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      drawText(
+        ctx,
+        `${interpDew.toFixed(1)}°C`,
+        dx - 8,
+        mouseY + 10,
+        CHART_COLORS.dewpoint,
+        'right',
+        'top',
+        '12px sans-serif'
+      );
+    }
+  }
+
+  // ── Dynamic parcel trace ─────────────────────────────────────────────────────
+  {
+    const { minP, maxP, pressureSamples } = layout;
+    const hoverP = hitResult.pressure;
+    const hoverT = hitResult.temperature;
+
+    // Dry adiabat: from hover level downward to x-axis (maxP)
+    const thetaK = (hoverT + 273.15) * Math.pow(1000 / hoverP, RD / CP);
+    const dryPts: [number, number][] = [];
+    for (const p of pressureSamples) {
+      if (p >= hoverP && p <= maxP) {
+        const tC = thetaK * Math.pow(p / 1000, RD / CP) - 273.15;
+        dryPts.push(tempPressureToCanvas(layout, tC, p));
+      }
+    }
+    if (dryPts.length >= 2) {
+      drawLine(ctx, dryPts, '#f80', 1.5, [6, 4]);
+    }
+
+    // Moist adiabat: from hover level upward to top (minP)
+    const moistPts: [number, number][] = [];
+    let moistTemp = hoverT;
+    let prevP = hoverP;
+    for (const p of [...pressureSamples].reverse()) {
+      if (p >= hoverP) continue;
+      const dp = p - prevP;
+      moistTemp += moistAdiabaticLapseRate(moistTemp, (p + prevP) / 2) * dp;
+      moistPts.push(tempPressureToCanvas(layout, moistTemp, p));
+      prevP = p;
+      if (p <= minP) break;
+    }
+    if (moistPts.length >= 2) {
+      drawLine(ctx, moistPts, '#f80', 1.5, [6, 4]);
+    }
+  }
+
+  ctx.restore(); // plot clip
+  ctx.restore(); // initial save
+}
+
 export interface HitTestResult {
   pressure: number;
   heightMeters: number;
@@ -529,16 +681,25 @@ export function renderSkewT(
   const hitTest: HitTestFn = (cx, cy) => {
     const yn = canvasToYNorm(cy, plotTop, plotHeight);
     const pressure = yNormToPressure(yn, layout.minP, layout.maxP);
-    const nearestP = Math.round(pressure);
-    const levelData =
-      layout.levelByPressure.get(nearestP) ?? layout.levelByPressure.get(Math.round(pressure / 10) * 10);
+
+    let nearestP = -1;
+    let minDist = Infinity;
+    for (const key of layout.levelByPressure.keys()) {
+      const dist = Math.abs(key - pressure);
+      if (dist < minDist) {
+        minDist = dist;
+        nearestP = key;
+      }
+    }
+    if (nearestP === -1) return null;
+    const levelData = layout.levelByPressure.get(nearestP);
     if (!levelData) return null;
 
     const sx = canvasToSkewX(layout, cx);
     const temp = sx - SKEW_OFFSET * (1 - yn);
 
     return {
-      pressure: nearestP,
+      pressure: Math.round(pressure),
       heightMeters: levelData.heightMeters,
       temperature: temp,
       dewpoint: levelData.dewpoint,

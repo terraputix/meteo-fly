@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { renderSkewT, type HitTestResult } from '$lib/charts/skewTRenderer';
+  import { renderSkewT, renderHoverOverlay, type HitTestResult, type PlotLayout } from '$lib/charts/skewTRenderer';
   import { CHART_COLORS } from '$lib/charts/chartColors';
   import { windColorScale } from '$lib/charts/scales';
   import type { SkewTData } from '$lib/meteo/types';
@@ -12,17 +12,15 @@
   const totalHeight = 520;
 
   let canvas: HTMLCanvasElement | undefined;
+  let overlayCanvas: HTMLCanvasElement | undefined;
   let container: HTMLDivElement | undefined;
-  let tooltipData: HitTestResult | null = null;
-  let tooltipPos = { x: 0, y: 0 };
-  let showTooltip = false;
   let hitTest: ((cx: number, cy: number) => HitTestResult | null) | null = null;
+  let lastLayout: PlotLayout | null = null;
   let resizeObserver: ResizeObserver | null = null;
 
   const legendItems = [
     { label: 'Temperature', color: CHART_COLORS.temperature, dash: false },
     { label: 'Dewpoint', color: CHART_COLORS.dewpoint, dash: false },
-    { label: 'Parcel', color: '#f80', dash: true },
     { label: 'LCL', color: CHART_COLORS.lcl, dash: true },
     { label: 'Dry adiabat', color: '#e55', dash: false },
     { label: 'Moist adiabat', color: '#55e', dash: true },
@@ -31,7 +29,7 @@
   ];
 
   function render() {
-    if (!canvas || !skewTData) return;
+    if (!canvas || !overlayCanvas || !skewTData) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
@@ -45,6 +43,17 @@
 
     const result = renderSkewT(ctx, skewTData, selectedTraceIndex, width, totalHeight);
     hitTest = result?.hitTest ?? null;
+    lastLayout = result?.layout ?? null;
+
+    const overlayCtx = overlayCanvas.getContext('2d');
+    if (overlayCtx) {
+      overlayCanvas.width = width * dpr;
+      overlayCanvas.height = totalHeight * dpr;
+      overlayCanvas.style.width = `${width}px`;
+      overlayCanvas.style.height = `${totalHeight}px`;
+      overlayCtx.scale(dpr, dpr);
+      overlayCtx.clearRect(0, 0, width, totalHeight);
+    }
   }
 
   $: if (canvas && skewTData) render();
@@ -60,23 +69,45 @@
   });
 
   function handleMouseMove(e: MouseEvent) {
-    if (!hitTest || !canvas) return;
+    if (!hitTest || !canvas || !overlayCanvas || !skewTData || !lastLayout) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const result = hitTest(x, y);
-    if (result) {
-      tooltipData = result;
-      tooltipPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-      showTooltip = true;
-    } else {
-      showTooltip = false;
+    if (!result) {
+      clearOverlay();
+      return;
     }
+    const trace = skewTData.traces[selectedTraceIndex] ?? skewTData.traces[0];
+    if (!trace) {
+      clearOverlay();
+      return;
+    }
+    const overlayCtx = overlayCanvas.getContext('2d');
+    if (!overlayCtx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const width = container?.clientWidth || 600;
+    overlayCtx.save();
+    overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    overlayCtx.clearRect(0, 0, width, totalHeight);
+    renderHoverOverlay(overlayCtx, lastLayout, trace, result);
+    overlayCtx.restore();
   }
 
   function handleMouseLeave() {
-    showTooltip = false;
-    tooltipData = null;
+    clearOverlay();
+  }
+
+  function clearOverlay() {
+    if (!overlayCanvas) return;
+    const overlayCtx = overlayCanvas.getContext('2d');
+    if (!overlayCtx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const width = container?.clientWidth || 600;
+    overlayCtx.save();
+    overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    overlayCtx.clearRect(0, 0, width, totalHeight);
+    overlayCtx.restore();
   }
 </script>
 
@@ -89,22 +120,7 @@
   <div class="chart-wrapper" style="position: relative;">
     <canvas bind:this={canvas} on:mousemove={handleMouseMove} on:mouseleave={handleMouseLeave} class="chart-canvas"
     ></canvas>
-
-    {#if showTooltip && tooltipData}
-      <div
-        class="tooltip"
-        style="left: {Math.min(tooltipPos.x + 12, (container?.clientWidth || 600) - 180)}px; top: {Math.max(
-          tooltipPos.y - 10,
-          0
-        )}px;"
-      >
-        <div class="tooltip-line">{tooltipData.temperature.toFixed(1)}°C / {tooltipData.dewpoint.toFixed(1)}°C</div>
-        <div class="tooltip-line">{tooltipData.windSpeed.toFixed(1)} km/h @ {tooltipData.windDirection}°</div>
-        <div class="tooltip-line">
-          {tooltipData.pressure} hPa &middot; {tooltipData.heightMeters} m{tooltipData.isNative ? '' : ' (interp.)'}
-        </div>
-      </div>
-    {/if}
+    <canvas bind:this={overlayCanvas} class="overlay-canvas"></canvas>
   </div>
 
   <div class="skewt-legend">
@@ -140,6 +156,13 @@
     display: block;
     width: 100%;
     cursor: crosshair;
+  }
+
+  .overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
   }
 
   .loading-state {
@@ -196,23 +219,5 @@
   .legend-label {
     font-size: 11px;
     color: #666;
-  }
-
-  .tooltip {
-    position: absolute;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 6px 10px;
-    font-size: 12px;
-    line-height: 1.5;
-    pointer-events: none;
-    white-space: nowrap;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-    z-index: 20;
-  }
-
-  .tooltip-line {
-    color: #333;
   }
 </style>
