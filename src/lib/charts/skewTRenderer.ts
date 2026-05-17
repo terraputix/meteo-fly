@@ -1,5 +1,5 @@
 import { metersToHPa } from '$lib/meteo/pressureLevels';
-import { RD, CP, moistAdiabaticLapseRate } from '$lib/meteo/thermo';
+import { RD, CP, EPS, inverseSaturationVaporPressure, moistAdiabaticLapseRate, saturationVaporPressure } from '$lib/meteo/thermo';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
 import { SKEWT_PRESSURE_LEVELS, type SkewTData, type SkewTLevelData, type SkewTTrace } from '$lib/meteo/types';
@@ -21,6 +21,8 @@ const MOIST_ADIABAT_COLOR = '#2e7d32';
 
 const DRY_THETAS = [-20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80];
 const MOIST_STARTS = [-30, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40];
+const MIXING_RATIOS = [0.32, 0.8, 1.8, 2.6, 3.8, 5.8, 7.8, 11, 15, 20, 28, 49, 88];
+const MIXING_LINE_COLOR = '#8fbc8f';
 
 // ─── Coordinate helpers ────────────────────────────────────────────────────────
 
@@ -245,6 +247,22 @@ function drawMoistAdiabats(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
   }
 }
 
+// ─── Mixing ratio lines ─────────────────────────────────────────────────────────
+
+function drawMixingLines(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
+  for (const w of MIXING_RATIOS) {
+    const w_kg = w / 1000;
+    const pts: [number, number][] = [];
+    for (const p of layout.pressureSamples) {
+      const e = (w_kg * p) / (EPS + w_kg);
+      if (e <= 0) continue;
+      const tC = inverseSaturationVaporPressure(e);
+      pts.push(tempPressureToCanvas(layout, tC, p));
+    }
+    drawLine(ctx, pts, MIXING_LINE_COLOR, 0.7, [3, 4], 0.7);
+  }
+}
+
 // ─── Background grid ───────────────────────────────────────────────────────────
 
 function drawGrid(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
@@ -287,6 +305,9 @@ function drawGrid(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
       drawLine(ctx, pts, ISO_COLOR, ADIABAT_WIDTH, undefined, ADIABAT_OPACITY);
     }
   }
+
+  // Mixing ratio lines
+  drawMixingLines(ctx, layout);
 
   // Dry adiabats
   drawDryAdiabats(ctx, layout);
@@ -531,6 +552,9 @@ export function renderHoverOverlay(
     drawText(ctx, label, labelX, mouseY, '#333', 'left', 'middle', 'bold 11px sans-serif');
   }
 
+  // Collect x-axis labels to draw after clip restore
+  const axisLabels: { x: number; text: string }[] = [];
+
   // Clip to plot area for all internal elements
   ctx.save();
   ctx.beginPath();
@@ -593,6 +617,36 @@ export function renderHoverOverlay(
     }
   }
 
+  // ── Specific humidity isohume ────────────────────────────────────────────────
+  {
+    const p0 = hitResult.pressure;
+    const cursorT = hitResult.temperature;
+
+    // Compute mixing ratio from the cursor's temperature
+    const e = saturationVaporPressure(cursorT);
+    const w = (EPS * e) / Math.max(p0 - e, 0.1);
+    const q = w / (1 + w);
+
+    if (isFinite(w) && w > 0) {
+      const { pressureSamples, maxP } = layout;
+      const pts: [number, number][] = [];
+      const w_kg = w;
+      for (const p of pressureSamples) {
+        if (p >= p0 && p <= maxP) {
+          const es = (w_kg * p) / (EPS + w_kg);
+          if (es <= 0) continue;
+          const tC = inverseSaturationVaporPressure(es);
+          pts.push(tempPressureToCanvas(layout, tC, p));
+        }
+      }
+      if (pts.length >= 2) {
+        drawLine(ctx, pts, MIXING_LINE_COLOR, 1.2, [2, 4], 0.85);
+        const [labelX] = pts[pts.length - 1];
+        axisLabels.push({ x: labelX, text: `q = ${(q * 1000).toFixed(1)} g/kg` });
+      }
+    }
+  }
+
   // ── Dynamic parcel trace ─────────────────────────────────────────────────────
   {
     const { minP, maxP, pressureSamples } = layout;
@@ -610,6 +664,9 @@ export function renderHoverOverlay(
     }
     if (dryPts.length >= 2) {
       drawLine(ctx, dryPts, '#f80', 1.5, [6, 4]);
+      const thetaC = thetaK - 273.15;
+      const [dryX] = dryPts[dryPts.length - 1];
+      axisLabels.push({ x: dryX, text: `θ = ${thetaC.toFixed(1)}°C` });
     }
 
     // Moist adiabat: from hover level upward to top (minP)
@@ -630,6 +687,13 @@ export function renderHoverOverlay(
   }
 
   ctx.restore(); // plot clip
+
+  // Draw x-axis labels (outside clip area)
+  const axisY = layout.plotTop + layout.plotHeight + 2;
+  for (const lbl of axisLabels) {
+    drawText(ctx, lbl.text, lbl.x, axisY, '#666', 'center', 'top', '9px sans-serif');
+  }
+
   ctx.restore(); // initial save
 }
 
