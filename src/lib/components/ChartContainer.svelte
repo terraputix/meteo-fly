@@ -70,10 +70,6 @@
     chartView = view;
   }
 
-  function formatHour(date: Date): string {
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-  }
-
   function formatDayHour(date: Date): string {
     return date.toLocaleDateString('en-US', {
       weekday: 'short',

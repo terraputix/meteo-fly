@@ -19,17 +19,14 @@ const TEMP_PADDING = 12;
 
 const ADIABAT_OPACITY = 0.7;
 const ADIABAT_WIDTH = 0.85;
-const MIXING_LINE_OPACITY = 0.7;
-const MIXING_LINE_WIDTH = 0.7;
+const MOIST_ADIABAT_OPACITY = 0.7;
+const MOIST_ADIABAT_WIDTH = 0.7;
 const ISO_COLOR = '#eee';
 const AXIS_COLOR = '#ccc';
-const DRY_ADIABAT_COLOR = '#9f6628';
-const MOIST_ADIABAT_COLOR = '#2c9dfa';
 
 const DRY_THETAS = [-20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80];
 const MOIST_STARTS = [-30, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40];
 const MIXING_RATIOS = [0.32, 0.8, 1.8, 2.6, 3.8, 5.8, 7.8, 11, 15, 20, 28, 49, 88];
-const MIXING_LINE_COLOR = '#569f28';
 
 // ─── Coordinate helpers ────────────────────────────────────────────────────────
 
@@ -238,7 +235,7 @@ function drawDryAdiabat(ctx: CanvasRenderingContext2D, layout: PlotLayout, theta
     const tC = thetaK * Math.pow(p / 1000, RD / CP) - 273.15;
     pts.push(tempPressureToCanvas(layout, tC, p));
   }
-  drawLine(ctx, pts, DRY_ADIABAT_COLOR, ADIABAT_WIDTH, [4, 4], ADIABAT_OPACITY);
+  drawLine(ctx, pts, CHART_COLORS.dryAdiabat, ADIABAT_WIDTH, [4, 4], ADIABAT_OPACITY);
 }
 
 function drawDryAdiabats(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
@@ -262,7 +259,7 @@ function drawMoistAdiabats(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
         t += moistAdiabaticLapseRate(t, p) * dp;
       }
     }
-    drawLine(ctx, pts, MOIST_ADIABAT_COLOR, MIXING_LINE_WIDTH, [2, 4], MIXING_LINE_OPACITY);
+    drawLine(ctx, pts, CHART_COLORS.moistAdiabat, MOIST_ADIABAT_WIDTH, [2, 4], MOIST_ADIABAT_OPACITY);
   }
 }
 
@@ -278,7 +275,7 @@ function drawMixingLines(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
       const tC = inverseSaturationVaporPressure(e);
       pts.push(tempPressureToCanvas(layout, tC, p));
     }
-    drawLine(ctx, pts, MIXING_LINE_COLOR, 0.7, [3, 4], 0.7);
+    drawLine(ctx, pts, CHART_COLORS.isohume, 0.7, [3, 4], 0.7);
   }
 }
 
@@ -506,11 +503,11 @@ function drawElevationLine(ctx: CanvasRenderingContext2D, elevation: number, lay
       [plotLeft, y],
       [plotLeft + plotWidth, y],
     ],
-    '#A0785C',
+    CHART_COLORS.skewtElevation,
     1,
     [3, 3]
   );
-  drawText(ctx, `Elev. ${elevation}m`, plotLeft + plotWidth - 4, y - 4, '#A0785C', 'right', 'bottom');
+  drawText(ctx, `Elev. ${elevation}m`, plotLeft + plotWidth - 4, y - 4, CHART_COLORS.skewtElevation, 'right', 'bottom');
 }
 
 // ─── Hover overlay ─────────────────────────────────────────────────────────────
@@ -731,7 +728,7 @@ export function renderHoverOverlay(
         }
       }
       if (pts.length >= 2) {
-        drawLine(ctx, pts, MIXING_LINE_COLOR, 1.2, [2, 4], 0.85);
+        drawLine(ctx, pts, CHART_COLORS.isohume, 1.2, [2, 4], 0.85);
         const [labelX] = pts[pts.length - 1];
         axisLabels.push({ x: labelX, text: `q = ${(q * 1000).toFixed(1)} g/kg` });
       }
