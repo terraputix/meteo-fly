@@ -21,6 +21,7 @@ export interface SkewTLevelData {
   dewpoint: number;
   windSpeed: number;
   windDirection: number;
+  cloudCover: number;
   isNative: boolean;
   source: 'model' | 'interpolated';
 }

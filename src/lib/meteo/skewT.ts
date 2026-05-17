@@ -59,6 +59,7 @@ function buildLevelDataAtHour({
   const dewProfile = weatherData.hourly.dewpointProfile as VerticalProfile;
   const windSpeedProfile = weatherData.hourly.windSpeedProfile as VerticalProfile;
   const windDirProfile = weatherData.hourly.windDirectionProfile as VerticalProfile;
+  const cloudProfile = weatherData.hourly.cloudCoverProfile as VerticalProfile;
 
   const surfaceTemp = weatherData.hourly.temperature_2m?.[hourIndex] ?? 20;
   const surfaceDewpoint = weatherData.hourly.dewpoint_2m?.[hourIndex] ?? 15;
@@ -73,6 +74,7 @@ function buildLevelDataAtHour({
     const dewAtLevel = getProfileValue(dewProfile, level.hPa, hourIndex);
     const windSpeedAtLevel = getProfileValue(windSpeedProfile, level.hPa, hourIndex);
     const windDirAtLevel = getProfileValue(windDirProfile, level.hPa, hourIndex);
+    const cloudAtLevel = getProfileValue(cloudProfile, level.hPa, hourIndex);
 
     const lowerTemp = lowerNative ? getProfileValue(tempProfile, lowerNative.hPa, hourIndex) : null;
     const upperTemp = upperNative ? getProfileValue(tempProfile, upperNative.hPa, hourIndex) : null;
@@ -133,6 +135,7 @@ function buildLevelDataAtHour({
       dewpoint: Math.round(dewpoint * 10) / 10,
       windSpeed: Math.round(windSpeed * 10) / 10,
       windDirection: Math.round(windDirection),
+      cloudCover: cloudAtLevel != null ? Math.round(cloudAtLevel) : 0,
       isNative: level.source === 'model',
       source: level.source,
     } as SkewTLevelData;

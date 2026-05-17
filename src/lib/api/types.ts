@@ -64,6 +64,7 @@ export interface SkewTWeatherData {
     dewpointProfile: VerticalProfile;
     windSpeedProfile: VerticalProfile;
     windDirectionProfile: VerticalProfile;
+    cloudCoverProfile: VerticalProfile;
     temperature_2m: Float32Array;
     dewpoint_2m: Float32Array;
   };

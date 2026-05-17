@@ -292,7 +292,11 @@ function drawGrid(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
     for (const p of layout.pressureSamples) {
       pts.push(tempPressureToCanvas(layout, t, p));
     }
-    drawLine(ctx, pts, ISO_COLOR, ADIABAT_WIDTH, undefined, ADIABAT_OPACITY);
+    if (t === 0) {
+      drawLine(ctx, pts, '#bbb', 1.2);
+    } else {
+      drawLine(ctx, pts, ISO_COLOR, ADIABAT_WIDTH, undefined, ADIABAT_OPACITY);
+    }
   }
 
   // Dry adiabats
@@ -409,7 +413,7 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTData['traces
   );
   drawText(ctx, 'LCL', plotLeft + plotWidth - 4, lclY - 4, CHART_COLORS.lcl, 'right', 'bottom');
 
-  const arrowX = plotLeft + plotWidth + 24;
+  const arrowX = plotLeft + plotWidth + 38;
   for (const level of trace.levels) {
     const y = pressureToCanvasY(layout, level.pressure);
     const rotation = (((level.windDirection - 180) * Math.PI) / 180) * -1;
@@ -434,7 +438,50 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTData['traces
   drawText(ctx, 'Wind', arrowX, layout.plotTop - 8, '#666', 'center', 'bottom');
 }
 
-// ─── Public API ────────────────────────────────────────────────────────────────
+// ─── Cloud cover ───────────────────────────────────────────────────────────────
+
+function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'][number], layout: PlotLayout) {
+  const { plotLeft, plotTop, plotWidth, plotHeight } = layout;
+  const stripX = plotLeft + plotWidth - 18;
+  const stripWidth = 16;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(plotLeft, plotTop, plotWidth, plotHeight);
+  ctx.clip();
+
+  for (let i = 0; i < trace.levels.length - 1; i++) {
+    const level = trace.levels[i];
+    const nextLevel = trace.levels[i + 1];
+    const avgCloud = (level.cloudCover + nextLevel.cloudCover) / 2;
+    if (avgCloud <= 2) continue;
+
+    const y0 = pressureToCanvasY(layout, level.pressure);
+    const y1 = pressureToCanvasY(layout, nextLevel.pressure);
+    const y = Math.min(y0, y1);
+    const h = Math.abs(y1 - y0);
+
+    ctx.fillStyle = `${CHART_COLORS.cloudRect},${(avgCloud / 100).toFixed(3)})`;
+    ctx.fillRect(stripX, y, stripWidth, h);
+  }
+
+  ctx.restore();
+}
+
+// ─── Height labels ─────────────────────────────────────────────────────────────
+
+function drawHeightLabels(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'][number], layout: PlotLayout) {
+  const { plotLeft, plotWidth } = layout;
+  const labelX = plotLeft + plotWidth + 4;
+
+  for (const p of layout.pressureLevels) {
+    const y = pressureToCanvasY(layout, p);
+    const level = trace.levels.find((l) => l.pressure === p);
+    if (level) {
+      drawText(ctx, `${level.heightMeters}`, labelX, y, '#888', 'left', 'middle', '10px sans-serif');
+    }
+  }
+}
 
 export interface HitTestResult {
   pressure: number;
@@ -473,7 +520,9 @@ export function renderSkewT(
   if (!layout) return null;
 
   drawGrid(ctx, layout);
+  drawCloudCover(ctx, trace, layout);
   drawAxis(ctx, layout, width, height);
+  drawHeightLabels(ctx, trace, layout);
   drawTraces(ctx, trace, layout);
   drawAnnotations(ctx, trace, layout);
 
