@@ -10,4 +10,5 @@ export interface PageParameters {
   maxAltitude?: MaxAltitude;
   cellSelection: CellSelection;
   chartView?: ChartView;
+  hour?: number;
 }

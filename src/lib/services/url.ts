@@ -11,6 +11,7 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
   const maxAlt = params.get('maxAlt');
   const cellSelection = params.get('cellSelection');
   const view = params.get('view');
+  const hourStr = params.get('hour');
 
   if (!(lat && lon && day && model)) {
     return null;
@@ -29,6 +30,7 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
   const selectedCellSelection: CellSelection =
     cellSelection === 'nearest' || cellSelection === 'land' ? cellSelection : defaultCellSelection;
   const chartView: ChartView | undefined = view === 'wind' || view === 'skewt' ? view : undefined;
+  const hour = hourStr ? Number(hourStr) : undefined;
 
   return {
     location,
@@ -37,5 +39,6 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
     maxAltitude,
     cellSelection: selectedCellSelection,
     chartView,
+    hour,
   };
 }

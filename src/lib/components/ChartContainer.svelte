@@ -22,6 +22,7 @@
   export let longitude: number;
   export let chartView: ChartView = 'wind';
   export let selectedTraceIndex = 0;
+  export let hour: number | undefined = undefined;
 
   let skewTData: SkewTData | null = null;
   let traceHours: Date[] = [];
@@ -66,6 +67,37 @@
     }
   }
 
+let syncedHour: number | undefined = undefined;
+
+$: if (traceHours.length > 0 && hour != null && hour !== syncedHour) {
+    const idx = traceHours.findIndex((t) => t.getHours() === hour);
+    if (idx >= 0) selectedTraceIndex = idx;
+  }
+
+  function emitHour() {
+    const h = traceHours[selectedTraceIndex]?.getHours();
+    if (h != null) {
+      syncedHour = h;
+      dispatch('hourChange', h);
+    }
+  }
+
+  function prevTrace() {
+    if (selectedTraceIndex > 0) selectedTraceIndex--;
+    emitHour();
+  }
+
+  function nextTrace() {
+    if (selectedTraceIndex < traceHours.length - 1) selectedTraceIndex++;
+    emitHour();
+  }
+
+  function handleSliderInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    selectedTraceIndex = parseInt(target.value);
+    emitHour();
+  }
+
   function handleViewChange(view: ChartView) {
     chartView = view;
   }
@@ -77,14 +109,6 @@
       minute: '2-digit',
       hour12: false,
     });
-  }
-
-  function prevTrace() {
-    if (selectedTraceIndex > 0) selectedTraceIndex--;
-  }
-
-  function nextTrace() {
-    if (selectedTraceIndex < traceHours.length - 1) selectedTraceIndex++;
   }
 
   function getDayLabel(day: number) {
@@ -292,7 +316,8 @@
             type="range"
             min="0"
             max={traceHours.length - 1}
-            bind:value={selectedTraceIndex}
+            value={selectedTraceIndex}
+            on:input={handleSliderInput}
             class="h-2 flex-1 cursor-pointer rounded-lg bg-slate-200 accent-indigo-600"
           />
           <button

@@ -16,6 +16,7 @@
   let showChart = $state(false);
   let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
   let selectedTraceIndex = $state(0);
+  let selectedHour = $state(parameters.hour);
   let weatherData = $state.raw<WeatherDataType | null>(null);
   let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
   let isWeatherLoading = $state(false);
@@ -37,9 +38,11 @@
       cellSelection,
       view: chartView,
     });
+    if (selectedHour != null) {
+      params.set('hour', selectedHour.toString());
+    }
     return `?${params.toString()}`;
   });
-
   function syncURL() {
     const search = urlSearch;
     const currentSearch = window.location.search;
@@ -195,6 +198,8 @@
             bind:longitude={parameters.location.longitude}
             bind:chartView
             bind:selectedTraceIndex
+            hour={selectedHour}
+            on:hourChange={(e) => (selectedHour = e.detail)}
             on:close={() => (showChart = false)}
           />
         </div>
