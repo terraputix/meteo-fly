@@ -27,8 +27,9 @@
   const legendItems = [
     { label: 'Temperature', color: CHART_COLORS.temperature, dash: false },
     { label: 'Dewpoint', color: CHART_COLORS.dewpoint, dash: false },
-    { label: 'Dry adiabat', color: '#e4a017', dash: true },
-    { label: 'Moist adiabat', color: '#2e7d32', dash: true, opacity: 0.55 },
+    { label: 'Dry adiabat', color: '#9f6628', dash: true, opacity: 0.7 },
+    { label: 'Moist adiabat', color: '#2c9dfa', dash: true, opacity: 0.6 },
+    { label: 'Isohume', color: '#569f28', dash: true, opacity: 0.65 },
   ];
 
   function render() {

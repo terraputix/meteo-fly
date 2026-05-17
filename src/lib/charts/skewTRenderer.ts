@@ -17,19 +17,19 @@ const SKEW_OFFSET = 40;
 const PRESSURE_SAMPLE_COUNT = 84;
 const TEMP_PADDING = 12;
 
-const ADIABAT_OPACITY = 1.0;
-const ADIABAT_WIDTH = 0.7;
-const MIXING_LINE_OPACITY = 0.55;
-const MIXING_LINE_WIDTH = 0.5;
+const ADIABAT_OPACITY = 0.7;
+const ADIABAT_WIDTH = 0.85;
+const MIXING_LINE_OPACITY = 0.7;
+const MIXING_LINE_WIDTH = 0.7;
 const ISO_COLOR = '#eee';
 const AXIS_COLOR = '#ccc';
-const DRY_ADIABAT_COLOR = '#e4a017';
-const MOIST_ADIABAT_COLOR = '#2e7d32';
+const DRY_ADIABAT_COLOR = '#9f6628';
+const MOIST_ADIABAT_COLOR = '#2c9dfa';
 
 const DRY_THETAS = [-20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80];
 const MOIST_STARTS = [-30, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40];
 const MIXING_RATIOS = [0.32, 0.8, 1.8, 2.6, 3.8, 5.8, 7.8, 11, 15, 20, 28, 49, 88];
-const MIXING_LINE_COLOR = '#8fbc8f';
+const MIXING_LINE_COLOR = '#569f28';
 
 // ─── Coordinate helpers ────────────────────────────────────────────────────────
 
@@ -492,6 +492,27 @@ function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout
   ctx.restore();
 }
 
+// ─── Elevation line ────────────────────────────────────────────────────────────
+
+function drawElevationLine(ctx: CanvasRenderingContext2D, elevation: number, layout: PlotLayout) {
+  const { plotLeft, plotWidth, minP, maxP } = layout;
+  const p = metersToHPa(elevation);
+  if (p < minP || p > maxP) return;
+  const y = pressureToCanvasY(layout, p);
+
+  drawLine(
+    ctx,
+    [
+      [plotLeft, y],
+      [plotLeft + plotWidth, y],
+    ],
+    '#A0785C',
+    1,
+    [3, 3]
+  );
+  drawText(ctx, `Elev. ${elevation}m`, plotLeft + plotWidth - 4, y - 4, '#A0785C', 'right', 'bottom');
+}
+
 // ─── Hover overlay ─────────────────────────────────────────────────────────────
 
 function interpolateAtPressure(
@@ -805,6 +826,7 @@ export function renderSkewT(
 
   drawGrid(ctx, layout);
   drawCloudCover(ctx, trace, layout);
+  drawElevationLine(ctx, skewTData.elevation, layout);
   drawAxis(ctx, layout);
   drawTraces(ctx, trace, layout);
   drawAnnotations(ctx, trace, layout);
