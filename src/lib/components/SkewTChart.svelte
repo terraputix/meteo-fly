@@ -16,7 +16,14 @@
   let container: HTMLDivElement | undefined;
   let hitTest: ((cx: number, cy: number) => HitTestResult | null) | null = null;
   let lastLayout: PlotLayout | null = null;
+  let currentTrace: SkewTData['traces'][number] | null = null;
   let resizeObserver: ResizeObserver | null = null;
+
+  function canvasSize() {
+    const dpr = window.devicePixelRatio || 1;
+    const width = container?.clientWidth || 600;
+    return { dpr, width };
+  }
 
   const legendItems = [
     { label: 'Temperature', color: CHART_COLORS.temperature, dash: false },
@@ -32,8 +39,7 @@
     if (!canvas || !overlayCanvas || !skewTData) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const width = container?.clientWidth || 600;
+    const { dpr, width } = canvasSize();
     canvas.width = width * dpr;
     canvas.height = totalHeight * dpr;
     canvas.style.width = `${width}px`;
@@ -44,6 +50,7 @@
     const result = renderSkewT(ctx, skewTData, selectedTraceIndex, width, totalHeight);
     hitTest = result?.hitTest ?? null;
     lastLayout = result?.layout ?? null;
+    currentTrace = result?.layout ? (skewTData.traces[selectedTraceIndex] ?? skewTData.traces[0]) : null;
 
     const overlayCtx = overlayCanvas.getContext('2d');
     if (overlayCtx) {
@@ -69,7 +76,7 @@
   });
 
   function handleMouseMove(e: MouseEvent) {
-    if (!hitTest || !canvas || !overlayCanvas || !skewTData || !lastLayout) return;
+    if (!hitTest || !canvas || !overlayCanvas || !currentTrace || !lastLayout) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -78,19 +85,13 @@
       clearOverlay();
       return;
     }
-    const trace = skewTData.traces[selectedTraceIndex] ?? skewTData.traces[0];
-    if (!trace) {
-      clearOverlay();
-      return;
-    }
     const overlayCtx = overlayCanvas.getContext('2d');
     if (!overlayCtx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const width = container?.clientWidth || 600;
+    const { dpr, width } = canvasSize();
     overlayCtx.save();
     overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     overlayCtx.clearRect(0, 0, width, totalHeight);
-    renderHoverOverlay(overlayCtx, lastLayout, trace, result);
+    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result);
     overlayCtx.restore();
   }
 
@@ -102,8 +103,7 @@
     if (!overlayCanvas) return;
     const overlayCtx = overlayCanvas.getContext('2d');
     if (!overlayCtx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const width = container?.clientWidth || 600;
+    const { dpr, width } = canvasSize();
     overlayCtx.save();
     overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     overlayCtx.clearRect(0, 0, width, totalHeight);

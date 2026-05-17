@@ -1,13 +1,5 @@
 import type { PressureLevel, WindData } from './types';
 
-export function getUComponent(speed: number, direction: number): number {
-  return speed * Math.sin((direction * Math.PI) / 180);
-}
-
-export function getVComponent(speed: number, direction: number): number {
-  return speed * Math.cos((direction * Math.PI) / 180);
-}
-
 export function interpolateWind(
   height: number,
   lower: PressureLevel,

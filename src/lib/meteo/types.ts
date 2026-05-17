@@ -30,7 +30,6 @@ export interface SkewTTrace {
   time: Date;
   levels: SkewTLevelData[];
   lcl: number;
-  parcelTrace: number[];
 }
 
 export interface SkewTData {

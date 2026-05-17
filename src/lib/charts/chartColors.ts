@@ -9,7 +9,7 @@ export const CHART_COLORS = {
   lcl: '#805ad5',
   elevation: '#8B4513',
   rain: 'rgba(30,100,220,0.80)',
-  cloudRect: 'rgba(100,120,145',
+  cloudRect: 'rgba(100,120,145,',
   windCloud: 'rgba(90,110,140',
   axisLine: '#ccc',
   gridLine: '#eee',

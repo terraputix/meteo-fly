@@ -3,7 +3,6 @@ import { getAtLevel, type VerticalProfile } from '$lib/api/types';
 import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, type TaggedPressureLevel } from './pressureLevels';
 import { calculateLcl } from './lcl';
 import { interpolateWind } from './wind';
-import { RD, CP, moistAdiabaticLapseRate } from './thermo';
 import type { MaxAltitude, SkewTLevelData, SkewTTrace, SkewTData, PressureLevel } from './types';
 
 interface BuildSkewTLevelOptions {
@@ -64,10 +63,11 @@ function buildLevelDataAtHour({
   const surfaceTemp = weatherData.hourly.temperature_2m?.[hourIndex] ?? 20;
   const surfaceDewpoint = weatherData.hourly.dewpoint_2m?.[hourIndex] ?? 15;
   const lclHeight = calculateLcl(surfaceTemp, surfaceDewpoint);
+  const reversedNative = [...nativeLevels].reverse();
 
   return levels.map((level) => {
     const targetHeight = level.heightMeters;
-    const lowerNative = [...nativeLevels].reverse().find((l) => l.heightMeters <= targetHeight);
+    const lowerNative = reversedNative.find((l) => l.heightMeters <= targetHeight);
     const upperNative = nativeLevels.find((l) => l.heightMeters > targetHeight);
 
     const tempAtLevel = getProfileValue(tempProfile, level.hPa, hourIndex);
@@ -138,73 +138,8 @@ function buildLevelDataAtHour({
       cloudCover: cloudAtLevel != null ? Math.round(cloudAtLevel) : 0,
       isNative: level.source === 'model',
       source: level.source,
-    } as SkewTLevelData;
+    };
   });
-}
-
-function buildParcelTrace(levels: SkewTLevelData[], lclHeight: number): number[] {
-  const aboveLcl = levels.filter((l) => l.heightMeters > lclHeight);
-  const belowLcl = levels.filter((l) => l.heightMeters <= lclHeight);
-
-  const surfaceLevel = levels.reduce((lowest, l) => (l.pressure > (lowest?.pressure ?? 0) ? l : lowest));
-  const surfaceTemp = surfaceLevel?.temperature ?? 15;
-  const surfacePressure = surfaceLevel?.pressure ?? 1013;
-
-  // Surface potential temperature (K) — defines the dry adiabat below LCL
-  const thetaK = (surfaceTemp + 273.15) * Math.pow(1000 / surfacePressure, RD / CP);
-
-  // Interpolate LCL pressure between the levels bracketing the LCL height
-  let lclPressure: number;
-  if (aboveLcl.length === 0 || belowLcl.length === 0) {
-    lclPressure = surfacePressure;
-  } else {
-    const a = belowLcl[belowLcl.length - 1];
-    const b = aboveLcl[0];
-    const t = (lclHeight - a.heightMeters) / (b.heightMeters - a.heightMeters);
-    lclPressure = a.pressure + t * (b.pressure - a.pressure);
-  }
-
-  const lclTemp = thetaK * Math.pow(lclPressure / 1000, RD / CP) - 273.15;
-
-  const result: number[] = [];
-  let enteredMoist = false;
-  let moistTemp = lclTemp;
-  let moistPressure = lclPressure;
-
-  for (const level of levels) {
-    if (level.heightMeters <= lclHeight) {
-      result.push(thetaK * Math.pow(level.pressure / 1000, RD / CP) - 273.15);
-    } else if (!enteredMoist) {
-      enteredMoist = true;
-      const steps = Math.max(5, Math.round(Math.abs(level.pressure - lclPressure)));
-      const dp = (level.pressure - lclPressure) / steps;
-      let t = lclTemp;
-      let p = lclPressure;
-      for (let s = 0; s < steps; s++) {
-        const pMid = p + dp / 2;
-        t += moistAdiabaticLapseRate(t, pMid) * dp;
-        p += dp;
-      }
-      result.push(t);
-      moistTemp = t;
-      moistPressure = level.pressure;
-    } else {
-      const steps = Math.max(5, Math.round(Math.abs(level.pressure - moistPressure)));
-      const dp = (level.pressure - moistPressure) / steps;
-      let t = moistTemp;
-      let p = moistPressure;
-      for (let s = 0; s < steps; s++) {
-        const pMid = p + dp / 2;
-        t += moistAdiabaticLapseRate(t, pMid) * dp;
-        p += dp;
-      }
-      result.push(t);
-      moistTemp = t;
-      moistPressure = level.pressure;
-    }
-  }
-
-  return result;
 }
 
 export function buildSkewTData(
@@ -223,9 +158,7 @@ export function buildSkewTData(
     const lclHeight = lclValue + weatherData.elevation;
 
     const levels = buildLevelDataAtHour({ weatherData, hourIndex: i, levels: allLevels, nativeLevels });
-    const parcelTrace = buildParcelTrace(levels, lclHeight);
-
-    traces.push({ time, levels, lcl: lclHeight, parcelTrace });
+    traces.push({ time, levels, lcl: lclHeight });
   });
 
   return {

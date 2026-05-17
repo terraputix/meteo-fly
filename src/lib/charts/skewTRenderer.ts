@@ -93,11 +93,12 @@ function roundToNice(v: number, step: number): number {
   return Math.round(v / step) * step;
 }
 
-function computeTempRange(trace: SkewTData['traces'][number], padding: number): { tempMin: number; tempMax: number } {
-  const pressures = trace.levels.map((l) => l.pressure);
-  const minP = Math.min(...pressures);
-  const maxP = Math.max(...pressures);
-
+function computeTempRange(
+  trace: SkewTTrace,
+  minP: number,
+  maxP: number,
+  padding: number
+): { tempMin: number; tempMax: number } {
   let lo = Infinity;
   let hi = -Infinity;
   for (const level of trace.levels) {
@@ -126,17 +127,14 @@ function computeTempRange(trace: SkewTData['traces'][number], padding: number): 
 }
 
 function buildLayout(
-  skewTData: SkewTData,
-  traceIndex: number,
+  trace: SkewTTrace,
+  pressureLevelsInput: number[],
   plotLeft: number,
   plotTop: number,
   plotWidth: number,
   plotHeight: number
 ): PlotLayout | null {
-  const trace = skewTData.traces[traceIndex] ?? skewTData.traces[0];
-  if (!trace) return null;
-
-  const pressureLevels = (skewTData.pressureLevels?.length ? skewTData.pressureLevels : SKEWT_PRESSURE_LEVELS).slice();
+  const pressureLevels = (pressureLevelsInput.length ? pressureLevelsInput : [...SKEWT_PRESSURE_LEVELS]).slice();
   pressureLevels.sort((a, b) => b - a);
   const minP = Math.min(...pressureLevels);
   const maxP = Math.max(...pressureLevels);
@@ -145,7 +143,7 @@ function buildLayout(
   const levelByPressure = new Map<number, SkewTLevelData>();
   trace.levels.forEach((l) => levelByPressure.set(l.pressure, l));
 
-  const { tempMin, tempMax } = computeTempRange(trace, TEMP_PADDING);
+  const { tempMin, tempMax } = computeTempRange(trace, minP, maxP, TEMP_PADDING);
   const skewXMin = tempMin;
   const skewXMax = tempMax;
   const skewXRange = skewXMax - skewXMin;
@@ -300,7 +298,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
 
 // ─── Axis ──────────────────────────────────────────────────────────────────────
 
-function drawAxis(ctx: CanvasRenderingContext2D, layout: PlotLayout, width: number, height: number) {
+function drawAxis(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
   const { plotLeft, plotTop, plotWidth, plotHeight } = layout;
 
   ctx.save();
@@ -350,7 +348,7 @@ function drawAxis(ctx: CanvasRenderingContext2D, layout: PlotLayout, width: numb
 
 // ─── Data traces ──────────────────────────────────────────────────────────────
 
-function drawTraces(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'][number], layout: PlotLayout) {
+function drawTraces(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout) {
   const tempPts: [number, number][] = trace.levels.map((l) => tempPressureToCanvas(layout, l.temperature, l.pressure));
   drawLine(ctx, tempPts, CHART_COLORS.temperature, 2);
   ctx.save();
@@ -382,7 +380,7 @@ function drawTraces(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'][nu
 
 // ─── Annotations ───────────────────────────────────────────────────────────────
 
-function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'][number], layout: PlotLayout) {
+function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout) {
   const { plotLeft, plotWidth } = layout;
 
   const lclPressure = metersToHPa(trace.lcl);
@@ -426,7 +424,7 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTData['traces
 
 // ─── Cloud cover ───────────────────────────────────────────────────────────────
 
-function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'][number], layout: PlotLayout) {
+function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout) {
   const { plotLeft, plotTop, plotWidth, plotHeight } = layout;
   const stripX = plotLeft + plotWidth - 18;
   const stripWidth = 16;
@@ -447,7 +445,7 @@ function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'
     const y = Math.min(y0, y1);
     const h = Math.abs(y1 - y0);
 
-    ctx.fillStyle = `${CHART_COLORS.cloudRect},${(avgCloud / 100).toFixed(3)})`;
+    ctx.fillStyle = `${CHART_COLORS.cloudRect}${(avgCloud / 100).toFixed(3)})`;
     ctx.fillRect(stripX, y, stripWidth, h);
   }
 
@@ -456,7 +454,7 @@ function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'
 
 // ─── Height labels ─────────────────────────────────────────────────────────────
 
-function drawHeightLabels(ctx: CanvasRenderingContext2D, trace: SkewTData['traces'][number], layout: PlotLayout) {
+function drawHeightLabels(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout) {
   const { plotLeft, plotWidth } = layout;
   const labelX = plotLeft + plotWidth + 4;
 
@@ -668,12 +666,12 @@ export function renderSkewT(
   const trace = skewTData.traces[selectedTraceIndex] ?? skewTData.traces[0];
   if (!trace) return null;
 
-  const layout = buildLayout(skewTData, selectedTraceIndex, plotLeft, plotTop, plotWidth, plotHeight);
+  const layout = buildLayout(trace, skewTData.pressureLevels, plotLeft, plotTop, plotWidth, plotHeight);
   if (!layout) return null;
 
   drawGrid(ctx, layout);
   drawCloudCover(ctx, trace, layout);
-  drawAxis(ctx, layout, width, height);
+  drawAxis(ctx, layout);
   drawHeightLabels(ctx, trace, layout);
   drawTraces(ctx, trace, layout);
   drawAnnotations(ctx, trace, layout);

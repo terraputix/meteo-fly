@@ -119,19 +119,6 @@ describe('Skew-T data building', () => {
     });
   });
 
-  it('includes parcel trace for each trace', () => {
-    const weatherData = createMockSkewTData();
-    const result = buildSkewTData(weatherData, 'icon_d2', 4000);
-    const expected = expectedLevelCount();
-
-    result.traces.forEach((trace: SkewTTrace) => {
-      expect(trace.parcelTrace).toHaveLength(expected);
-      trace.parcelTrace.forEach((t: number) => {
-        expect(typeof t).toBe('number');
-      });
-    });
-  });
-
   it('uses actual profile temperature when available', () => {
     const weatherData = createMockSkewTData();
     const result = buildSkewTData(weatherData, 'icon_d2', 4000);

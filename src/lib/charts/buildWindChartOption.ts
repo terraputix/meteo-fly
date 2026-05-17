@@ -327,7 +327,7 @@ export function buildWindChartOption(
         type: 'rect',
         shape: { x: p1[0], y: p1[1], width: w, height: h },
         style: {
-          fill: `${CHART_COLORS.cloudRect},${(item.cloudCover / 100).toFixed(3)})`,
+          fill: `${CHART_COLORS.cloudRect}${(item.cloudCover / 100).toFixed(3)})`,
           stroke: 'none',
         },
       };
