@@ -3,6 +3,7 @@ import { getAtLevel, type VerticalProfile } from '$lib/api/types';
 import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, type TaggedPressureLevel } from './pressureLevels';
 import { calculateLcl } from './lcl';
 import { interpolateWind } from './wind';
+import { RD, CP, moistAdiabaticLapseRate } from './thermo';
 import type { MaxAltitude, SkewTLevelData, SkewTTrace, SkewTData, PressureLevel } from './types';
 
 interface BuildSkewTLevelOptions {
@@ -139,19 +140,68 @@ function buildLevelDataAtHour({
 }
 
 function buildParcelTrace(levels: SkewTLevelData[], lclHeight: number): number[] {
+  const aboveLcl = levels.filter((l) => l.heightMeters > lclHeight);
+  const belowLcl = levels.filter((l) => l.heightMeters <= lclHeight);
+
   const surfaceLevel = levels.reduce((lowest, l) => (l.pressure > (lowest?.pressure ?? 0) ? l : lowest));
   const surfaceTemp = surfaceLevel?.temperature ?? 15;
-  const DRY_LAPSE = 0.0098;
-  const MOIST_LAPSE = 0.006;
-  const lclTemp = surfaceTemp - lclHeight * DRY_LAPSE;
+  const surfacePressure = surfaceLevel?.pressure ?? 1013;
 
-  return levels.map((level) => {
+  // Surface potential temperature (K) — defines the dry adiabat below LCL
+  const thetaK = (surfaceTemp + 273.15) * Math.pow(1000 / surfacePressure, RD / CP);
+
+  // Interpolate LCL pressure between the levels bracketing the LCL height
+  let lclPressure: number;
+  if (aboveLcl.length === 0 || belowLcl.length === 0) {
+    lclPressure = surfacePressure;
+  } else {
+    const a = belowLcl[belowLcl.length - 1];
+    const b = aboveLcl[0];
+    const t = (lclHeight - a.heightMeters) / (b.heightMeters - a.heightMeters);
+    lclPressure = a.pressure + t * (b.pressure - a.pressure);
+  }
+
+  const lclTemp = thetaK * Math.pow(lclPressure / 1000, RD / CP) - 273.15;
+
+  const result: number[] = [];
+  let enteredMoist = false;
+  let moistTemp = lclTemp;
+  let moistPressure = lclPressure;
+
+  for (const level of levels) {
     if (level.heightMeters <= lclHeight) {
-      return surfaceTemp - level.heightMeters * DRY_LAPSE;
+      result.push(thetaK * Math.pow(level.pressure / 1000, RD / CP) - 273.15);
+    } else if (!enteredMoist) {
+      enteredMoist = true;
+      const steps = Math.max(5, Math.round(Math.abs(level.pressure - lclPressure)));
+      const dp = (level.pressure - lclPressure) / steps;
+      let t = lclTemp;
+      let p = lclPressure;
+      for (let s = 0; s < steps; s++) {
+        const pMid = p + dp / 2;
+        t += moistAdiabaticLapseRate(t, pMid) * dp;
+        p += dp;
+      }
+      result.push(t);
+      moistTemp = t;
+      moistPressure = level.pressure;
     } else {
-      return lclTemp - (level.heightMeters - lclHeight) * MOIST_LAPSE;
+      const steps = Math.max(5, Math.round(Math.abs(level.pressure - moistPressure)));
+      const dp = (level.pressure - moistPressure) / steps;
+      let t = moistTemp;
+      let p = moistPressure;
+      for (let s = 0; s < steps; s++) {
+        const pMid = p + dp / 2;
+        t += moistAdiabaticLapseRate(t, pMid) * dp;
+        p += dp;
+      }
+      result.push(t);
+      moistTemp = t;
+      moistPressure = level.pressure;
     }
-  });
+  }
+
+  return result;
 }
 
 export function buildSkewTData(

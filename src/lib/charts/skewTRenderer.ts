@@ -1,4 +1,5 @@
 import { metersToHPa } from '$lib/meteo/pressureLevels';
+import { RD, CP, moistAdiabaticLapseRate } from '$lib/meteo/thermo';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
 import { SKEWT_PRESSURE_LEVELS, type SkewTData, type SkewTLevelData } from '$lib/meteo/types';
@@ -17,11 +18,6 @@ const ISO_COLOR = '#eee';
 const AXIS_COLOR = '#ccc';
 const DRY_ADIABAT_COLOR = '#e4a017';
 const MOIST_ADIABAT_COLOR = '#2e7d32';
-
-const RD = 287.058;
-const CP = 1004.0;
-const EPS = 0.622;
-const LV = 2.5e6;
 
 const DRY_THETAS = [-20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80];
 const MOIST_STARTS = [0, 5, 10, 15, 20, 25, 30, 35, 40];
@@ -80,17 +76,6 @@ function tempPressureToCanvas(layout: PlotLayout, temp: number, p: number): [num
 
 function pressureToCanvasY(layout: PlotLayout, p: number): number {
   return canvasYFn(yNorm(p, layout.minP, layout.maxP), layout.plotTop, layout.plotHeight);
-}
-
-// ─── Thermodynamic helpers ─────────────────────────────────────────────────────
-
-function saturationVaporPressure(tC: number): number {
-  return 6.112 * Math.exp((17.67 * tC) / (tC + 243.5));
-}
-
-function saturationMixingRatio(tC: number, p: number): number {
-  const e = saturationVaporPressure(tC);
-  return (EPS * e) / Math.max(p - e, 0.1);
 }
 
 // ─── Layout builder ────────────────────────────────────────────────────────────
@@ -253,15 +238,6 @@ function drawDryAdiabats(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
 }
 
 // ─── Moist adiabats ────────────────────────────────────────────────────────────
-
-function moistAdiabaticLapseRate(tC: number, p: number): number {
-  const T = tC + 273.15;
-  const rs = saturationMixingRatio(tC, p);
-  const lrwbt = (LV * rs) / (RD * T);
-  const num = ((RD * T) / (CP * p)) * (1 + lrwbt);
-  const den = 1 + lrwbt * ((EPS * LV) / (CP * T));
-  return num / den;
-}
 
 function drawMoistAdiabats(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
   const levels = layout.pressureSamples.slice().reverse();
