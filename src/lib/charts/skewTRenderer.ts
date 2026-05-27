@@ -536,7 +536,8 @@ export function renderHoverOverlay(
   layout: PlotLayout,
   trace: SkewTTrace,
   hitResult: HitTestResult,
-  canvasWidth: number
+  canvasWidth: number,
+  elevation: number
 ): void {
   const { plotLeft, plotTop, plotWidth, plotHeight } = layout;
   const mouseY = pressureToCanvasY(layout, hitResult.pressure);
@@ -640,8 +641,11 @@ export function renderHoverOverlay(
     drawText(ctx, label, boxX + boxW / 2, boxY + boxH / 2, '#333', 'center', 'middle', 'bold 11px sans-serif');
   }
 
+  const elevP = metersToHPa(elevation);
+  const elevY = pressureToCanvasY(layout, elevP);
+
   // Collect x-axis labels to draw after clip restore
-  const axisLabels: { x: number; text: string }[] = [];
+  const axisLabels: { x: number; text: string; atElevation: boolean }[] = [];
 
   // Clip to plot area for all internal elements
   ctx.save();
@@ -710,7 +714,6 @@ export function renderHoverOverlay(
     const p0 = hitResult.pressure;
     const cursorT = hitResult.temperature;
 
-    // Compute mixing ratio from the cursor's temperature
     const e = saturationVaporPressure(cursorT);
     const w = (EPS * e) / Math.max(p0 - e, 0.1);
     const q = w / (1 + w);
@@ -729,8 +732,18 @@ export function renderHoverOverlay(
       }
       if (pts.length >= 2) {
         drawLine(ctx, pts, CHART_COLORS.isohume, 1.2, [2, 4], 0.85);
-        const [labelX] = pts[pts.length - 1];
-        axisLabels.push({ x: labelX, text: `q = ${(q * 1000).toFixed(1)} g/kg` });
+        const labelText = `q = ${(q * 1000).toFixed(1)} g/kg`;
+        if (elevP >= p0 && elevP <= maxP) {
+          const es_elev = (w_kg * elevP) / (EPS + w_kg);
+          if (es_elev > 0) {
+            const tC_elev = inverseSaturationVaporPressure(es_elev);
+            const [lx] = tempPressureToCanvas(layout, tC_elev, elevP);
+            axisLabels.push({ x: lx, text: labelText, atElevation: true });
+          }
+        } else {
+          const [lx] = pts[pts.length - 1];
+          axisLabels.push({ x: lx, text: labelText, atElevation: false });
+        }
       }
     }
   }
@@ -753,8 +766,15 @@ export function renderHoverOverlay(
     if (dryPts.length >= 2) {
       drawLine(ctx, dryPts, '#f80', 1.5, [6, 4]);
       const thetaC = thetaK - 273.15;
-      const [dryX] = dryPts[dryPts.length - 1];
-      axisLabels.push({ x: dryX, text: `θ = ${thetaC.toFixed(1)}°C` });
+      const labelText = `θ = ${thetaC.toFixed(1)}°C`;
+      if (elevP >= hoverP && elevP <= maxP) {
+        const tC_elev = thetaK * Math.pow(elevP / 1000, RD / CP) - 273.15;
+        const [lx] = tempPressureToCanvas(layout, tC_elev, elevP);
+        axisLabels.push({ x: lx, text: labelText, atElevation: true });
+      } else {
+        const [lx] = dryPts[dryPts.length - 1];
+        axisLabels.push({ x: lx, text: labelText, atElevation: false });
+      }
     }
 
     // Moist adiabat: from hover level upward to top (minP)
@@ -776,15 +796,23 @@ export function renderHoverOverlay(
 
   ctx.restore(); // plot clip
 
-  // Draw x-axis labels (outside clip area)
-  const axisY = layout.plotTop + layout.plotHeight + 2;
+  // Draw labels at their computed positions (elevation line or fallback)
   for (const lbl of axisLabels) {
-    drawText(ctx, lbl.text, lbl.x, axisY, '#666', 'center', 'top', '9px sans-serif');
+    const ly = lbl.atElevation ? elevY : (layout.plotTop + layout.plotHeight + 2);
+    const lc = lbl.atElevation ? CHART_COLORS.skewtElevation : '#666';
+    drawText(ctx, lbl.text, lbl.x, ly, lc, 'center', 'bottom', '9px sans-serif');
+    if (lbl.atElevation) {
+      ctx.save();
+      ctx.fillStyle = CHART_COLORS.skewtElevation;
+      ctx.beginPath();
+      ctx.arc(lbl.x, ly, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   ctx.restore(); // initial save
 }
-
 export interface HitTestResult {
   pressure: number;
   heightMeters: number;

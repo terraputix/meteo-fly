@@ -88,7 +88,7 @@
     overlayCtx.save();
     overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     overlayCtx.clearRect(0, 0, width, totalHeight);
-    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width);
+    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width, skewTData!.elevation);
     overlayCtx.restore();
   }
 
