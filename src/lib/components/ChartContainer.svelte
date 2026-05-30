@@ -59,26 +59,25 @@
   let showMobileSettings = false;
   let scrollContainer: HTMLDivElement | undefined;
 
-  let syncedHour: number | undefined = undefined;
-
   $: if (skewTWeatherData && chartView === 'skewt') {
     skewTData = buildSkewTData(skewTWeatherData, model, maxAltitude);
     traceHours = skewTData?.traces.map((t) => t.time) ?? [];
-    syncedHour = undefined;
     if (selectedTraceIndex >= traceHours.length) {
       selectedTraceIndex = 0;
     }
   }
 
-  $: if (traceHours.length > 0 && hour != null && hour !== syncedHour) {
-    const idx = traceHours.findIndex((t) => t.getHours() === hour);
-    if (idx >= 0) selectedTraceIndex = idx;
+  $: if (traceHours.length > 0 && hour != null) {
+    const currentHour = traceHours[selectedTraceIndex]?.getHours();
+    if (currentHour !== hour) {
+      const idx = traceHours.findIndex((t) => t.getHours() === hour);
+      if (idx >= 0) selectedTraceIndex = idx;
+    }
   }
 
   function emitHour() {
     const h = traceHours[selectedTraceIndex]?.getHours();
     if (h != null) {
-      syncedHour = h;
       dispatch('hourChange', h);
     }
   }
