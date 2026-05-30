@@ -49,13 +49,14 @@
     if (currentSearch === search) return;
     const newURL = `${window.location.pathname}${search}`;
     saveLastVisitedURL(newURL);
+    // eslint-disable-next-line svelte/no-navigation-without-resolve
     replaceState(newURL, window.history.state);
   }
 
   afterNavigate(syncURL);
 
   $effect(() => {
-    urlSearch;
+    void urlSearch;
     try {
       syncURL();
     } catch {
@@ -79,12 +80,12 @@
   }
 
   $effect(() => {
-    parameters.location.latitude;
-    parameters.location.longitude;
-    parameters.selectedDay;
-    parameters.selectedModel;
-    parameters.maxAltitude;
-    parameters.cellSelection;
+    void parameters.location.latitude;
+    void parameters.location.longitude;
+    void parameters.selectedDay;
+    void parameters.selectedModel;
+    void parameters.maxAltitude;
+    void parameters.cellSelection;
 
     clearTimeout(updateTimer ?? undefined);
     updateTimer = setTimeout(updateWeather, 5);

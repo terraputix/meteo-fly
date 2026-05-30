@@ -24,6 +24,7 @@
 </script>
 
 <svelte:head>
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html webManifest}
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Meteo-Fly" />

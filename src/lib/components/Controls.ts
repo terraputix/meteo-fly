@@ -205,6 +205,7 @@ export class AboutControl extends BaseButtonControl {
   }
 
   protected onButtonClick() {
+    // eslint-disable-next-line svelte/no-navigation-without-resolve
     goto(this.aboutOptions.url);
   }
 

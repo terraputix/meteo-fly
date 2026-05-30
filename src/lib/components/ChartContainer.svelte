@@ -150,12 +150,12 @@
     dispatch('close');
   }
 
-  $: (weatherData, refreshScrollPosition());
-  $: (selectedDay, refreshScrollPosition());
-  $: (maxAltitude, refreshScrollPosition());
-  $: (model, refreshScrollPosition());
-  $: (cellSelection, refreshScrollPosition());
-  $: (showMobileSettings, refreshScrollPosition());
+  $: void (weatherData, refreshScrollPosition());
+  $: void (selectedDay, refreshScrollPosition());
+  $: void (maxAltitude, refreshScrollPosition());
+  $: void (model, refreshScrollPosition());
+  $: void (cellSelection, refreshScrollPosition());
+  $: void (showMobileSettings, refreshScrollPosition());
 </script>
 
 <div
@@ -235,7 +235,7 @@
           bind:value={maxAltitude}
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
         >
-          {#each altitudes as alt}
+          {#each altitudes as alt (alt.value)}
             <option value={alt.value}>{alt.name}</option>
           {/each}
         </select>
@@ -483,7 +483,7 @@
             bind:value={maxAltitude}
             class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
           >
-            {#each altitudes as alt}
+            {#each altitudes as alt (alt.value)}
               <option value={alt.value}>{alt.name}</option>
             {/each}
           </select>
