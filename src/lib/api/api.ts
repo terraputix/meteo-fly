@@ -94,6 +94,7 @@ export function createQueryParams(
     models: model,
     cell_selection: cellSelection,
     timezone: localTimezone,
+    elevation: 'nan',
   };
 }
 
