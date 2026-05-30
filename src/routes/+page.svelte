@@ -11,6 +11,7 @@
   import { fetchWeatherData, fetchSkewTData } from '$lib/api/api';
   import type { Location, WeatherDataType, SkewTWeatherData } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
+  import { SvelteURLSearchParams } from 'svelte/reactivity';
 
   let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
   let showChart = $state(false);
@@ -29,7 +30,7 @@
 
   const urlSearch = $derived.by(() => {
     const { location, selectedDay, selectedModel, maxAltitude, cellSelection } = parameters;
-    const params = new URLSearchParams({
+    const params = new SvelteURLSearchParams({
       lat: location.latitude.toString(),
       lon: location.longitude.toString(),
       day: selectedDay.toString(),
@@ -94,12 +95,12 @@
   $effect(() => {
     if (!showChart || chartView !== 'skewt') return;
 
-    parameters.location.latitude;
-    parameters.location.longitude;
-    parameters.selectedModel;
-    parameters.maxAltitude;
-    parameters.cellSelection;
-    startDate;
+    void parameters.location.latitude;
+    void parameters.location.longitude;
+    void parameters.selectedModel;
+    void parameters.maxAltitude;
+    void parameters.cellSelection;
+    void startDate;
 
     updateSkewTData();
   });

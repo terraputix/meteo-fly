@@ -121,7 +121,7 @@
   </div>
 
   <div class="skewt-legend">
-    {#each legendItems as item}
+    {#each legendItems as item (item.label)}
       <span class="legend-item">
         <svg width="24" height="12" viewBox="0 0 24 12">
           <line
