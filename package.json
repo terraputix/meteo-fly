@@ -23,6 +23,7 @@
     "@types/maplibre-gl": "^1.14.0",
     "clsx": "^2.1.1",
     "echarts": "^6.1.0",
+    "@eslint/js": "^10.0.0",
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.0",
     "eslint-plugin-svelte": "^3.17.1",
