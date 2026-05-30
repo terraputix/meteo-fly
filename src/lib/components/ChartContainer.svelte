@@ -59,17 +59,18 @@
   let showMobileSettings = false;
   let scrollContainer: HTMLDivElement | undefined;
 
+  let syncedHour: number | undefined = undefined;
+
   $: if (skewTWeatherData && chartView === 'skewt') {
     skewTData = buildSkewTData(skewTWeatherData, model, maxAltitude);
     traceHours = skewTData?.traces.map((t) => t.time) ?? [];
+    syncedHour = undefined;
     if (selectedTraceIndex >= traceHours.length) {
       selectedTraceIndex = 0;
     }
   }
 
-let syncedHour: number | undefined = undefined;
-
-$: if (traceHours.length > 0 && hour != null && hour !== syncedHour) {
+  $: if (traceHours.length > 0 && hour != null && hour !== syncedHour) {
     const idx = traceHours.findIndex((t) => t.getHours() === hour);
     if (idx >= 0) selectedTraceIndex = idx;
   }
@@ -103,7 +104,7 @@ $: if (traceHours.length > 0 && hour != null && hour !== syncedHour) {
   }
 
   function formatDayHour(date: Date): string {
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleString('en-US', {
       weekday: 'short',
       hour: '2-digit',
       minute: '2-digit',
@@ -336,7 +337,7 @@ $: if (traceHours.length > 0 && hour != null && hour !== syncedHour) {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </button>
-          <span class="min-w-[120px] text-right text-xs font-medium text-slate-700">
+          <span class="min-w-30 text-right text-xs font-medium text-slate-700">
             {formatDayHour(traceHours[selectedTraceIndex] ?? new Date())}
             <span class="text-slate-400"> {skewTData?.timezoneAbbr ?? ''}</span>
           </span>

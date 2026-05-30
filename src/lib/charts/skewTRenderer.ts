@@ -798,7 +798,7 @@ export function renderHoverOverlay(
 
   // Draw labels at their computed positions (elevation line or fallback)
   for (const lbl of axisLabels) {
-    const ly = lbl.atElevation ? elevY : (layout.plotTop + layout.plotHeight + 2);
+    const ly = lbl.atElevation ? elevY : layout.plotTop + layout.plotHeight + 2;
     const lc = lbl.atElevation ? CHART_COLORS.skewtElevation : '#666';
     drawText(ctx, lbl.text, lbl.x, ly, lc, 'center', 'bottom', '9px sans-serif');
     if (lbl.atElevation) {
