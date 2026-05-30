@@ -3,7 +3,6 @@
   import { cn } from '$lib/utils.js';
 
   let {
-    ref = $bindable(null),
     this: paneGroup = $bindable(),
     class: className,
     ...restProps

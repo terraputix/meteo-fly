@@ -200,7 +200,7 @@
     map.setCenter(newPos);
   }
 
-  $: (selectedGridCell, latitude, longitude, map, updateSelectedGridCellMarker());
+  $: void (selectedGridCell, latitude, longitude, map, updateSelectedGridCellMarker());
 
   function handleMapViewChange() {
     updateGridCellConnector();

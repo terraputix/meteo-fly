@@ -29,12 +29,14 @@
           condensation level analysis.
         </p>
       </div>
+      <!-- eslint-disable svelte/no-navigation-without-resolve -->
       <a
         href={returnUrl}
         class="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold tracking-widest text-slate-600 uppercase transition hover:border-slate-300 hover:text-slate-900"
       >
         Back to forecast
       </a>
+      <!-- eslint-enable svelte/no-navigation-without-resolve -->
     </div>
 
     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
