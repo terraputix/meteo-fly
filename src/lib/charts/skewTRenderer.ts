@@ -1,4 +1,4 @@
-import { metersToHPa } from '$lib/meteo/pressureLevels';
+import { hPaToMeters, metersToHPa } from '$lib/meteo/pressureLevels';
 import {
   RD,
   CP,
@@ -878,7 +878,7 @@ export function renderSkewT(
 
     return {
       pressure: Math.round(pressure),
-      heightMeters: levelData.heightMeters,
+      heightMeters: hPaToMeters(pressure),
       temperature: temp,
       dewpoint: levelData.dewpoint,
       windSpeed: levelData.windSpeed,
