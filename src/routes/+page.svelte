@@ -171,6 +171,7 @@
           longitude={parameters.location.longitude}
           bind:chartOpen={showChart}
           selectedGridCell={weatherData?.selectedGridCell ?? null}
+          gridCellElevation={weatherData?.elevation}
           onToggleChart={toggleChartPanel}
           onLocationChange={updateLocation}
         />

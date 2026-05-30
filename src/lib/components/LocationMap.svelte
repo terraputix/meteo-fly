@@ -12,6 +12,7 @@
   export let longitude: number;
   export let chartOpen = false;
   export let selectedGridCell: Location | null = null;
+  export let gridCellElevation: number | undefined = undefined;
   export let onLocationChange: ((location: Location) => void) | undefined = undefined;
   export let onToggleChart: (() => void) | undefined = undefined;
 
@@ -27,6 +28,7 @@
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
+  let elevationBadge: HTMLDivElement | undefined;
   let selectedGridCellMarker: Marker | null = null;
   let distanceMarker: Marker | null = null;
   let unsubscribe: () => void;
@@ -56,6 +58,18 @@
       : `${Math.round(distanceMeters)} m`;
   }
 
+  function queryElevation(lat: number, lng: number) {
+    if (!map || !map.isStyleLoaded() || !isTerrainEnabled) return;
+    const elev = map.queryTerrainElevation([lng, lat]);
+
+    if (elev == null) return;
+    const rounded = Math.round(elev);
+    if (elevationBadge) {
+      elevationBadge.style.display = '';
+      elevationBadge.textContent = `${rounded} m`;
+    }
+  }
+
   function updatePosition(lat: number, lng: number) {
     const nextLatitude = parseFloat(lat.toFixed(5));
     const nextLongitude = parseFloat(lng.toFixed(5));
@@ -65,6 +79,7 @@
     if (marker) {
       marker.setLngLat([nextLongitude, nextLatitude]);
     }
+    queryElevation(nextLatitude, nextLongitude);
   }
 
   function handleLocationDetected(location: Location) {
@@ -152,6 +167,7 @@
     }
 
     const lngLat: LngLatLike = [selectedGridCell.longitude, selectedGridCell.latitude];
+    const badgeText = gridCellElevation != null ? `Grid cell · ${Math.round(gridCellElevation)} m` : 'Grid cell';
 
     if (!selectedGridCellMarker) {
       const element = document.createElement('div');
@@ -165,8 +181,13 @@
       })
         .setLngLat(lngLat)
         .addTo(map);
+
+      const badgeEl = element.querySelector('.selected-grid-cell-marker__badge');
+      if (badgeEl) badgeEl.textContent = badgeText;
     } else {
       selectedGridCellMarker.setLngLat(lngLat);
+      const badgeEl = selectedGridCellMarker.getElement().querySelector('.selected-grid-cell-marker__badge');
+      if (badgeEl) badgeEl.textContent = badgeText;
     }
 
     updateGridCellConnector();
@@ -175,9 +196,7 @@
   function setTerrainVisibility(enabled: boolean) {
     isTerrainEnabled = enabled;
 
-    if (!map || !map.isStyleLoaded()) {
-      return;
-    }
+    if (!map) return;
 
     if (map.getLayer(hillshadeLayerId)) {
       map.setLayoutProperty(hillshadeLayerId, 'visibility', enabled ? 'visible' : 'none');
@@ -191,6 +210,13 @@
           }
         : null
     );
+
+    if (enabled) {
+      queryElevation(latitude, longitude);
+      map.once('idle', () => queryElevation(latitude, longitude));
+    } else if (elevationBadge) {
+      elevationBadge.style.display = 'none';
+    }
   }
 
   // Watch for prop changes and update map
@@ -255,6 +281,9 @@
     selectedLocationElement.innerHTML =
       '<span class="selected-location-marker__outer"></span><span class="selected-location-marker__inner"></span><span class="selected-location-marker__core"></span>';
 
+    elevationBadge = document.createElement('div');
+    elevationBadge.className = 'selected-location-marker__elevation';
+    selectedLocationElement.appendChild(elevationBadge);
     marker = new maplibregl.Marker({
       element: selectedLocationElement,
       draggable: true,
@@ -467,6 +496,23 @@
     background: rgba(224, 242, 254, 0.95);
     transform: translate(-50%, -50%);
     box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.24);
+  }
+
+  :global(.selected-location-marker__elevation) {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(30, 41, 59, 0.85);
+    color: #f8fafc;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
   }
 
   :global(.selected-grid-cell-marker) {
