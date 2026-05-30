@@ -157,6 +157,7 @@ function getSkewTVariablesForModel(model: WeatherModel, maxAltitude: MaxAltitude
     makeProfileVar('windSpeedProfile', 'wind_speed', model, maxAltitude),
     makeProfileVar('windDirectionProfile', 'wind_direction', model, maxAltitude),
     makeProfileVar('cloudCoverProfile', 'cloud_cover', model, maxAltitude),
+    makeProfileVar('geopotentialHeightProfile', 'geopotential_height', model, maxAltitude),
   ];
 }
 
@@ -202,6 +203,7 @@ export async function fetchSkewTData(
     windSpeedProfile: {},
     windDirectionProfile: {},
     cloudCoverProfile: {},
+    geopotentialHeightProfile: {},
     temperature_2m: new Float32Array(times.length),
     dewpoint_2m: new Float32Array(times.length),
   };

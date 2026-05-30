@@ -30,6 +30,8 @@ export interface SkewTTrace {
   time: Date;
   levels: SkewTLevelData[];
   lcl: number;
+  surfaceTemp: number;
+  surfaceDewpoint: number;
 }
 
 export interface SkewTData {

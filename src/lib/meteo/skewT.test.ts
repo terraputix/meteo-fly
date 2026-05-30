@@ -64,6 +64,7 @@ function createMockSkewTData(): SkewTWeatherData {
         _400hPa: new Float32Array([20, 30, 40]),
         _300hPa: new Float32Array([10, 20, 30]),
       } as SkewTWeatherData['hourly']['cloudCoverProfile'],
+      geopotentialHeightProfile: {},
     },
     elevation: 500,
     timezoneAbbr: 'UTC',
@@ -116,6 +117,16 @@ describe('Skew-T data building', () => {
     result.traces.forEach((trace: SkewTTrace) => {
       expect(trace.lcl).toBeGreaterThan(0);
       expect(typeof trace.lcl).toBe('number');
+    });
+  });
+
+  it('includes surface temperature and dewpoint for each trace', () => {
+    const weatherData = createMockSkewTData();
+    const result = buildSkewTData(weatherData, 'icon_d2', 4000);
+
+    result.traces.forEach((trace: SkewTTrace, i: number) => {
+      expect(trace.surfaceTemp).toBeCloseTo(20 + 2 * i, 0);
+      expect(trace.surfaceDewpoint).toBeCloseTo(15 + i, 0);
     });
   });
 

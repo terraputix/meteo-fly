@@ -40,6 +40,7 @@ export interface HourlyData {
   windSpeedProfile: VerticalProfile;
   windDirectionProfile: VerticalProfile;
   verticalVelocityProfile: VerticalProfile | undefined;
+  geopotentialHeightProfile: VerticalProfile;
   precipitation: Float32Array;
   temperature_2m: Float32Array;
   dewpoint_2m: Float32Array;
@@ -65,6 +66,7 @@ export interface SkewTWeatherData {
     windSpeedProfile: VerticalProfile;
     windDirectionProfile: VerticalProfile;
     cloudCoverProfile: VerticalProfile;
+    geopotentialHeightProfile: VerticalProfile;
     temperature_2m: Float32Array;
     dewpoint_2m: Float32Array;
   };

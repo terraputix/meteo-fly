@@ -1,4 +1,4 @@
-import { hPaToMeters, metersToHPa } from '$lib/meteo/pressureLevels';
+import { metersToHPa } from '$lib/meteo/pressureLevels';
 import {
   RD,
   CP,
@@ -417,7 +417,7 @@ function drawTraces(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: Pl
 
 // ─── Annotations ───────────────────────────────────────────────────────────────
 
-function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout) {
+function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout, elevation: number) {
   const { plotLeft, plotWidth } = layout;
 
   const lclPressure = metersToHPa(trace.lcl);
@@ -433,6 +433,46 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
     [3, 3]
   );
   drawText(ctx, 'LCL', plotLeft + plotWidth - 4, lclY - 4, CHART_COLORS.lcl, 'right', 'bottom');
+
+  // Surface temperature & dewpoint markers at elevation line
+  const elevPressure = metersToHPa(elevation);
+  if (elevPressure >= layout.minP && elevPressure <= layout.maxP) {
+    const elevY = pressureToCanvasY(layout, elevPressure);
+    const [stX] = tempPressureToCanvas(layout, trace.surfaceTemp, elevPressure);
+    const [sdX] = tempPressureToCanvas(layout, trace.surfaceDewpoint, elevPressure);
+
+    ctx.save();
+    ctx.fillStyle = CHART_COLORS.temperature;
+    ctx.beginPath();
+    ctx.arc(stX, elevY, 3, 0, Math.PI * 2);
+    ctx.fill();
+    drawText(
+      ctx,
+      `${trace.surfaceTemp.toFixed(1)}°C`,
+      stX - 6,
+      elevY + 16,
+      CHART_COLORS.temperature,
+      'center',
+      'top',
+      '10px sans-serif'
+    );
+
+    ctx.fillStyle = CHART_COLORS.dewpoint;
+    ctx.beginPath();
+    ctx.arc(sdX, elevY, 3, 0, Math.PI * 2);
+    ctx.fill();
+    drawText(
+      ctx,
+      `${trace.surfaceDewpoint.toFixed(1)}°C`,
+      sdX + 6,
+      elevY + 16,
+      CHART_COLORS.dewpoint,
+      'center',
+      'top',
+      '10px sans-serif'
+    );
+    ctx.restore();
+  }
 
   const arrowX = plotLeft + plotWidth + 50;
   for (const level of trace.levels) {
@@ -854,7 +894,7 @@ export function renderSkewT(
   drawElevationLine(ctx, skewTData.elevation, layout);
   drawAxis(ctx, layout);
   drawTraces(ctx, trace, layout);
-  drawAnnotations(ctx, trace, layout);
+  drawAnnotations(ctx, trace, layout, skewTData.elevation);
 
   const hitTest: HitTestFn = (cx, cy) => {
     const yn = canvasToYNorm(cy, plotTop, plotHeight);
@@ -878,7 +918,7 @@ export function renderSkewT(
 
     return {
       pressure: Math.round(pressure),
-      heightMeters: hPaToMeters(pressure),
+      heightMeters: levelData.heightMeters,
       temperature: temp,
       dewpoint: levelData.dewpoint,
       windSpeed: levelData.windSpeed,

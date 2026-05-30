@@ -34,6 +34,7 @@ export function getVariablesForModel(
     makeProfileVar('cloudCoverProfile', 'cloud_cover', model, maxAltitude),
     makeProfileVar('windSpeedProfile', 'wind_speed', model, maxAltitude),
     makeProfileVar('windDirectionProfile', 'wind_direction', model, maxAltitude),
+    makeProfileVar('geopotentialHeightProfile', 'geopotential_height', model, maxAltitude),
   ];
 
   const modelSpecificVars: (ProfileVariables | FlatVariable)[] = (() => {

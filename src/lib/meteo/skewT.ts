@@ -22,12 +22,12 @@ function getProfileValue(profile: VerticalProfile, pressure: number, hourIndex: 
 
 function interpolateScalar(
   height: number,
-  lower: PressureLevel,
-  upper: PressureLevel,
+  lowerH: number,
+  upperH: number,
   lowerValue: number,
   upperValue: number
 ): number {
-  const ratio = (height - lower.heightMeters) / (upper.heightMeters - lower.heightMeters);
+  const ratio = (height - lowerH) / (upperH - lowerH);
   return lowerValue + (upperValue - lowerValue) * ratio;
 }
 
@@ -55,13 +55,44 @@ function buildLevelDataAtHour({
   const windSpeedProfile = weatherData.hourly.windSpeedProfile as VerticalProfile;
   const windDirProfile = weatherData.hourly.windDirectionProfile as VerticalProfile;
   const cloudProfile = weatherData.hourly.cloudCoverProfile as VerticalProfile;
+  const geoProfile = weatherData.hourly.geopotentialHeightProfile as VerticalProfile;
 
-  const reversedNative = [...nativeLevels].reverse();
+  // Actual geopotential heights for native levels at this hour
+  const nativeActualHeights = new Map<number, number>();
+  for (const nl of nativeLevels) {
+    const h = getProfileValue(geoProfile, nl.hPa, hourIndex);
+    if (h != null) nativeActualHeights.set(nl.hPa, h);
+  }
+
+  const bracketHeight = (nl: PressureLevel) => nativeActualHeights.get(nl.hPa) ?? nl.heightMeters;
 
   return levels.map((level) => {
-    const targetHeight = level.heightMeters;
-    const lowerNative = reversedNative.find((l) => l.heightMeters <= targetHeight);
-    const upperNative = nativeLevels.find((l) => l.heightMeters > targetHeight);
+    // Interpolate actual height in log-p space for non-native levels
+    let actualHeight: number | null = null;
+    if (level.source === 'model') {
+      actualHeight = nativeActualHeights.get(level.hPa) ?? null;
+    } else {
+      const lower = [...nativeLevels].reverse().find((l) => l.hPa > level.hPa);
+      const upper = nativeLevels.find((l) => l.hPa < level.hPa);
+      if (lower && upper) {
+        const lh = nativeActualHeights.get(lower.hPa);
+        const uh = nativeActualHeights.get(upper.hPa);
+        if (lh != null && uh != null) {
+          const logP = Math.log(level.hPa);
+          const logLo = Math.log(lower.hPa);
+          const logHi = Math.log(upper.hPa);
+          actualHeight = lh + ((uh - lh) * (logP - logLo)) / (logHi - logLo);
+        }
+      }
+    }
+
+    const targetHeight = actualHeight ?? level.heightMeters;
+
+    // Bracket in pressure space (always correct regardless of height variability)
+    const lowerNative = [...nativeLevels].reverse().find((l) => l.hPa > level.hPa);
+    const upperNative = nativeLevels.find((l) => l.hPa < level.hPa);
+    const lowerH = lowerNative ? bracketHeight(lowerNative) : NaN;
+    const upperH = upperNative ? bracketHeight(upperNative) : NaN;
 
     const tempAtLevel = getProfileValue(tempProfile, level.hPa, hourIndex);
     const dewAtLevel = getProfileValue(dewProfile, level.hPa, hourIndex);
@@ -82,14 +113,14 @@ function buildLevelDataAtHour({
 
     const temperature =
       tempAtLevel ??
-      (lowerNative && upperNative && lowerTemp != null && upperTemp != null
-        ? interpolateScalar(targetHeight, lowerNative, upperNative, lowerTemp, upperTemp)
+      (lowerNative && upperNative && isFinite(lowerH) && isFinite(upperH) && lowerTemp != null && upperTemp != null
+        ? interpolateScalar(targetHeight, lowerH, upperH, lowerTemp, upperTemp)
         : NaN);
 
     const dewpoint =
       dewAtLevel ??
-      (lowerNative && upperNative && lowerDew != null && upperDew != null
-        ? interpolateScalar(targetHeight, lowerNative, upperNative, lowerDew, upperDew)
+      (lowerNative && upperNative && isFinite(lowerH) && isFinite(upperH) && lowerDew != null && upperDew != null
+        ? interpolateScalar(targetHeight, lowerH, upperH, lowerDew, upperDew)
         : NaN);
 
     let windSpeed = windSpeedAtLevel;
@@ -99,6 +130,8 @@ function buildLevelDataAtHour({
       if (
         lowerNative &&
         upperNative &&
+        isFinite(lowerH) &&
+        isFinite(upperH) &&
         lowerWindSpeed != null &&
         upperWindSpeed != null &&
         lowerWindDir != null &&
@@ -109,7 +142,9 @@ function buildLevelDataAtHour({
           lowerNative,
           upperNative,
           { speed: lowerWindSpeed, direction: lowerWindDir },
-          { speed: upperWindSpeed, direction: upperWindDir }
+          { speed: upperWindSpeed, direction: upperWindDir },
+          lowerH,
+          upperH
         );
         windSpeed = interpolated.speed;
         windDirection = interpolated.direction;
@@ -149,7 +184,7 @@ export function buildSkewTData(
     const lclHeight = lclValue + weatherData.elevation;
 
     const levels = buildLevelDataAtHour({ weatherData, hourIndex: i, levels: allLevels, nativeLevels });
-    traces.push({ time, levels, lcl: lclHeight });
+    traces.push({ time, levels, lcl: lclHeight, surfaceTemp, surfaceDewpoint });
   });
 
   return {
