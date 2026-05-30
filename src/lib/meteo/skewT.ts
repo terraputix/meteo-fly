@@ -31,10 +31,6 @@ function interpolateScalar(
   return lowerValue + (upperValue - lowerValue) * ratio;
 }
 
-function getIsaTemperature(heightMeters: number): number {
-  return 15 - 0.0065 * heightMeters;
-}
-
 export function dedupeLevels(levels: TaggedPressureLevel[]): TaggedPressureLevel[] {
   const byHpa = new Map<number, TaggedPressureLevel>();
 
@@ -60,9 +56,6 @@ function buildLevelDataAtHour({
   const windDirProfile = weatherData.hourly.windDirectionProfile as VerticalProfile;
   const cloudProfile = weatherData.hourly.cloudCoverProfile as VerticalProfile;
 
-  const surfaceTemp = weatherData.hourly.temperature_2m?.[hourIndex] ?? 20;
-  const surfaceDewpoint = weatherData.hourly.dewpoint_2m?.[hourIndex] ?? 15;
-  const lclHeight = calculateLcl(surfaceTemp, surfaceDewpoint);
   const reversedNative = [...nativeLevels].reverse();
 
   return levels.map((level) => {
@@ -91,15 +84,13 @@ function buildLevelDataAtHour({
       tempAtLevel ??
       (lowerNative && upperNative && lowerTemp != null && upperTemp != null
         ? interpolateScalar(targetHeight, lowerNative, upperNative, lowerTemp, upperTemp)
-        : getIsaTemperature(targetHeight));
+        : NaN);
 
     const dewpoint =
       dewAtLevel ??
       (lowerNative && upperNative && lowerDew != null && upperDew != null
         ? interpolateScalar(targetHeight, lowerNative, upperNative, lowerDew, upperDew)
-        : targetHeight <= lclHeight
-          ? temperature - (surfaceTemp - surfaceDewpoint)
-          : temperature - Math.min((surfaceTemp - surfaceDewpoint) * 1.5, 40));
+        : NaN);
 
     let windSpeed = windSpeedAtLevel;
     let windDirection = windDirAtLevel;
