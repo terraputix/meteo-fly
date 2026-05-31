@@ -10,7 +10,7 @@ export const CHART_COLORS = {
   modelGridElevation: '#556B2F',
   rain: 'rgba(30,100,220,0.80)',
   cloudRect: 'rgba(100,120,145,',
-  windCloud: 'rgba(90,110,140',
+  windCloud: 'rgba(90,110,140,',
   skewtElevation: '#A0785C',
   dryAdiabat: '#9f6628',
   moistAdiabat: '#2c9dfa',
