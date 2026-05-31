@@ -100,7 +100,8 @@ export function buildWindChartOption(
   activeState: ActiveState,
   windHeight: number = 440,
   maxAltitude: MaxAltitude = 4000,
-  model: WeatherModel = 'icon_d2'
+  model: WeatherModel = 'icon_d2',
+  modelGridElevation: number | undefined = undefined
 ): EChartsOption {
   // ── Model-specific level data ──────────────────────────────────────────────
   // nativeLevels drives cloud-band geometry and pressure labels.
@@ -517,7 +518,7 @@ export function buildWindChartOption(
       label: {
         show: true,
         position: 'insideStartTop',
-        formatter: `Elevation (${elevation}m)`,
+        formatter: `DEM Elev. (${elevation}m)`,
         color: CHART_COLORS.elevation,
         fontWeight: 'bold',
         fontSize: 10,
@@ -526,6 +527,36 @@ export function buildWindChartOption(
     z: 5,
     tooltip: { show: false },
   };
+
+  const modelGridElevationSeries: LineSeriesOption | undefined =
+    modelGridElevation != null
+      ? {
+          name: '_modelGridElevation',
+          type: 'line',
+          xAxisIndex: 2,
+          yAxisIndex: 3,
+          silent: true,
+          symbol: 'none',
+          lineStyle: { opacity: 0 },
+          data: [],
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            data: [{ yAxis: modelGridElevation }],
+            lineStyle: { color: CHART_COLORS.modelGridElevation, width: 2, type: 'dotted' },
+            label: {
+              show: true,
+              position: 'insideStartTop',
+              formatter: `Model Grid Elev. (${modelGridElevation}m)`,
+              color: CHART_COLORS.modelGridElevation,
+              fontWeight: 'bold',
+              fontSize: 10,
+            },
+          },
+          z: 5,
+          tooltip: { show: false },
+        }
+      : undefined;
 
   // ── Pressure-level markLines (right-side hPa labels) ──────────────────────
   // Only draw lines for pressure levels that come directly from the weather model.
@@ -589,6 +620,7 @@ export function buildWindChartOption(
     windArrowSeries,
     lclSeries,
     elevationLineSeries,
+    ...(modelGridElevationSeries ? [modelGridElevationSeries] : []),
     pressureLabelSeries,
   ];
 

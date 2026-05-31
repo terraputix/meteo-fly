@@ -92,6 +92,7 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
         windData,
         lcl,
         elevation: weatherData.elevation,
+        modelGridElevation: weatherData.modelGridElevation,
         timezoneAbbr: weatherData.timezoneAbbr,
         temperatureChartData,
         rainCloudChartData,

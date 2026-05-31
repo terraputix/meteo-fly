@@ -13,6 +13,7 @@
   export let chartOpen = false;
   export let selectedGridCell: Location | null = null;
   export let gridCellElevation: number | undefined = undefined;
+  export let modelGridElevation: number | undefined = undefined;
   export let onLocationChange: ((location: Location) => void) | undefined = undefined;
   export let onToggleChart: (() => void) | undefined = undefined;
 
@@ -33,6 +34,7 @@
   let distanceMarker: Marker | null = null;
   let unsubscribe: () => void;
   let isTerrainEnabled = true;
+  let lastTerrainElevation: number | undefined;
 
   function toRadians(value: number) {
     return (value * Math.PI) / 180;
@@ -64,10 +66,21 @@
 
     if (elev == null) return;
     const rounded = Math.round(elev);
-    if (elevationBadge) {
-      elevationBadge.style.display = '';
-      elevationBadge.textContent = `${rounded} m`;
+    lastTerrainElevation = rounded;
+    updateElevationBadge();
+  }
+
+  function updateElevationBadge() {
+    if (!elevationBadge) return;
+    const parts: string[] = [];
+    if (lastTerrainElevation != null) parts.push(`Map ${lastTerrainElevation}m`);
+    if (gridCellElevation != null) parts.push(`API DEM ${Math.round(gridCellElevation)}m`);
+    if (parts.length === 0) {
+      elevationBadge.style.display = 'none';
+      return;
     }
+    elevationBadge.style.display = '';
+    elevationBadge.textContent = parts.join(' · ');
   }
 
   function updatePosition(lat: number, lng: number) {
@@ -167,7 +180,7 @@
     }
 
     const lngLat: LngLatLike = [selectedGridCell.longitude, selectedGridCell.latitude];
-    const badgeText = gridCellElevation != null ? `Grid cell · ${Math.round(gridCellElevation)} m` : 'Grid cell';
+    const badgeText = modelGridElevation != null ? `Grid cell · ${Math.round(modelGridElevation)} m` : 'Grid cell';
 
     if (!selectedGridCellMarker) {
       const element = document.createElement('div');
@@ -214,8 +227,9 @@
     if (enabled) {
       queryElevation(latitude, longitude);
       map.once('idle', () => queryElevation(latitude, longitude));
-    } else if (elevationBadge) {
-      elevationBadge.style.display = 'none';
+    } else {
+      lastTerrainElevation = undefined;
+      updateElevationBadge();
     }
   }
 
@@ -226,7 +240,8 @@
     map.setCenter(newPos);
   }
 
-  $: void (selectedGridCell, latitude, longitude, map, updateSelectedGridCellMarker());
+  $: void (selectedGridCell, latitude, longitude, modelGridElevation, map, updateSelectedGridCellMarker());
+  $: void (gridCellElevation, modelGridElevation, updateElevationBadge());
 
   function handleMapViewChange() {
     updateGridCellConnector();

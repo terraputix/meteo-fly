@@ -28,6 +28,7 @@ export function getAtLevel(data: VerticalProfile, pressure: number): Float32Arra
 export interface WeatherDataType {
   hourly: HourlyData;
   elevation: number;
+  modelGridElevation?: number;
   timezoneAbbr: string;
   sunrise: Date;
   sunset: Date;

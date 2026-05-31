@@ -7,6 +7,7 @@ export const CHART_COLORS = {
   humidity: '#3182ce',
   lcl: '#805ad5',
   elevation: '#8B4513',
+  modelGridElevation: '#556B2F',
   rain: 'rgba(30,100,220,0.80)',
   cloudRect: 'rgba(100,120,145,',
   windCloud: 'rgba(90,110,140',

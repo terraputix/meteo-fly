@@ -81,8 +81,17 @@
           return;
         }
 
-        const { cloudData, windData, lcl, elevation, timezoneAbbr, temperatureChartData, rainCloudChartData, xDomain } =
-          response.data;
+        const {
+          cloudData,
+          windData,
+          lcl,
+          elevation,
+          modelGridElevation,
+          timezoneAbbr,
+          temperatureChartData,
+          rainCloudChartData,
+          xDomain,
+        } = response.data;
 
         const canvas = document.createElement('div');
         canvas.style.cssText = `width:100%;height:${totalHeight}px;`;
@@ -107,7 +116,8 @@
             activeState,
             windHeight,
             maxAltitude,
-            model
+            model,
+            modelGridElevation
           )
         );
 

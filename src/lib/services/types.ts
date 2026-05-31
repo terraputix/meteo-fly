@@ -7,7 +7,7 @@ export interface PageParameters {
   location: Location;
   selectedDay: number;
   selectedModel: WeatherModel;
-  maxAltitude?: MaxAltitude;
+  maxAltitude: MaxAltitude;
   cellSelection: CellSelection;
   chartView?: ChartView;
   hour?: number;
