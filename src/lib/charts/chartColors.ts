@@ -8,6 +8,7 @@ export const CHART_COLORS = {
   humidity: '#3182ce',
   lcl: '#805ad5',
   elevation: '#8B4513',
+  modelGridElevation: '#556B2F',
   rain: 'rgba(30,100,220,0.80)',
   cloudRect: 'rgba(100,120,145',
   windCloud: 'rgba(90,110,140',
@@ -29,6 +30,7 @@ export const LEGEND_ITEMS: LegendItem[] = [
   { label: 'Dewpoint', color: CHART_COLORS.dewpoint, style: 'solid' },
   { label: 'Humidity', color: CHART_COLORS.humidity, style: 'dashed' },
   { label: 'LCL', color: CHART_COLORS.lcl, style: 'solid' },
-  { label: 'Surface Elev.', color: CHART_COLORS.elevation, style: 'dashed' },
+  { label: 'DEM Elev.', color: CHART_COLORS.elevation, style: 'dashed' },
+  { label: 'Model Grid Elev.', color: CHART_COLORS.modelGridElevation, style: 'dashed' },
   { label: 'Rain', color: '', style: 'emoji', emoji: '💧' },
 ];

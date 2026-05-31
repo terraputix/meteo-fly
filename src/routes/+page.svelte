@@ -8,7 +8,7 @@
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
   import { getInitialParameters } from '$lib/services/defaults';
   import { type PageParameters } from '$lib/services/types';
-  import { fetchWeatherData } from '$lib/api/api';
+  import { fetchWeatherData, fetchModelGridElevation } from '$lib/api/api';
   import type { Location, WeatherDataType } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
 
@@ -88,7 +88,7 @@
 
     try {
       error = null;
-      weatherData = await fetchWeatherData(
+      const weatherDataResult = await fetchWeatherData(
         parameters.location,
         parameters.selectedModel,
         startDate,
@@ -96,6 +96,14 @@
         parameters.maxAltitude ?? 4000,
         parameters.cellSelection
       );
+      const modelGridElevation = weatherDataResult.selectedGridCell
+        ? await fetchModelGridElevation(
+            weatherDataResult.selectedGridCell,
+            parameters.selectedModel,
+            parameters.cellSelection
+          ).catch(() => undefined)
+        : undefined;
+      weatherData = { ...weatherDataResult, modelGridElevation };
       showChart = true;
     } catch (err) {
       console.error(err);
@@ -130,6 +138,7 @@
           bind:chartOpen={showChart}
           selectedGridCell={weatherData?.selectedGridCell ?? null}
           gridCellElevation={weatherData?.elevation}
+          modelGridElevation={weatherData?.modelGridElevation}
           onToggleChart={toggleChartPanel}
           onLocationChange={updateLocation}
         />
