@@ -328,7 +328,7 @@ export function buildWindChartOption(
         type: 'rect',
         shape: { x: p1[0], y: p1[1], width: w, height: h },
         style: {
-          fill: `${CHART_COLORS.cloudRect},${(item.cloudCover / 100).toFixed(3)})`,
+          fill: `${CHART_COLORS.cloudRect}${(item.cloudCover / 100).toFixed(3)})`,
           stroke: 'none',
         },
       };
@@ -436,7 +436,7 @@ export function buildWindChartOption(
         // Expand 1 px horizontally to close any sub-pixel gap between columns.
         shape: { x: xLeft - 0.5, y: yTop, width: w + 1, height: h },
         style: {
-          fill: `${CHART_COLORS.windCloud},${alpha.toFixed(3)})`,
+          fill: `${CHART_COLORS.windCloud}${alpha.toFixed(3)})`,
           stroke: 'none',
         },
       };

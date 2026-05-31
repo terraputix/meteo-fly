@@ -8,14 +8,19 @@
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
   import { getInitialParameters } from '$lib/services/defaults';
   import { type PageParameters } from '$lib/services/types';
-  import { fetchWeatherData, fetchModelGridElevation } from '$lib/api/api';
-  import type { Location, WeatherDataType } from '$lib/api/types';
+  import { fetchWindChartData, fetchModelGridElevation, fetchSkewTData } from '$lib/api/api';
+  import type { Location, WindChartData, SkewTWeatherData } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
+  import { SvelteURLSearchParams } from 'svelte/reactivity';
 
   let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
   let showChart = $state(false);
-  let weatherData = $state.raw<WeatherDataType | null>(null);
-  let isWeatherLoading = $state(false);
+  let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
+  let selectedHour = $state(parameters.hour ?? 0);
+  let windChartData = $state.raw<WindChartData | null>(null);
+  let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
+  let isWindChartLoading = $state(false);
+  let isSkewTLoading = $state(false);
   let error: string | null = $state(null);
 
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -24,17 +29,18 @@
 
   const urlSearch = $derived.by(() => {
     const { location, selectedDay, selectedModel, maxAltitude, cellSelection } = parameters;
-    const params = new URLSearchParams({
+    const params = new SvelteURLSearchParams({
       lat: location.latitude.toString(),
       lon: location.longitude.toString(),
       day: selectedDay.toString(),
       model: selectedModel,
-      maxAlt: (maxAltitude ?? 4000).toString(),
+      maxAlt: maxAltitude.toString(),
       cellSelection,
+      view: chartView,
     });
+    params.set('hour', selectedHour.toString());
     return `?${params.toString()}`;
   });
-
   function syncURL() {
     const search = urlSearch;
     const currentSearch = window.location.search;
@@ -63,9 +69,9 @@
   function updateLocation(location: Location) {
     parameters.location = location;
 
-    if (weatherData) {
-      weatherData = {
-        ...weatherData,
+    if (windChartData) {
+      windChartData = {
+        ...windChartData,
         selectedGridCell: null,
       };
     }
@@ -80,36 +86,69 @@
     void parameters.cellSelection;
 
     clearTimeout(updateTimer ?? undefined);
-    updateTimer = setTimeout(updateWeather, 5);
+    updateTimer = setTimeout(updateWindChart, 5);
   });
 
-  async function updateWeather() {
-    isWeatherLoading = true;
+  $effect(() => {
+    if (!showChart || chartView !== 'skewt') return;
+
+    void parameters.location.latitude;
+    void parameters.location.longitude;
+    void parameters.selectedModel;
+    void parameters.maxAltitude;
+    void parameters.cellSelection;
+    void startDate;
+
+    updateSkewTData();
+  });
+
+  async function updateWindChart() {
+    isWindChartLoading = true;
 
     try {
       error = null;
-      const weatherDataResult = await fetchWeatherData(
+      const result = await fetchWindChartData(
         parameters.location,
         parameters.selectedModel,
         startDate,
         1,
-        parameters.maxAltitude ?? 4000,
+        parameters.maxAltitude,
         parameters.cellSelection
       );
-      const modelGridElevation = weatherDataResult.selectedGridCell
+      const modelGridElevation = result.selectedGridCell
         ? await fetchModelGridElevation(
-            weatherDataResult.selectedGridCell,
+            result.selectedGridCell,
             parameters.selectedModel,
             parameters.cellSelection
           ).catch(() => undefined)
         : undefined;
-      weatherData = { ...weatherDataResult, modelGridElevation };
+      windChartData = { ...result, modelGridElevation };
       showChart = true;
     } catch (err) {
       console.error(err);
       error = 'Failed to fetch weather data. Please try again.';
     } finally {
-      isWeatherLoading = false;
+      isWindChartLoading = false;
+    }
+  }
+
+  async function updateSkewTData() {
+    if (!showChart) return;
+
+    isSkewTLoading = true;
+
+    try {
+      skewTWeatherData = await fetchSkewTData(
+        parameters.location,
+        parameters.selectedModel,
+        startDate,
+        parameters.maxAltitude,
+        parameters.cellSelection
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      isSkewTLoading = false;
     }
   }
 </script>
@@ -136,16 +175,16 @@
           latitude={parameters.location.latitude}
           longitude={parameters.location.longitude}
           bind:chartOpen={showChart}
-          selectedGridCell={weatherData?.selectedGridCell ?? null}
-          gridCellElevation={weatherData?.elevation}
-          modelGridElevation={weatherData?.modelGridElevation}
+          selectedGridCell={windChartData?.selectedGridCell ?? null}
+          gridCellElevation={windChartData?.elevation}
+          modelGridElevation={windChartData?.modelGridElevation}
           onToggleChart={toggleChartPanel}
           onLocationChange={updateLocation}
         />
       </div>
     </ResizablePane>
 
-    {#if showChart && weatherData}
+    {#if showChart && windChartData}
       <ResizableHandle withHandle />
       <ResizablePane defaultSize={50} minSize={$isMobile ? 10 : 30}>
         <div class="h-full overflow-y-auto bg-white p-0 sm:p-0">
@@ -155,16 +194,20 @@
             </div>
           {/if}
           <ChartContainer
-            {weatherData}
+            {windChartData}
+            {skewTWeatherData}
             {startDate}
-            {isWeatherLoading}
+            {isWindChartLoading}
+            {isSkewTLoading}
             bind:selectedDay={parameters.selectedDay}
             bind:maxAltitude={parameters.maxAltitude}
             bind:model={parameters.selectedModel}
             bind:cellSelection={parameters.cellSelection}
             bind:latitude={parameters.location.latitude}
             bind:longitude={parameters.location.longitude}
-            on:close={() => (showChart = false)}
+            bind:chartView
+            bind:hour={selectedHour}
+            onClose={() => (showChart = false)}
           />
         </div>
       </ResizablePane>

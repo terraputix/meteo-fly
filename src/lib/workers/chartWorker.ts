@@ -2,7 +2,7 @@ import { getCloudCoverData } from '$lib/charts/clouds';
 import { getWindFieldAllLevels } from '$lib/charts/wind';
 import { calculateLclWeather } from '$lib/meteo/lcl';
 
-import type { WeatherDataType } from '$lib/api/types';
+import type { WindChartData } from '$lib/api/types';
 import type {
   ChartWorkerInput,
   ChartWorkerSuccessOutput,
@@ -12,7 +12,7 @@ import type {
 } from './chartWorker.types';
 import { addSeconds } from '$lib/utils/dateExtensions';
 
-function prepareTemperatureData(data: WeatherDataType): TemperatureChartData {
+function prepareTemperatureData(data: WindChartData): TemperatureChartData {
   return {
     temperatureData: data.hourly.time.map((time, i) => ({
       time,
@@ -31,7 +31,7 @@ function prepareTemperatureData(data: WeatherDataType): TemperatureChartData {
   };
 }
 
-function prepareRainAndCloudData(data: WeatherDataType): RainCloudChartData {
+function prepareRainAndCloudData(data: WindChartData): RainCloudChartData {
   return {
     cloudRects: data.hourly.time.flatMap((time, i) => [
       {
@@ -73,17 +73,17 @@ function calculateDomains(windData: Array<{ time: Date }>): [Date, Date] {
 }
 
 self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
-  const { weatherData, maxAltitude, model } = e.data;
+  const { windChartData, maxAltitude, model } = e.data;
 
   try {
-    const cloudData = getCloudCoverData(weatherData, model, maxAltitude);
-    const windData = getWindFieldAllLevels(weatherData, model, maxAltitude);
-    const lcl = calculateLclWeather(weatherData);
+    const cloudData = getCloudCoverData(windChartData, model, maxAltitude);
+    const windData = getWindFieldAllLevels(windChartData, model, maxAltitude);
+    const lcl = calculateLclWeather(windChartData);
 
     const xDomain = calculateDomains(windData);
 
-    const temperatureChartData = prepareTemperatureData(weatherData);
-    const rainCloudChartData = prepareRainAndCloudData(weatherData);
+    const temperatureChartData = prepareTemperatureData(windChartData);
+    const rainCloudChartData = prepareRainAndCloudData(windChartData);
 
     const successResponse: ChartWorkerSuccessOutput = {
       success: true,
@@ -91,9 +91,9 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
         cloudData,
         windData,
         lcl,
-        elevation: weatherData.elevation,
-        modelGridElevation: weatherData.modelGridElevation,
-        timezoneAbbr: weatherData.timezoneAbbr,
+        elevation: windChartData.elevation,
+        modelGridElevation: windChartData.modelGridElevation,
+        timezoneAbbr: windChartData.timezoneAbbr,
         temperatureChartData,
         rainCloudChartData,
         xDomain,

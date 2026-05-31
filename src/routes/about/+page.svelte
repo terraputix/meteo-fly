@@ -95,9 +95,9 @@
           Weather models provide data on a grid. Meteo-Fly lets you decide whether to always select the closest grid
           cell or whether a grid cell with a similar terrain height should be selected. The resulting grid cell, the
           model grid elevation, and the DEM elevation will be displayed on the map. Which mode is optimal depends on
-          various factors, such as the model's grid resolution, the local terrain variability, and the conditions
-          on a specific day (e.g. windward vs. leeward). Experiment with both modes to see which one provides
-          more realistic forecasts for your location and conditions.
+          various factors, such as the model's grid resolution, the local terrain variability, and the conditions on a
+          specific day (e.g. windward vs. leeward). Experiment with both modes to see which one provides more realistic
+          forecasts for your location and conditions.
         </p>
         <ul class="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-600 sm:text-base">
           <li>
