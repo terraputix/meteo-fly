@@ -121,8 +121,8 @@ describe('Skew-T data building', () => {
     const expected = expectedLevelCount();
 
     result.traces.forEach((trace: SkewTTrace) => {
-      const nativeCount = trace.levels.filter((l: SkewTLevelData) => l.isNative).length;
-      const interpCount = trace.levels.filter((l: SkewTLevelData) => !l.isNative).length;
+      const nativeCount = trace.levels.filter((l: SkewTLevelData) => !l.isInterpolated).length;
+      const interpCount = trace.levels.filter((l: SkewTLevelData) => l.isInterpolated).length;
       expect(nativeCount + interpCount).toBe(expected);
       expect(nativeCount).toBeGreaterThan(0);
     });

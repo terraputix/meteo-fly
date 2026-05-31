@@ -162,8 +162,7 @@ function buildLevelDataAtHour({
       windSpeed: Math.round(windSpeed * 10) / 10,
       windDirection: Math.round(windDirection),
       cloudCover: cloudAtLevel != null ? Math.round(cloudAtLevel) : 0,
-      isNative: level.source === 'model',
-      source: level.source,
+      isInterpolated: level.source !== 'model',
     };
   });
 }

@@ -390,7 +390,7 @@ function drawTraces(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: Pl
   ctx.save();
   ctx.fillStyle = CHART_COLORS.temperature;
   for (let i = 0; i < trace.levels.length; i++) {
-    if (trace.levels[i].isNative) {
+    if (!trace.levels[i].isInterpolated) {
       const [x, y] = tempPts[i];
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
@@ -404,7 +404,7 @@ function drawTraces(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: Pl
   ctx.save();
   ctx.fillStyle = CHART_COLORS.dewpoint;
   for (let i = 0; i < trace.levels.length; i++) {
-    if (trace.levels[i].isNative) {
+    if (!trace.levels[i].isInterpolated) {
       const [x, y] = dewPts[i];
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
@@ -492,7 +492,7 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
     ctx.lineWidth = strokeWidthScale(level.windSpeed);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalAlpha = level.isNative ? 1 : 0.4;
+    ctx.globalAlpha = level.isInterpolated ? 0.4 : 1;
     ctx.beginPath();
     ctx.moveTo(0, 7);
     ctx.lineTo(0, -7);
@@ -897,7 +897,7 @@ export interface HitTestResult {
   dewpoint: number;
   windSpeed: number;
   windDirection: number;
-  isNative: boolean;
+  isInterpolated: boolean;
 }
 
 export type HitTestFn = (canvasX: number, canvasY: number) => HitTestResult | null;
@@ -960,7 +960,7 @@ export function renderSkewT(
       dewpoint: levelData.dewpoint,
       windSpeed: levelData.windSpeed,
       windDirection: levelData.windDirection,
-      isNative: levelData.isNative,
+      isInterpolated: levelData.isInterpolated,
     };
   };
 

@@ -18,8 +18,7 @@ export interface SkewTLevelData {
   windSpeed: number;
   windDirection: number;
   cloudCover: number;
-  isNative: boolean;
-  source: 'model' | 'interpolated';
+  isInterpolated: boolean;
 }
 
 export interface SkewTTrace {
