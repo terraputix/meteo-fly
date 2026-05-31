@@ -9,7 +9,7 @@ import {
 } from '$lib/meteo/thermo';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
-import { SKEWT_PRESSURE_LEVELS, type SkewTData, type SkewTLevelData, type SkewTTrace } from '$lib/meteo/types';
+import { type SkewTData, type SkewTLevelData, type SkewTTrace } from '$lib/meteo/types';
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
 
@@ -134,13 +134,12 @@ function computeTempRange(
 
 function buildLayout(
   trace: SkewTTrace,
-  pressureLevelsInput: number[],
+  pressureLevels: number[],
   plotLeft: number,
   plotTop: number,
   plotWidth: number,
   plotHeight: number
 ): PlotLayout | null {
-  const pressureLevels = (pressureLevelsInput.length ? pressureLevelsInput : [...SKEWT_PRESSURE_LEVELS]).slice();
   pressureLevels.sort((a, b) => b - a);
   const minP = Math.min(...pressureLevels);
   const maxP = Math.max(...pressureLevels);
@@ -432,7 +431,15 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
     1,
     [3, 3]
   );
-  drawText(ctx, `LCL (${Math.round(trace.lcl)}m)`, plotLeft + plotWidth - 4, lclY - 4, CHART_COLORS.lcl, 'right', 'bottom');
+  drawText(
+    ctx,
+    `LCL (${Math.round(trace.lcl)}m)`,
+    plotLeft + plotWidth - 4,
+    lclY - 4,
+    CHART_COLORS.lcl,
+    'right',
+    'bottom'
+  );
 
   // Surface temperature & dewpoint markers at elevation line
   const elevPressure = metersToHPa(elevation);
