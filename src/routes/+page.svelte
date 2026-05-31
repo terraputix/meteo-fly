@@ -34,13 +34,11 @@
       lon: location.longitude.toString(),
       day: selectedDay.toString(),
       model: selectedModel,
-      maxAlt: (maxAltitude ?? 4000).toString(),
+      maxAlt: maxAltitude.toString(),
       cellSelection,
       view: chartView,
     });
-    if (selectedHour != null) {
-      params.set('hour', selectedHour.toString());
-    }
+    params.set('hour', selectedHour.toString());
     return `?${params.toString()}`;
   });
   function syncURL() {
@@ -114,7 +112,7 @@
         parameters.selectedModel,
         startDate,
         1,
-        parameters.maxAltitude ?? 4000,
+        parameters.maxAltitude,
         parameters.cellSelection
       );
       const modelGridElevation = weatherDataResult.selectedGridCell
@@ -144,7 +142,7 @@
         parameters.location,
         parameters.selectedModel,
         startDate,
-        parameters.maxAltitude ?? 4000,
+        parameters.maxAltitude,
         parameters.cellSelection
       );
     } catch (err) {
@@ -209,7 +207,7 @@
             bind:longitude={parameters.location.longitude}
             bind:chartView
             bind:hour={selectedHour}
-            on:close={() => (showChart = false)}
+            onClose={() => (showChart = false)}
           />
         </div>
       </ResizablePane>

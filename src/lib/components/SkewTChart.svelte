@@ -60,7 +60,7 @@
     }
   }
 
-  $: if (canvas && skewTData) render();
+  $: if (canvas && skewTData && (hour, true)) render();
 
   onMount(() => {
     if (!container) return;
