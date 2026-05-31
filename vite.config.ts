@@ -11,7 +11,7 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'service-worker.ts',
-      // registerType: 'autoUpdate',
+      registerType: 'autoUpdate',
       manifest: {
         name: 'Meteo-Fly',
         short_name: 'Meteo-Fly',
@@ -48,7 +48,6 @@ export default defineConfig({
       },
       devOptions: {
         enabled: true,
-        type: 'module',
       },
     }),
   ],

@@ -11,7 +11,7 @@
     if (pwaInfo) {
       const { registerSW } = await import('virtual:pwa-register');
       registerSW({
-        immediate: true,
+        immediate: false,
         onRegistered(r) {
           console.log(`SW Registered: ${r}`);
         },

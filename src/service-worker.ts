@@ -1,13 +1,15 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from 'workbox-precaching';
+import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
+import { clientsClaim } from 'workbox-core';
 
 declare const self: ServiceWorkerGlobalScope;
 
+cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
 self.skipWaiting();
-// self.clientsClaim();
+clientsClaim();
 
 const CACHE_NAME = 'weather-api-cache';
 const CACHED_AT_HEADER = 'x-meteo-fly-cached-at';
