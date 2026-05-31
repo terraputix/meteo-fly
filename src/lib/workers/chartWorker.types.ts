@@ -38,6 +38,7 @@ export interface ChartWorkerSuccessOutput {
     windData: WindFieldLevel[];
     lcl: Array<{ time: Date; value: number }>;
     elevation: number;
+    modelGridElevation: number | undefined;
     timezoneAbbr: string;
     temperatureChartData: TemperatureChartData;
     rainCloudChartData: RainCloudChartData;
