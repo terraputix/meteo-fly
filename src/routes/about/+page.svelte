@@ -92,18 +92,22 @@
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="text-xl font-semibold text-slate-900">Grid cell selection</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
-          Models provide data on a grid. Meteo-Fly lets you decide how to choose the grid cell when your location sits
-          between land and water or rugged terrain. The selected grid cell is shown on the map with a label, connected
-          to your chosen location by a line that displays the distance between them.
+          Weather models provide data on a grid. Meteo-Fly lets you decide whether to always select the closest grid
+          cell or whether a grid cell with a similar terrain height should be selected. The resulting grid cell, the
+          model grid elevation, and the DEM elevation will be displayed on the map. Which mode is optimal depends on
+          various factors, such as the model's grid resolution, the local terrain variability, and the conditions
+          on a specific day (e.g. windward vs. leeward). Experiment with both modes to see which one provides
+          more realistic forecasts for your location and conditions.
         </p>
         <ul class="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-600 sm:text-base">
-          <li><strong>Terrain-aware</strong> favors land grid cells around the selected point.</li>
-          <li><strong>Nearest</strong> always picks the closest grid cell, even if it sits over water.</li>
+          <li>
+            <strong>Terrain-aware</strong> favors land grid cells around the selected point with a similar elevation.
+          </li>
+          <li>
+            <strong>Nearest</strong> always picks the closest grid cell, even if it sits over water or the elevation does
+            not match.
+          </li>
         </ul>
-        <p class="mt-4 text-sm text-slate-600 sm:text-base">
-          For free flight, terrain-aware selection usually matches launch reality better, but coastal and lake sites can
-          benefit from the nearest mode.
-        </p>
       </div>
 
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
