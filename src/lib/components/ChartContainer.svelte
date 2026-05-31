@@ -6,6 +6,7 @@
   import ChartSettings from './ChartSettings.svelte';
   import HourSlider from './HourSlider.svelte';
   import Footer from './Footer.svelte';
+  import { browser } from '$app/environment';
   import { buildSkewTData } from '$lib/meteo/skewT';
   import type { MaxAltitude } from '$lib/meteo/types';
   import type { ChartView } from '$lib/services/types';
@@ -64,7 +65,7 @@
     void model;
     void cellSelection;
     void showMobileSettings;
-    if (scrollContainer) {
+    if (scrollContainer && browser && window.innerWidth < 640) {
       scrollContainer.scrollTop = scrollContainer.scrollHeight;
     }
   });
