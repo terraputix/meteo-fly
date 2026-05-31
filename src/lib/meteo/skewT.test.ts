@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { SkewTWeatherData } from '$lib/api/types';
-import { getAllTaggedLevelsForModel } from './pressureLevels';
-import { dedupeLevels, buildSkewTData } from './skewT';
+import { buildSkewTData } from './skewT';
 import type { SkewTTrace, SkewTLevelData } from './types';
 
 function createMockSkewTData(): SkewTWeatherData {
@@ -71,12 +70,6 @@ function createMockSkewTData(): SkewTWeatherData {
   };
 }
 
-// Returns the deduplicated level count (unique hPa values) used by buildSkewTData
-function expectedLevelCount(): number {
-  const allLevels = getAllTaggedLevelsForModel('icon_d2', 4000);
-  return dedupeLevels(allLevels).length;
-}
-
 describe('Skew-T data building', () => {
   it('builds skew-t data for icon_d2 model', () => {
     const weatherData = createMockSkewTData();
@@ -100,31 +93,26 @@ describe('Skew-T data building', () => {
 
     // LCL is calculated as lclValue + groundElevation
     // For first trace: surfaceTemp=20, surfaceDewpoint=15 → approx 750m LCL AGL
-    const trace0 = result.traces[0];
-    expect(trace0.lcl).toBeGreaterThan(550); // at least ground elevation
-    expect(trace0.lcl).toBeLessThan(2000);
+    expect(result.traces[0].lcl).toBe(1125); // at least ground elevation
   });
 
   it('returns correct number of levels per trace (native + interpolated)', () => {
     const weatherData = createMockSkewTData();
     const result = buildSkewTData(weatherData, 'icon_d2', 4000);
-    const expected = expectedLevelCount();
 
     result.traces.forEach((trace: SkewTTrace) => {
-      expect(trace.levels).toHaveLength(expected);
+      expect(trace.levels).toHaveLength(16);
     });
   });
 
   it('marks native vs interpolated levels correctly', () => {
     const weatherData = createMockSkewTData();
     const result = buildSkewTData(weatherData, 'icon_d2', 4000);
-    const expected = expectedLevelCount();
 
     result.traces.forEach((trace: SkewTTrace) => {
       const nativeCount = trace.levels.filter((l: SkewTLevelData) => !l.isInterpolated).length;
       const interpCount = trace.levels.filter((l: SkewTLevelData) => l.isInterpolated).length;
-      expect(nativeCount + interpCount).toBe(expected);
-      expect(nativeCount).toBeGreaterThan(0);
+      expect(nativeCount + interpCount).toBe(16);
     });
   });
 
@@ -143,8 +131,8 @@ describe('Skew-T data building', () => {
     const result = buildSkewTData(weatherData, 'icon_d2', 4000);
 
     result.traces.forEach((trace: SkewTTrace, i: number) => {
-      expect(trace.surfaceTemp).toBeCloseTo(20 + 2 * i, 0);
-      expect(trace.surfaceDewpoint).toBeCloseTo(15 + i, 0);
+      expect(trace.surfaceTemp).toBe(20 + 2 * i);
+      expect(trace.surfaceDewpoint).toBe(15 + i);
     });
   });
 
@@ -155,7 +143,7 @@ describe('Skew-T data building', () => {
     // First trace at 1000hPa should use profile temperature (~18°C)
     const firstTrace = result.traces[0];
     const level1000 = firstTrace.levels.find((l: SkewTLevelData) => l.pressure === 1000);
-    expect(level1000?.temperature).toBeCloseTo(18, 0);
+    expect(level1000?.temperature).toBe(18);
   });
 
   it('uses actual profile dewpoint when available', () => {
@@ -164,6 +152,6 @@ describe('Skew-T data building', () => {
 
     const firstTrace = result.traces[0];
     const level1000 = firstTrace.levels.find((l: SkewTLevelData) => l.pressure === 1000);
-    expect(level1000?.dewpoint).toBeCloseTo(14, 0);
+    expect(level1000?.dewpoint).toBe(14);
   });
 });
