@@ -432,7 +432,7 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
     1,
     [3, 3]
   );
-  drawText(ctx, 'LCL', plotLeft + plotWidth - 4, lclY - 4, CHART_COLORS.lcl, 'right', 'bottom');
+  drawText(ctx, `LCL (${Math.round(trace.lcl)}m)`, plotLeft + plotWidth - 4, lclY - 4, CHART_COLORS.lcl, 'right', 'bottom');
 
   // Surface temperature & dewpoint markers at elevation line
   const elevPressure = metersToHPa(elevation);
