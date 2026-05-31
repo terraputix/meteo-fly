@@ -8,8 +8,10 @@ export default defineConfig({
     tailwindcss(),
     sveltekit(),
     SvelteKitPWA({
-      strategies: 'generateSW',
-      registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'service-worker.ts',
+      // registerType: 'autoUpdate',
       manifest: {
         name: 'Meteo-Fly',
         short_name: 'Meteo-Fly',
@@ -40,34 +42,13 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        // Raise the limit to 3 MiB to accommodate the echarts bundle
+      injectManifest: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        // Precache all build assets and static files
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        // 5 minute cache for weather API responses
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\.open-meteo\.com\/v1\/forecast/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'weather-api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 5,
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-        ],
-        cleanupOutdatedCaches: true,
-        skipWaiting: true,
-        clientsClaim: true,
       },
       devOptions: {
         enabled: true,
+        type: 'module',
       },
     }),
   ],
