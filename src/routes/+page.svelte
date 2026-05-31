@@ -8,8 +8,8 @@
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
   import { getInitialParameters } from '$lib/services/defaults';
   import { type PageParameters } from '$lib/services/types';
-  import { fetchWeatherData, fetchModelGridElevation, fetchSkewTData } from '$lib/api/api';
-  import type { Location, WeatherDataType, SkewTWeatherData } from '$lib/api/types';
+  import { fetchWindChartData, fetchModelGridElevation, fetchSkewTData } from '$lib/api/api';
+  import type { Location, WindChartData, SkewTWeatherData } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
 
@@ -17,9 +17,9 @@
   let showChart = $state(false);
   let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
   let selectedHour = $state(parameters.hour ?? 0);
-  let weatherData = $state.raw<WeatherDataType | null>(null);
+  let windChartData = $state.raw<WindChartData | null>(null);
   let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
-  let isWeatherLoading = $state(false);
+  let isWindChartLoading = $state(false);
   let isSkewTLoading = $state(false);
   let error: string | null = $state(null);
 
@@ -69,9 +69,9 @@
   function updateLocation(location: Location) {
     parameters.location = location;
 
-    if (weatherData) {
-      weatherData = {
-        ...weatherData,
+    if (windChartData) {
+      windChartData = {
+        ...windChartData,
         selectedGridCell: null,
       };
     }
@@ -86,7 +86,7 @@
     void parameters.cellSelection;
 
     clearTimeout(updateTimer ?? undefined);
-    updateTimer = setTimeout(updateWeather, 5);
+    updateTimer = setTimeout(updateWindChart, 5);
   });
 
   $effect(() => {
@@ -102,12 +102,12 @@
     updateSkewTData();
   });
 
-  async function updateWeather() {
-    isWeatherLoading = true;
+  async function updateWindChart() {
+    isWindChartLoading = true;
 
     try {
       error = null;
-      const weatherDataResult = await fetchWeatherData(
+      const result = await fetchWindChartData(
         parameters.location,
         parameters.selectedModel,
         startDate,
@@ -115,20 +115,20 @@
         parameters.maxAltitude,
         parameters.cellSelection
       );
-      const modelGridElevation = weatherDataResult.selectedGridCell
+      const modelGridElevation = result.selectedGridCell
         ? await fetchModelGridElevation(
-            weatherDataResult.selectedGridCell,
+            result.selectedGridCell,
             parameters.selectedModel,
             parameters.cellSelection
           ).catch(() => undefined)
         : undefined;
-      weatherData = { ...weatherDataResult, modelGridElevation };
+      windChartData = { ...result, modelGridElevation };
       showChart = true;
     } catch (err) {
       console.error(err);
       error = 'Failed to fetch weather data. Please try again.';
     } finally {
-      isWeatherLoading = false;
+      isWindChartLoading = false;
     }
   }
 
@@ -175,16 +175,16 @@
           latitude={parameters.location.latitude}
           longitude={parameters.location.longitude}
           bind:chartOpen={showChart}
-          selectedGridCell={weatherData?.selectedGridCell ?? null}
-          gridCellElevation={weatherData?.elevation}
-          modelGridElevation={weatherData?.modelGridElevation}
+          selectedGridCell={windChartData?.selectedGridCell ?? null}
+          gridCellElevation={windChartData?.elevation}
+          modelGridElevation={windChartData?.modelGridElevation}
           onToggleChart={toggleChartPanel}
           onLocationChange={updateLocation}
         />
       </div>
     </ResizablePane>
 
-    {#if showChart && weatherData}
+    {#if showChart && windChartData}
       <ResizableHandle withHandle />
       <ResizablePane defaultSize={50} minSize={$isMobile ? 10 : 30}>
         <div class="h-full overflow-y-auto bg-white p-0 sm:p-0">
@@ -194,10 +194,10 @@
             </div>
           {/if}
           <ChartContainer
-            {weatherData}
+            {windChartData}
             {skewTWeatherData}
             {startDate}
-            {isWeatherLoading}
+            {isWindChartLoading}
             {isSkewTLoading}
             bind:selectedDay={parameters.selectedDay}
             bind:maxAltitude={parameters.maxAltitude}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CellSelection, WeatherDataType, WeatherModel, SkewTWeatherData } from '$lib/api/types';
+  import type { CellSelection, WindChartData, WeatherModel, SkewTWeatherData } from '$lib/api/types';
   import WindChart from './WindChart.svelte';
   import SkewTChart from './SkewTChart.svelte';
   import DayNavigator from './DayNavigator.svelte';
@@ -11,10 +11,10 @@
   import type { ChartView } from '$lib/services/types';
 
   let {
-    weatherData,
+    windChartData,
     skewTWeatherData = null,
     startDate,
-    isWeatherLoading = false,
+    isWindChartLoading = false,
     isSkewTLoading = false,
     selectedDay = $bindable(),
     maxAltitude = $bindable(4000),
@@ -26,10 +26,10 @@
     hour = $bindable(0),
     onClose,
   }: {
-    weatherData: WeatherDataType;
+    windChartData: WindChartData;
     skewTWeatherData?: SkewTWeatherData | null;
     startDate: Date;
-    isWeatherLoading?: boolean;
+    isWindChartLoading?: boolean;
     isSkewTLoading?: boolean;
     selectedDay: number;
     maxAltitude?: MaxAltitude;
@@ -44,7 +44,7 @@
 
   let skewTData = $derived.by(() => {
     if (!skewTWeatherData || chartView !== 'skewt') return null;
-    return buildSkewTData(skewTWeatherData, model, maxAltitude, weatherData.modelGridElevation);
+    return buildSkewTData(skewTWeatherData, model, maxAltitude, windChartData.modelGridElevation);
   });
   let traceHours = $derived(skewTData?.traces.map((t) => t.time) ?? []);
 
@@ -58,7 +58,7 @@
   });
 
   $effect(() => {
-    void weatherData;
+    void windChartData;
     void selectedDay;
     void maxAltitude;
     void model;
@@ -121,7 +121,7 @@
     </div>
 
     {#if chartView === 'wind'}
-      <WindChart {weatherData} {maxAltitude} {model} isLoading={isWeatherLoading} />
+      <WindChart {windChartData} {maxAltitude} {model} isLoading={isWindChartLoading} />
     {:else if skewTData && traceHours.length > 0}
       <div class="mb-3">
         <HourSlider bind:hour {traceHours} timezoneAbbr={skewTData?.timezoneAbbr ?? ''} />

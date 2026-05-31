@@ -10,7 +10,7 @@ import {
   type ProfileVariables,
   type FlatVariable,
   type HourlyData,
-  type WeatherDataType,
+  type WindChartData,
   type SkewTWeatherData,
 } from './types';
 import { getVariablesForModel, makeProfileVar } from './variables';
@@ -117,14 +117,14 @@ export async function fetchModelGridElevation(
   return response.elevation();
 }
 
-export async function fetchWeatherData(
+export async function fetchWindChartData(
   location: Location,
   model: WeatherModel = 'icon_d2',
   start: Date,
   numberOfDays: number = 1,
   maxAltitude: MaxAltitude = 4000,
   cellSelection: CellSelection = 'nearest'
-): Promise<WeatherDataType> {
+): Promise<WindChartData> {
   const modelVariables = getVariablesForModel(model, maxAltitude);
   const hourlyParams = createHourlyParams(modelVariables);
   const params = createQueryParams(location, hourlyParams, model, cellSelection, start, numberOfDays);
@@ -146,7 +146,7 @@ export async function fetchWeatherData(
   const elevation = response.elevation();
 
   const hourly = response.hourly()!;
-  const weatherData: WeatherDataType = {
+  const windChartData: WindChartData = {
     elevation: elevation,
     hourly: {
       time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map((t) => new Date(t * 1000)),
@@ -163,7 +163,7 @@ export async function fetchWeatherData(
     selectedGridCell,
   };
 
-  return weatherData;
+  return windChartData;
 }
 
 // ─── Skew-T data fetching ────────────────────────────────────────────────────

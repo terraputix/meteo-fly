@@ -25,7 +25,7 @@ export function getAtLevel(data: VerticalProfile, pressure: number): Float32Arra
   return data[`_${pressure}hPa` as VerticalProfileKey];
 }
 
-export interface WeatherDataType {
+export interface WindChartData {
   hourly: HourlyData;
   elevation: number;
   modelGridElevation?: number;

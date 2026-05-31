@@ -1,4 +1,4 @@
-import type { WeatherDataType } from '$lib/api/types';
+import type { WindChartData } from '$lib/api/types';
 
 /**
  * Calculates the Lifting Condensation Level (LCL) height using Espy's equation
@@ -25,7 +25,7 @@ export function calculateLcl(temperature: number, dewpoint: number): number {
   return Math.round(lclHeight);
 }
 
-export function calculateLclWeather(data: WeatherDataType): { time: Date; value: number }[] {
+export function calculateLclWeather(data: WindChartData): { time: Date; value: number }[] {
   const lcls: { time: Date; value: number }[] = [];
 
   const times = data.hourly.time;
