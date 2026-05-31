@@ -66,6 +66,19 @@ function buildLevelDataAtHour({
 
   const bracketHeight = (nl: PressureLevel) => nativeActualHeights.get(nl.hPa) ?? nl.heightMeters;
 
+  const nearestCloud = (levelHPa: number): number | null => {
+    let best: PressureLevel | null = null;
+    let bestDiff = Infinity;
+    for (const nl of nativeLevels) {
+      const diff = Math.abs(nl.hPa - levelHPa);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = nl;
+      }
+    }
+    return best ? getProfileValue(cloudProfile, best.hPa, hourIndex) : null;
+  };
+
   return levels.map((level) => {
     // Interpolate actual height in log-p space for non-native levels
     let actualHeight: number | null = null;
@@ -149,10 +162,13 @@ function buildLevelDataAtHour({
         windSpeed = interpolated.speed;
         windDirection = interpolated.direction;
       } else {
-        windSpeed = 0;
-        windDirection = 0;
+        windSpeed = NaN;
+        windDirection = NaN;
       }
     }
+
+    const cloudCoverVal = cloudAtLevel ?? nearestCloud(level.hPa);
+    const cloudCover = cloudCoverVal != null ? Math.round(cloudCoverVal) : NaN;
 
     return {
       pressure: level.hPa,
@@ -161,7 +177,7 @@ function buildLevelDataAtHour({
       dewpoint: Math.round(dewpoint * 10) / 10,
       windSpeed: Math.round(windSpeed * 10) / 10,
       windDirection: Math.round(windDirection),
-      cloudCover: cloudAtLevel != null ? Math.round(cloudAtLevel) : 0,
+      cloudCover,
       isInterpolated: level.source !== 'model',
     };
   });
@@ -178,8 +194,8 @@ export function buildSkewTData(
   const allLevels = dedupeLevels(getAllTaggedLevelsForModel(model, maxAltitude));
 
   weatherData.hourly.time.forEach((time, i) => {
-    const surfaceTemp = weatherData.hourly.temperature_2m?.[i] ?? 20;
-    const surfaceDewpoint = weatherData.hourly.dewpoint_2m?.[i] ?? 15;
+    const surfaceTemp = weatherData.hourly.temperature_2m?.[i] ?? NaN;
+    const surfaceDewpoint = weatherData.hourly.dewpoint_2m?.[i] ?? NaN;
     const lclValue = calculateLcl(surfaceTemp, surfaceDewpoint);
     const lclHeight = lclValue + weatherData.elevation;
 

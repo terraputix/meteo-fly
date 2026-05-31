@@ -34,13 +34,9 @@ export function getVariablesForModel(
     makeProfileVar('cloudCoverProfile', 'cloud_cover', model, maxAltitude),
     makeProfileVar('windSpeedProfile', 'wind_speed', model, maxAltitude),
     makeProfileVar('windDirectionProfile', 'wind_direction', model, maxAltitude),
-    makeProfileVar('geopotentialHeightProfile', 'geopotential_height', model, maxAltitude),
   ];
 
   const modelSpecificVars: (ProfileVariables | FlatVariable)[] = (() => {
-    // if (model === 'gfs_seamless') {
-    //   return [makeProfileVar('verticalVelocityProfile', 'vertical_velocity', model, maxAltitude)];
-    // }
     return [];
   })();
 

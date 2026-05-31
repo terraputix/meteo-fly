@@ -40,8 +40,6 @@ export interface HourlyData {
   cloudCoverProfile: VerticalProfile;
   windSpeedProfile: VerticalProfile;
   windDirectionProfile: VerticalProfile;
-  verticalVelocityProfile: VerticalProfile | undefined;
-  geopotentialHeightProfile: VerticalProfile;
   precipitation: Float32Array;
   temperature_2m: Float32Array;
   dewpoint_2m: Float32Array;
