@@ -60,7 +60,7 @@
   let scrollContainer: HTMLDivElement | undefined;
 
   $: if (skewTWeatherData && chartView === 'skewt') {
-    skewTData = buildSkewTData(skewTWeatherData, model, maxAltitude);
+    skewTData = buildSkewTData(skewTWeatherData, model, maxAltitude, weatherData?.modelGridElevation);
     traceHours = skewTData?.traces.map((t) => t.time) ?? [];
     if (selectedTraceIndex >= traceHours.length) {
       selectedTraceIndex = 0;

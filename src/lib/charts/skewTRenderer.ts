@@ -449,8 +449,8 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
     drawText(
       ctx,
       `${trace.surfaceTemp.toFixed(1)}°C`,
-      stX - 6,
-      elevY + 16,
+      stX + 6,
+      elevY + 8,
       CHART_COLORS.temperature,
       'center',
       'top',
@@ -465,7 +465,7 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
       ctx,
       `${trace.surfaceDewpoint.toFixed(1)}°C`,
       sdX + 6,
-      elevY + 16,
+      elevY + 8,
       CHART_COLORS.dewpoint,
       'center',
       'top',
@@ -531,23 +531,53 @@ function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout
 
 // ─── Elevation line ────────────────────────────────────────────────────────────
 
-function drawElevationLine(ctx: CanvasRenderingContext2D, elevation: number, layout: PlotLayout) {
+function drawElevationLine(
+  ctx: CanvasRenderingContext2D,
+  elevation: number,
+  layout: PlotLayout,
+  modelGridElevation?: number
+) {
   const { plotLeft, plotWidth, minP, maxP } = layout;
-  const p = metersToHPa(elevation);
-  if (p < minP || p > maxP) return;
-  const y = pressureToCanvasY(layout, p);
 
-  drawLine(
-    ctx,
-    [
-      [plotLeft, y],
-      [plotLeft + plotWidth, y],
-    ],
-    CHART_COLORS.skewtElevation,
-    1,
-    [3, 3]
-  );
-  drawText(ctx, `Elev. ${elevation}m`, plotLeft + plotWidth - 4, y - 4, CHART_COLORS.skewtElevation, 'right', 'bottom');
+  const drawOneLine = (
+    elev: number,
+    color: string,
+    label: string,
+    position: 'left' | 'right',
+    align: 'top' | 'bottom'
+  ) => {
+    const p = metersToHPa(elev);
+    if (p < minP || p > maxP) return;
+    const y = pressureToCanvasY(layout, p);
+
+    drawLine(
+      ctx,
+      [
+        [plotLeft, y],
+        [plotLeft + plotWidth, y],
+      ],
+      color,
+      1,
+      [3, 3]
+    );
+
+    const dy = align === 'top' ? 4 : -4;
+    drawText(ctx, label, position === 'left' ? plotLeft + 4 : plotLeft + plotWidth - 4, y + dy, color, position, align);
+  };
+
+  const gridBelow = modelGridElevation != null && modelGridElevation > elevation;
+
+  if (modelGridElevation != null) {
+    drawOneLine(
+      modelGridElevation,
+      CHART_COLORS.modelGridElevation,
+      `Model Grid Elev. ${modelGridElevation}m`,
+      'left',
+      gridBelow ? 'bottom' : 'top'
+    );
+  }
+
+  drawOneLine(elevation, CHART_COLORS.elevation, `DEM Elev. ${elevation}m`, 'right', gridBelow ? 'top' : 'bottom');
 }
 
 // ─── Hover overlay ─────────────────────────────────────────────────────────────
@@ -891,7 +921,7 @@ export function renderSkewT(
 
   drawGrid(ctx, layout);
   drawCloudCover(ctx, trace, layout);
-  drawElevationLine(ctx, skewTData.elevation, layout);
+  drawElevationLine(ctx, skewTData.elevation, layout, skewTData.modelGridElevation);
   drawAxis(ctx, layout);
   drawTraces(ctx, trace, layout);
   drawAnnotations(ctx, trace, layout, skewTData.elevation);

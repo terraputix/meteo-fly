@@ -171,7 +171,8 @@ function buildLevelDataAtHour({
 export function buildSkewTData(
   weatherData: SkewTWeatherData,
   model: WeatherModel,
-  maxAltitude: MaxAltitude
+  maxAltitude: MaxAltitude,
+  modelGridElevation?: number
 ): SkewTData {
   const traces: SkewTTrace[] = [];
   const nativeLevels = getNativeLevelsForFetch(model, maxAltitude);
@@ -190,6 +191,7 @@ export function buildSkewTData(
   return {
     traces,
     elevation: weatherData.elevation,
+    modelGridElevation,
     timezoneAbbr: weatherData.timezoneAbbr,
     pressureLevels: allLevels.map((l) => l.hPa),
   };

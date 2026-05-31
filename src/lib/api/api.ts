@@ -198,7 +198,6 @@ export async function fetchSkewTData(
     models: model,
     cell_selection: cellSelection,
     timezone: localTimezone,
-    elevation: 'nan',
   };
 
   const responses = await fetchWeatherApi(url, params);

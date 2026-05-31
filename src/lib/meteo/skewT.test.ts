@@ -87,6 +87,24 @@ describe('Skew-T data building', () => {
     expect(result.timezoneAbbr).toBe('UTC');
   });
 
+  it('includes modelGridElevation when provided', () => {
+    const weatherData = createMockSkewTData();
+    const result = buildSkewTData(weatherData, 'icon_d2', 4000, 480);
+
+    expect(result.modelGridElevation).toBe(480);
+  });
+
+  it('uses modelGridElevation for LCL calculation', () => {
+    const weatherData = createMockSkewTData();
+    const result = buildSkewTData(weatherData, 'icon_d2', 4000, 550);
+
+    // LCL is calculated as lclValue + groundElevation
+    // For first trace: surfaceTemp=20, surfaceDewpoint=15 → approx 750m LCL AGL
+    const trace0 = result.traces[0];
+    expect(trace0.lcl).toBeGreaterThan(550); // at least ground elevation
+    expect(trace0.lcl).toBeLessThan(2000);
+  });
+
   it('returns correct number of levels per trace (native + interpolated)', () => {
     const weatherData = createMockSkewTData();
     const result = buildSkewTData(weatherData, 'icon_d2', 4000);
