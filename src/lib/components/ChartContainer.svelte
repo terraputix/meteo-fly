@@ -21,8 +21,7 @@
   export let latitude: number;
   export let longitude: number;
   export let chartView: ChartView = 'wind';
-  export let selectedTraceIndex = 0;
-  export let hour: number | undefined = undefined;
+  export let hour = 0; // index into traceHours / traces array
 
   let skewTData: SkewTData | null = null;
   let traceHours: Date[] = [];
@@ -62,40 +61,22 @@
   $: if (skewTWeatherData && chartView === 'skewt') {
     skewTData = buildSkewTData(skewTWeatherData, model, maxAltitude, weatherData?.modelGridElevation);
     traceHours = skewTData?.traces.map((t) => t.time) ?? [];
-    if (selectedTraceIndex >= traceHours.length) {
-      selectedTraceIndex = 0;
-    }
-  }
-
-  $: if (traceHours.length > 0 && hour != null) {
-    const currentHour = traceHours[selectedTraceIndex]?.getHours();
-    if (currentHour !== hour) {
-      const idx = traceHours.findIndex((t) => t.getHours() === hour);
-      if (idx >= 0) selectedTraceIndex = idx;
-    }
-  }
-
-  function emitHour() {
-    const h = traceHours[selectedTraceIndex]?.getHours();
-    if (h != null) {
-      dispatch('hourChange', h);
+    if (hour >= traceHours.length) {
+      hour = 0;
     }
   }
 
   function prevTrace() {
-    if (selectedTraceIndex > 0) selectedTraceIndex--;
-    emitHour();
+    if (hour > 0) hour--;
   }
 
   function nextTrace() {
-    if (selectedTraceIndex < traceHours.length - 1) selectedTraceIndex++;
-    emitHour();
+    if (hour < traceHours.length - 1) hour++;
   }
 
   function handleSliderInput(e: Event) {
     const target = e.target as HTMLInputElement;
-    selectedTraceIndex = parseInt(target.value);
-    emitHour();
+    hour = parseInt(target.value);
   }
 
   function handleViewChange(view: ChartView) {
@@ -298,7 +279,7 @@
           <span class="text-xs font-medium text-slate-500">Time</span>
           <button
             on:click={prevTrace}
-            disabled={selectedTraceIndex <= 0}
+            disabled={hour <= 0}
             class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Previous hour"
           >
@@ -316,13 +297,13 @@
             type="range"
             min="0"
             max={traceHours.length - 1}
-            value={selectedTraceIndex}
+            value={hour}
             on:input={handleSliderInput}
             class="h-2 flex-1 cursor-pointer rounded-lg bg-slate-200 accent-indigo-600"
           />
           <button
             on:click={nextTrace}
-            disabled={selectedTraceIndex >= traceHours.length - 1}
+            disabled={hour >= traceHours.length - 1}
             class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Next hour"
           >
@@ -337,12 +318,12 @@
             </svg>
           </button>
           <span class="min-w-30 text-right text-xs font-medium text-slate-700">
-            {formatDayHour(traceHours[selectedTraceIndex] ?? new Date())}
+            {formatDayHour(traceHours[hour] ?? new Date())}
             <span class="text-slate-400"> {skewTData?.timezoneAbbr ?? ''}</span>
           </span>
         </div>
       </div>
-      <SkewTChart {skewTData} {selectedTraceIndex} isLoading={isSkewTLoading} />
+      <SkewTChart {skewTData} {hour} isLoading={isSkewTLoading} />
     {:else if isSkewTLoading}
       <div class="flex h-64 items-center justify-center">
         <div class="text-sm text-slate-500">Loading sounding data...</div>

@@ -16,8 +16,7 @@
   let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
   let showChart = $state(false);
   let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
-  let selectedTraceIndex = $state(0);
-  let selectedHour = $state(parameters.hour);
+  let selectedHour = $state(parameters.hour ?? 0);
   let weatherData = $state.raw<WeatherDataType | null>(null);
   let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
   let isWeatherLoading = $state(false);
@@ -209,9 +208,7 @@
             bind:latitude={parameters.location.latitude}
             bind:longitude={parameters.location.longitude}
             bind:chartView
-            bind:selectedTraceIndex
-            hour={selectedHour}
-            on:hourChange={(e) => (selectedHour = e.detail)}
+            bind:hour={selectedHour}
             on:close={() => (showChart = false)}
           />
         </div>

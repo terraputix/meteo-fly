@@ -5,7 +5,7 @@
   import type { SkewTData } from '$lib/meteo/types';
 
   export let skewTData: SkewTData | null = null;
-  export let selectedTraceIndex = 0;
+  export let hour = 0; // index into traces array
   export let isLoading = false;
 
   const totalHeight = 520;
@@ -44,10 +44,10 @@
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, totalHeight);
 
-    const result = renderSkewT(ctx, skewTData, selectedTraceIndex, width, totalHeight);
+    const result = renderSkewT(ctx, skewTData, hour, width, totalHeight);
     hitTest = result?.hitTest ?? null;
     lastLayout = result?.layout ?? null;
-    currentTrace = result?.layout ? (skewTData.traces[selectedTraceIndex] ?? skewTData.traces[0]) : null;
+    currentTrace = result?.layout ? (skewTData.traces[hour] ?? skewTData.traces[0]) : null;
 
     const overlayCtx = overlayCanvas.getContext('2d');
     if (overlayCtx) {
