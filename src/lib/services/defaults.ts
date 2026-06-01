@@ -21,5 +21,7 @@ export function getInitialParameters(urlParams: URLSearchParams): PageParameters
     selectedDay: defaultDay,
     maxAltitude: 4000,
     cellSelection: defaultCellSelection,
+    terrain: true,
+    modelTerrain: false,
   };
 }

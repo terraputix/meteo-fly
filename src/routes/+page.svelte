@@ -28,13 +28,15 @@
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
 
   const urlSearch = $derived.by(() => {
-    const { location, selectedDay, selectedModel, maxAltitude, cellSelection } = parameters;
+    const { location, selectedDay, selectedModel, terrain, modelTerrain, maxAltitude, cellSelection } = parameters;
     const params = new SvelteURLSearchParams({
       lat: location.latitude.toString(),
       lon: location.longitude.toString(),
       day: selectedDay.toString(),
       model: selectedModel,
       maxAlt: maxAltitude.toString(),
+      terrain: terrain ? '1' : '0',
+      modelTerrain: modelTerrain ? '1' : '0',
       cellSelection,
       view: chartView,
     });
@@ -180,6 +182,8 @@
           modelGridElevation={windChartData?.modelGridElevation}
           onToggleChart={toggleChartPanel}
           onLocationChange={updateLocation}
+          bind:terrain={parameters.terrain}
+          bind:modelTerrain={parameters.modelTerrain}
         />
       </div>
     </ResizablePane>

@@ -10,6 +10,8 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
   const model = params.get('model');
   const maxAlt = params.get('maxAlt');
   const cellSelection = params.get('cellSelection');
+  const terrainParam = params.get('terrain');
+  const modelTerrainParam = params.get('modelTerrain');
   const view = params.get('view');
   const hourStr = params.get('hour');
 
@@ -17,18 +19,14 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
     return null;
   }
 
-  let location: Location;
-  if (lat && lon) {
-    location = { latitude: Number(lat), longitude: Number(lon) };
-  } else {
-    location = defaultLocation;
-  }
-
-  const selectedDay = day ? Number(day) : defaultDay;
+  const location: Location = { latitude: Number(lat), longitude: Number(lon) };
+  const selectedDay = Number(day) || defaultDay;
   const selectedModel = model ? (model as WeatherModel) : defaultWeatherModel;
   const maxAltitude: MaxAltitude = maxAlt ? (Number(maxAlt) as MaxAltitude) : 4000;
   const selectedCellSelection: CellSelection =
     cellSelection === 'nearest' || cellSelection === 'land' ? cellSelection : defaultCellSelection;
+  const terrain = terrainParam !== null ? terrainParam === '1' : true;
+  const modelTerrain = modelTerrainParam === '1';
   const chartView: ChartView | undefined = view === 'wind' || view === 'skewt' ? view : undefined;
   const hour = hourStr ? Number(hourStr) : undefined;
 
@@ -38,6 +36,8 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
     selectedModel,
     maxAltitude,
     cellSelection: selectedCellSelection,
+    terrain,
+    modelTerrain,
     chartView,
     hour,
   };

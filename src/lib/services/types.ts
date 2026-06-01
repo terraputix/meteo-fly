@@ -9,6 +9,8 @@ export interface PageParameters {
   selectedModel: WeatherModel;
   maxAltitude: MaxAltitude;
   cellSelection: CellSelection;
+  terrain: boolean;
+  modelTerrain: boolean;
   chartView?: ChartView;
   hour?: number;
 }

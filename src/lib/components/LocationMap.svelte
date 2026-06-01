@@ -7,7 +7,14 @@
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
-  import { AboutControl, GithubControl, LocationControlManager, TerrainControl } from './Controls';
+  import {
+    AboutControl,
+    GithubControl,
+    LocationControlManager,
+    TerrainControl,
+    ModelTerrainControl,
+    registerPmtilesProtocol,
+  } from './Controls';
   export let latitude: number;
   export let longitude: number;
   export let chartOpen = false;
@@ -16,12 +23,17 @@
   export let modelGridElevation: number | undefined = undefined;
   export let onLocationChange: ((location: Location) => void) | undefined = undefined;
   export let onToggleChart: (() => void) | undefined = undefined;
+  export let terrain = true;
+  export let modelTerrain = false;
 
   const terrainSourceId = 'terrainSource';
   const hillshadeSourceId = 'hillshadeSource';
   const hillshadeLayerId = 'hills';
   const gridCellConnectorSourceId = 'grid-cell-connector';
   const gridCellConnectorLayerId = 'grid-cell-connector-line';
+  const modelTerrainSourceId = 'modelTerrainSource';
+  const modelTerrainLayerId = 'modelTerrainLayer';
+  const modelTerrainUrl = 'pmtiles://https://modelelevations.meteo-fly.com/DWD_ICON_SURFACE.pmtiles';
   const defaultTerrainExaggeration = 1;
   const earthRadiusMeters = 6371000;
   const aboutUrl = `${base}/about`;
@@ -33,6 +45,8 @@
   let selectedGridCellMarker: Marker | null = null;
   let distanceMarker: Marker | null = null;
   let unsubscribe: () => void;
+  let terrainControlRef: TerrainControl;
+  let modelTerrainControlRef: ModelTerrainControl;
   let isTerrainEnabled = true;
   let lastTerrainElevation: number | undefined;
 
@@ -206,31 +220,41 @@
     updateGridCellConnector();
   }
 
-  function setTerrainVisibility(enabled: boolean) {
-    isTerrainEnabled = enabled;
-
+  function applyTerrainState() {
     if (!map) return;
 
     if (map.getLayer(hillshadeLayerId)) {
-      map.setLayoutProperty(hillshadeLayerId, 'visibility', enabled ? 'visible' : 'none');
+      map.setLayoutProperty(hillshadeLayerId, 'visibility', terrain ? 'visible' : 'none');
+    }
+    if (map.getLayer(modelTerrainLayerId)) {
+      map.setLayoutProperty(modelTerrainLayerId, 'visibility', modelTerrain ? 'visible' : 'none');
     }
 
-    map.setTerrain(
-      enabled
-        ? {
-            source: terrainSourceId,
-            exaggeration: defaultTerrainExaggeration,
-          }
-        : null
-    );
-
-    if (enabled) {
-      queryElevation(latitude, longitude);
-      map.once('idle', () => queryElevation(latitude, longitude));
+    if (modelTerrain) {
+      map.setTerrain({ source: modelTerrainSourceId, exaggeration: defaultTerrainExaggeration });
+    } else if (terrain) {
+      map.setTerrain({ source: terrainSourceId, exaggeration: defaultTerrainExaggeration });
     } else {
-      lastTerrainElevation = undefined;
-      updateElevationBadge();
+      map.setTerrain(null);
     }
+  }
+
+  function setTerrainVisibility(enabled: boolean) {
+    terrain = enabled;
+    if (enabled && modelTerrain) {
+      modelTerrain = false;
+      modelTerrainControlRef?.setEnabled(false);
+    }
+    applyTerrainState();
+  }
+
+  function setModelTerrainVisibility(enabled: boolean) {
+    modelTerrain = enabled;
+    if (enabled && terrain) {
+      terrain = false;
+      terrainControlRef?.setEnabled(false);
+    }
+    applyTerrainState();
   }
 
   // Watch for prop changes and update map
@@ -248,6 +272,7 @@
   }
 
   onMount(async () => {
+    registerPmtilesProtocol();
     map = new maplibregl.Map({
       container: mapContainer,
       style: 'https://tiles.openfreemap.org/styles/positron',
@@ -270,11 +295,20 @@
       onLocationDetected: handleLocationDetected,
     });
     const terrainControl = new TerrainControl({
-      title: 'Disable terrain and hillshade',
+      title: terrain ? 'Disable terrain and hillshade' : 'Enable terrain and hillshade',
       className: 'maplibregl-ctrl-terrain-toggle',
-      initialEnabled: isTerrainEnabled,
+      initialEnabled: terrain,
       onToggle: setTerrainVisibility,
     });
+    terrainControlRef = terrainControl;
+    const modelTerrainControl = new ModelTerrainControl({
+      title: modelTerrain ? 'Disable model surface elevation' : 'Enable model surface elevation',
+      className: 'maplibregl-ctrl-model-terrain-toggle',
+      initialEnabled: modelTerrain,
+      onToggle: setModelTerrainVisibility,
+    });
+    modelTerrainControlRef = modelTerrainControl;
+
     const aboutControl = new AboutControl({
       title: 'About',
       className: 'maplibregl-ctrl-about',
@@ -288,6 +322,7 @@
 
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
+    map.addControl(modelTerrainControl, 'top-left');
     map.addControl(aboutControl, 'top-right');
     map.addControl(githubControl, 'top-right');
 
@@ -344,9 +379,10 @@
           id: hillshadeLayerId,
           type: 'hillshade',
           source: hillshadeSourceId,
+          layout: { visibility: terrain ? 'visible' : 'none' },
           paint: {
             'hillshade-shadow-color': '#473B24',
-            'hillshade-exaggeration': 0.35,
+            'hillshade-exaggeration': 0.66,
             'hillshade-highlight-color': 'rgba(255,255,255,0.2)',
             'hillshade-accent-color': 'rgba(120,95,58,0.18)',
           },
@@ -362,8 +398,28 @@
           'line-width': 1.5,
         },
       });
-      setTerrainVisibility(isTerrainEnabled);
-      terrainControl.setEnabled(isTerrainEnabled);
+      map.addSource(modelTerrainSourceId, {
+        type: 'raster-dem',
+        url: modelTerrainUrl,
+        tileSize: 512,
+        encoding: 'mapbox',
+      });
+      map.addLayer(
+        {
+          id: modelTerrainLayerId,
+          type: 'hillshade',
+          source: modelTerrainSourceId,
+          layout: { visibility: modelTerrain ? 'visible' : 'none' },
+          paint: {
+            'hillshade-shadow-color': '#473B24',
+            'hillshade-exaggeration': 1.0,
+          },
+        },
+        'waterway_line_label'
+      );
+      applyTerrainState();
+      terrainControl.setEnabled(terrain);
+      modelTerrainControl.setEnabled(modelTerrain);
       updateSelectedGridCellMarker();
     });
   });
@@ -615,6 +671,9 @@
   }
 
   :global(.maplibregl-ctrl-terrain-toggle.is-active) {
+    color: #2563eb;
+  }
+  :global(.maplibregl-ctrl-model-terrain-toggle.is-active) {
     color: #2563eb;
   }
 
