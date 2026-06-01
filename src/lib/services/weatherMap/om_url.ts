@@ -1,4 +1,4 @@
-import type { Domain } from '@openmeteo/mapbox-layer';
+import type { Domain } from '@openmeteo/weather-map-layer';
 
 export interface DomainInfo {
   variables: string[];

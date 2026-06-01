@@ -4,7 +4,7 @@
   import { afterNavigate, replaceState } from '$app/navigation';
   import { isMobile } from '$lib/stores/media';
   import type { RasterTileSource } from 'maplibre-gl';
-  import { domainOptions } from '@openmeteo/mapbox-layer';
+  import { domainOptions } from '@openmeteo/weather-map-layer';
   import Map from '$lib/components/Map.svelte';
   import MapControls from '$lib/components/MapControls.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
@@ -223,13 +223,6 @@
         onLevelChange={handleLevelChange}
         latitude={$weatherMapStore.location.latitude}
         longitude={$weatherMapStore.location.longitude}
-        selectedDay={$weatherMapStore.selectedDay}
-        selectedModel={$weatherMapStore.selectedModel}
-        onLocationChange={(loc: Location) => weatherMapManager.setLocation(loc)}
-        onSelectedDayChange={(day: number) => weatherMapManager.setSelectedDay(day)}
-        onSelectedModelChange={(model: WeatherModel) => weatherMapManager.setSelectedModel(model)}
-        maxAltitude={parameters.maxAltitude}
-        onMaxAltitudeChange={(alt) => (parameters.maxAltitude = alt)}
         onOpenChart={toggleChartPanel}
       />
     </div>

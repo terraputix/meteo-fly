@@ -24,6 +24,7 @@ export default defineConfig({
     exclude: ['@openmeteo/file-reader', '@openmeteo/file-format-wasm'],
   },
   plugins: [
+    viteServerConfig(),
     tailwindcss(),
     sveltekit(),
     SvelteKitPWA({

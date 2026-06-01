@@ -16,7 +16,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@lucide/svelte": "^1.16.0",
-    "@openmeteo/mapbox-layer": "^0.0.15",
+    "@openmeteo/weather-map-layer": "^0.0.19",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.61.1",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",

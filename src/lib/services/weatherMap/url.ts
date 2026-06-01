@@ -1,4 +1,4 @@
-import type { Domain } from '@openmeteo/mapbox-layer';
+import type { Domain } from '@openmeteo/weather-map-layer';
 import type { DomainInfo } from './om_url';
 
 export const fetchDomainInfo = async (targetDomain: Domain): Promise<DomainInfo | null> => {

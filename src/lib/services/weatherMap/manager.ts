@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import type { Writable } from 'svelte/store';
-import { domainOptions, type Domain } from '@openmeteo/mapbox-layer';
+import { domainOptions, type Domain } from '@openmeteo/weather-map-layer';
 import maplibregl from 'maplibre-gl';
 import { fetchDomainInfo } from './url';
 import type { DomainInfo } from './om_url';

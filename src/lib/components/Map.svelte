@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import maplibregl, { NavigationControl, type Map, type Marker, type RequestParameters } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { defaultOmProtocolSettings, omProtocol } from '@openmeteo/mapbox-layer';
+  import { defaultOmProtocolSettings, omProtocol } from '@openmeteo/weather-map-layer';
   import { Protocol } from 'pmtiles';
   import { base } from '$app/paths';
   import type { Location } from '$lib/api/types';
@@ -393,8 +393,11 @@
           id: 'omFileLayer',
           type: 'raster',
           source: 'omFileSource',
+          paint: {
+            'raster-opacity': 0.6,
+          },
         },
-        'waterway-tunnel'
+        'waterway_line_label'
       );
 
       setTerrainVisibility(isTerrainEnabled);
