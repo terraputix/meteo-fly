@@ -1,4 +1,4 @@
-import type { WeatherDataType, WeatherModel } from '$lib/api/types';
+import type { WindChartData, WeatherModel } from '$lib/api/types';
 import { getAtLevel } from '$lib/api/types';
 import { interpolateWind } from '$lib/meteo/wind';
 import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, type LevelSource } from '$lib/meteo/pressureLevels';
@@ -13,7 +13,7 @@ export interface WindFieldLevel {
 }
 
 export function getWindFieldAllLevels(
-  weatherData: WeatherDataType,
+  windChartData: WindChartData,
   model: WeatherModel,
   maxAltitude: MaxAltitude = 4000
 ): Array<WindFieldLevel> {
@@ -21,14 +21,14 @@ export function getWindFieldAllLevels(
   const nativeLevels = getNativeLevelsForFetch(model, maxAltitude);
   const allLevels = getAllTaggedLevelsForModel(model, maxAltitude);
 
-  weatherData.hourly.time.forEach((time: Date, i: number) => {
+  windChartData.hourly.time.forEach((time: Date, i: number) => {
     allLevels.forEach((level) => {
       let speed: number | null = null;
       let direction: number | null = null;
 
       if (level.source === 'model') {
-        const speedArr = getAtLevel(weatherData.hourly.windSpeedProfile, level.hPa);
-        const dirArr = getAtLevel(weatherData.hourly.windDirectionProfile, level.hPa);
+        const speedArr = getAtLevel(windChartData.hourly.windSpeedProfile, level.hPa);
+        const dirArr = getAtLevel(windChartData.hourly.windDirectionProfile, level.hPa);
         if (speedArr && dirArr) {
           speed = speedArr[i];
           direction = dirArr[i];
@@ -39,10 +39,10 @@ export function getWindFieldAllLevels(
         const upperLevel = nativeLevels.find((p) => p.heightMeters > level.heightMeters);
 
         if (lowerLevel && upperLevel) {
-          const lowerSpeedArr = getAtLevel(weatherData.hourly.windSpeedProfile, lowerLevel.hPa);
-          const lowerDirArr = getAtLevel(weatherData.hourly.windDirectionProfile, lowerLevel.hPa);
-          const upperSpeedArr = getAtLevel(weatherData.hourly.windSpeedProfile, upperLevel.hPa);
-          const upperDirArr = getAtLevel(weatherData.hourly.windDirectionProfile, upperLevel.hPa);
+          const lowerSpeedArr = getAtLevel(windChartData.hourly.windSpeedProfile, lowerLevel.hPa);
+          const lowerDirArr = getAtLevel(windChartData.hourly.windDirectionProfile, lowerLevel.hPa);
+          const upperSpeedArr = getAtLevel(windChartData.hourly.windSpeedProfile, upperLevel.hPa);
+          const upperDirArr = getAtLevel(windChartData.hourly.windDirectionProfile, upperLevel.hPa);
 
           if (lowerSpeedArr && lowerDirArr && upperSpeedArr && upperDirArr) {
             const result = interpolateWind(

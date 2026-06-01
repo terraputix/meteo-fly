@@ -16,6 +16,11 @@ export function hPaToMeters(hPa: number): number {
   return Math.round(ISA_T0_OVER_L * (1 - Math.pow((hPa * 100) / ISA_P0_PA, ISA_EXPONENT)));
 }
 
+export function metersToHPa(heightMeters: number): number {
+  const pascals = ISA_P0_PA * Math.pow(1 - heightMeters / ISA_T0_OVER_L, 1 / ISA_EXPONENT);
+  return Math.round(pascals / 100);
+}
+
 const ALL_PRESSURE_LEVELS = [
   1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 675, 650, 625, 600, 575, 550, 525, 500, 475, 450,
   425, 400, 375, 350, 325, 300,
@@ -27,7 +32,14 @@ function pickLevels(hPaValues: number[]): PressureLevel[] {
 
 // ─── Per-model native level sets ──────────────────────────────────────────────
 const ICON_HEIGHT_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300];
-const UKMO_HEIGHT_LEVELS = [1000, 950, 900, 850, 800, 700, 600, 500, 400, 300];
+const UKMO_HEIGHT_LEVELS = [
+  1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 375, 350, 325, 300,
+];
+const ECMWF_HEIGHT_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300];
+const CMA_HEIGHT_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300];
+const GEM_HEIGHT_LEVELS = [
+  1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300,
+];
 export const MODEL_NATIVE_LEVELS: Record<WeatherModel, PressureLevel[]> = {
   icon_seamless: pickLevels(ICON_HEIGHT_LEVELS),
   icon_d2: pickLevels(ICON_HEIGHT_LEVELS),
@@ -35,9 +47,11 @@ export const MODEL_NATIVE_LEVELS: Record<WeatherModel, PressureLevel[]> = {
   icon_global: pickLevels(ICON_HEIGHT_LEVELS),
   gfs_seamless: pickLevels(ALL_PRESSURE_LEVELS),
   meteofrance_seamless: pickLevels(ICON_HEIGHT_LEVELS),
+  ecmwf_ifs025: pickLevels(ECMWF_HEIGHT_LEVELS),
+  ecmwf_aifs025_single: pickLevels(ECMWF_HEIGHT_LEVELS),
   ukmo_seamless: pickLevels(UKMO_HEIGHT_LEVELS),
-  cma_grapes_global: pickLevels(ICON_HEIGHT_LEVELS),
-  gem_seamless: pickLevels(ICON_HEIGHT_LEVELS),
+  cma_grapes_global: pickLevels(CMA_HEIGHT_LEVELS),
+  gem_seamless: pickLevels(GEM_HEIGHT_LEVELS),
 };
 
 export function getNativeLevelsForModel(model: WeatherModel, maxAltitude: number): PressureLevel[] {

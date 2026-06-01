@@ -1,6 +1,6 @@
 import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest';
 import { getVariablesForModel } from './variables';
-import { createHourlyParams, createQueryParams } from './api';
+import { createHourlyParams, createQueryParams } from '$lib/api/api';
 
 describe('API Configuration', () => {
   it('should generate correct parameters for ICON-D2 model', () => {
@@ -35,7 +35,7 @@ describe('API Configuration', () => {
       const startDate = new Date('2023-10-25T23:30:00Z');
       const numberOfDays = 3;
 
-      const params = createQueryParams(location, hourlyParams, model, startDate, numberOfDays);
+      const params = createQueryParams(location, hourlyParams, model, 'land', startDate, numberOfDays);
 
       // Expected start_date is simply the YYYY-MM-DD part of the input date
       const expectedStartDate = '2023-10-26';
@@ -46,6 +46,7 @@ describe('API Configuration', () => {
 
       expect(params.start_date).toBe(expectedStartDate);
       expect(params.end_date).toBe(expectedEndDate);
+      expect(params.cell_selection).toBe('land');
       expect(params.timezone).toBe('Europe/Berlin'); // Verify the mocked local timezone is passed
     });
   });

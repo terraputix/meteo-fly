@@ -1,37 +1,237 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import maplibregl, { type Map, type Marker, type RequestParameters } from 'maplibre-gl';
+  import maplibregl, { NavigationControl, type Map, type Marker, type RequestParameters } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { defaultOmProtocolSettings, omProtocol, updateCurrentBounds } from '@openmeteo/mapbox-layer';
+  import { defaultOmProtocolSettings, omProtocol } from '@openmeteo/mapbox-layer';
   import { Protocol } from 'pmtiles';
+  import { base } from '$app/paths';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
-  import { LocationControlManager } from './LocationControl';
+  import { AboutControl, GithubControl, LocationControlManager, TerrainControl } from './Controls';
   import type { WeatherMapManager, WeatherMapState } from '$lib/services/weatherMap/manager';
   import type { Subscriber, Unsubscriber } from 'svelte/store';
   import { buildOpenMeteoUrl } from '$lib/services/weatherMap/om_url';
 
-  // Accept the manager and store as props
   export let weatherMapManager: WeatherMapManager;
   export let weatherMapStore: {
     subscribe: (this: void, run: Subscriber<WeatherMapState>, invalidate?: () => void) => Unsubscriber;
   };
   export let rasterTileSource: maplibregl.RasterTileSource | undefined;
+  export let latitude: number;
+  export let longitude: number;
+  export let chartOpen = false;
+  export let selectedGridCell: Location | null = null;
+  export let gridCellElevation: number | undefined = undefined;
+  export let modelGridElevation: number | undefined = undefined;
+  export let onLocationChange: ((location: Location) => void) | undefined = undefined;
+  export let onToggleChart: (() => void) | undefined = undefined;
 
+  const terrainSourceId = 'terrainSource';
+  const hillshadeSourceId = 'hillshadeSource';
+  const hillshadeLayerId = 'hills';
+  const gridCellConnectorSourceId = 'grid-cell-connector';
+  const gridCellConnectorLayerId = 'grid-cell-connector-line';
+  const defaultTerrainExaggeration = 1;
+  const earthRadiusMeters = 6371000;
+  const aboutUrl = `${base}/about`;
+  const githubUrl = 'https://github.com/terraputix/meteo-fly';
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
-  let locationUnsubscribe: () => void;
+  let elevationBadge: HTMLDivElement | undefined;
+  let selectedGridCellMarker: Marker | null = null;
+  let distanceMarker: Marker | null = null;
+  let unsubscribe: () => void;
+  let isTerrainEnabled = true;
+  let lastTerrainElevation: number | undefined;
+
+  function toRadians(value: number) {
+    return (value * Math.PI) / 180;
+  }
+
+  function getHaversineDistanceMeters(a: Location, b: Location) {
+    const dLat = toRadians(b.latitude - a.latitude);
+    const dLon = toRadians(b.longitude - a.longitude);
+    const lat1 = toRadians(a.latitude);
+    const lat2 = toRadians(b.latitude);
+    const sinLat = Math.sin(dLat / 2);
+    const sinLon = Math.sin(dLon / 2);
+    const haversine = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
+    const arc = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+    return earthRadiusMeters * arc;
+  }
+
+  function formatDistance(distanceMeters: number) {
+    return distanceMeters >= 1000
+      ? `${(distanceMeters / 1000).toFixed(distanceMeters >= 10000 ? 0 : 1)} km`
+      : `${Math.round(distanceMeters)} m`;
+  }
+
+  function queryElevation(lat: number, lng: number) {
+    if (!map || !map.isStyleLoaded() || !isTerrainEnabled) return;
+    const elev = map.queryTerrainElevation([lng, lat]);
+    if (elev == null) return;
+    lastTerrainElevation = Math.round(elev);
+    updateElevationBadge();
+  }
+
+  function updateElevationBadge() {
+    if (!elevationBadge) return;
+    const parts: string[] = [];
+    if (lastTerrainElevation != null) parts.push(`Map ${lastTerrainElevation}m`);
+    if (gridCellElevation != null) parts.push(`API DEM ${Math.round(gridCellElevation)}m`);
+    if (parts.length === 0) {
+      elevationBadge.style.display = 'none';
+      return;
+    }
+    elevationBadge.style.display = '';
+    elevationBadge.textContent = parts.join(' · ');
+  }
 
   function updatePosition(lat: number, lng: number) {
-    const newLat = parseFloat(lat.toFixed(5));
-    const newLng = parseFloat(lng.toFixed(5));
-
+    const nextLatitude = parseFloat(lat.toFixed(5));
+    const nextLongitude = parseFloat(lng.toFixed(5));
+    latitude = nextLatitude;
+    longitude = nextLongitude;
+    onLocationChange?.({ latitude: nextLatitude, longitude: nextLongitude });
+    weatherMapManager.setLocation({ latitude: nextLatitude, longitude: nextLongitude });
     if (marker) {
-      marker.setLngLat([newLng, newLat]);
+      marker.setLngLat([nextLongitude, nextLatitude]);
+    }
+    queryElevation(nextLatitude, nextLongitude);
+  }
+
+  function updateGridCellConnector() {
+    if (!map || !map.getSource(gridCellConnectorSourceId)) {
+      return;
     }
 
-    weatherMapManager.setLocation({ latitude: newLat, longitude: newLng });
+    const source = map.getSource(gridCellConnectorSourceId) as maplibregl.GeoJSONSource;
+
+    if (!selectedGridCell) {
+      source.setData({
+        type: 'FeatureCollection',
+        features: [],
+      });
+      distanceMarker?.remove();
+      distanceMarker = null;
+      return;
+    }
+
+    const gridCellLongitude = selectedGridCell.longitude;
+    const gridCellLatitude = selectedGridCell.latitude;
+    const selectedLocationPixel = map.project([longitude, latitude]);
+    const gridCellPixel = map.project([gridCellLongitude, gridCellLatitude]);
+    const lineLengthPixels = Math.hypot(
+      gridCellPixel.x - selectedLocationPixel.x,
+      gridCellPixel.y - selectedLocationPixel.y
+    );
+
+    source.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [longitude, latitude],
+              [gridCellLongitude, gridCellLatitude],
+            ],
+          },
+          properties: {},
+        },
+      ],
+    });
+
+    if (lineLengthPixels < 72) {
+      distanceMarker?.remove();
+      distanceMarker = null;
+      return;
+    }
+
+    const midpoint: [number, number] = [(longitude + gridCellLongitude) / 2, (latitude + gridCellLatitude) / 2];
+    const distanceLabel = formatDistance(getHaversineDistanceMeters({ latitude, longitude }, selectedGridCell));
+
+    if (!distanceMarker) {
+      const element = document.createElement('div');
+      element.className = 'grid-cell-distance-badge';
+      distanceMarker = new maplibregl.Marker({ element, anchor: 'center' }).setLngLat(midpoint).addTo(map);
+    } else {
+      distanceMarker.setLngLat(midpoint);
+    }
+
+    distanceMarker.getElement().textContent = distanceLabel;
+  }
+
+  function updateSelectedGridCellMarker() {
+    if (!map) {
+      return;
+    }
+
+    if (!selectedGridCell) {
+      selectedGridCellMarker?.remove();
+      selectedGridCellMarker = null;
+      updateGridCellConnector();
+      return;
+    }
+
+    const lngLat: [number, number] = [selectedGridCell.longitude, selectedGridCell.latitude];
+    const badgeText = modelGridElevation != null ? `Grid cell · ${Math.round(modelGridElevation)} m` : 'Grid cell';
+
+    if (!selectedGridCellMarker) {
+      const element = document.createElement('div');
+      element.className = 'selected-grid-cell-marker';
+      element.innerHTML =
+        '<span class="selected-grid-cell-marker__ring"></span><span class="selected-grid-cell-marker__dot"></span><span class="selected-grid-cell-marker__badge">Grid cell</span>';
+
+      selectedGridCellMarker = new maplibregl.Marker({
+        element,
+        anchor: 'center',
+      })
+        .setLngLat(lngLat)
+        .addTo(map);
+
+      const badgeEl = element.querySelector('.selected-grid-cell-marker__badge');
+      if (badgeEl) badgeEl.textContent = badgeText;
+    } else {
+      selectedGridCellMarker.setLngLat(lngLat);
+      const badgeEl = selectedGridCellMarker.getElement().querySelector('.selected-grid-cell-marker__badge');
+      if (badgeEl) badgeEl.textContent = badgeText;
+    }
+
+    updateGridCellConnector();
+  }
+
+  function setTerrainVisibility(enabled: boolean) {
+    isTerrainEnabled = enabled;
+
+    if (!map) return;
+
+    if (map.getLayer(hillshadeLayerId)) {
+      map.setLayoutProperty(hillshadeLayerId, 'visibility', enabled ? 'visible' : 'none');
+    }
+
+    map.setTerrain(
+      enabled
+        ? {
+            source: terrainSourceId,
+            exaggeration: defaultTerrainExaggeration,
+          }
+        : null
+    );
+
+    if (enabled) {
+      queryElevation(latitude, longitude);
+      map.once('idle', () => queryElevation(latitude, longitude));
+    } else {
+      lastTerrainElevation = undefined;
+      updateElevationBadge();
+    }
+  }
+
+  function handleMapViewChange() {
+    updateGridCellConnector();
   }
 
   function handleLocationDetected(location: Location) {
@@ -60,76 +260,125 @@
       omProtocol(params, abortController, omProtocolOptions)
     );
 
-    // Initialize the map
     map = new maplibregl.Map({
       container: mapContainer,
-      style: 'https://maptiler.servert.nl/styles/minimal-world-maps/style.json',
-      center: [$weatherMapStore.location.longitude, $weatherMapStore.location.latitude],
+      style: 'https://tiles.openfreemap.org/styles/positron',
+      center: [longitude, latitude],
       zoom: 8,
     });
 
-    // Add marker
-    marker = new maplibregl.Marker({ draggable: true })
-      .setLngLat([$weatherMapStore.location.longitude, $weatherMapStore.location.latitude])
+    map.addControl(
+      new NavigationControl({
+        visualizePitch: true,
+        showCompass: true,
+        showZoom: true,
+      }),
+      'top-left'
+    );
+
+    const locationControlManager = new LocationControlManager({
+      title: 'Use my location',
+      className: 'maplibregl-ctrl-geolocate',
+      onLocationDetected: handleLocationDetected,
+    });
+    const terrainControl = new TerrainControl({
+      title: 'Disable terrain and hillshade',
+      className: 'maplibregl-ctrl-terrain-toggle',
+      initialEnabled: isTerrainEnabled,
+      onToggle: setTerrainVisibility,
+    });
+    const aboutControl = new AboutControl({
+      title: 'About',
+      className: 'maplibregl-ctrl-about',
+      url: aboutUrl,
+    });
+    const githubControl = new GithubControl({
+      title: 'GitHub',
+      className: 'maplibregl-ctrl-github',
+      url: githubUrl,
+    });
+
+    map.addControl(locationControlManager, 'top-left');
+    map.addControl(terrainControl, 'top-left');
+    map.addControl(aboutControl, 'top-right');
+    map.addControl(githubControl, 'top-right');
+
+    const selectedLocationElement = document.createElement('div');
+    selectedLocationElement.className = 'selected-location-marker';
+    selectedLocationElement.innerHTML =
+      '<span class="selected-location-marker__outer"></span><span class="selected-location-marker__inner"></span><span class="selected-location-marker__core"></span>';
+
+    elevationBadge = document.createElement('div');
+    elevationBadge.className = 'selected-location-marker__elevation';
+    selectedLocationElement.appendChild(elevationBadge);
+    marker = new maplibregl.Marker({
+      element: selectedLocationElement,
+      draggable: true,
+      anchor: 'center',
+    })
+      .setLngLat([longitude, latitude])
       .addTo(map);
     marker.on('dragend', () => {
       const pos = marker.getLngLat();
       updatePosition(pos.lat, pos.lng);
     });
+    updateSelectedGridCellMarker();
 
-    // Map click event
     map.on('click', (e: maplibregl.MapMouseEvent) => {
       const { lat, lng } = e.lngLat;
       updatePosition(lat, lng);
     });
-
-    // Update bounds when map moves
-    map.on('dataloading', () => {
-      updateCurrentBounds(map.getBounds());
-    });
-
-    const locationControlManager = new LocationControlManager({});
-    map.addControl(locationControlManager, 'top-right');
-
-    // Subscribe to location store changes
-    locationUnsubscribe = locationStore.subscribe((state: LocationState) => {
+    map.on('zoom', handleMapViewChange);
+    map.on('move', handleMapViewChange);
+    unsubscribe = locationStore.subscribe((state: LocationState) => {
       locationControlManager.updateState(state);
-      if (state.current) {
-        handleLocationDetected(state.current);
-      }
     });
 
     map.on('load', () => {
-      map.addSource('terrainSource', {
+      map.addSource(terrainSourceId, {
         type: 'raster-dem',
-        tiles: ['mapterhorn://{z}/{x}/{y}'],
-        encoding: 'terrarium',
-        tileSize: 512,
-        attribution: '<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>',
+        url: 'https://tiles.mapterhorn.com/tilejson.json',
       });
-      map.addLayer({
-        source: 'terrainSource',
-        id: 'hillshadeLayer',
-        type: 'hillshade',
-        paint: {
-          'hillshade-method': 'igor',
-          'hillshade-shadow-color': 'rgba(0,0,0,0.4)',
-          'hillshade-highlight-color': 'rgba(255,255,255,0.35)',
+      map.addSource(hillshadeSourceId, {
+        type: 'raster-dem',
+        url: 'https://tiles.mapterhorn.com/tilejson.json',
+      });
+      map.addSource(gridCellConnectorSourceId, {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [],
         },
       });
-      map.setTerrain({
-        source: 'terrainSource',
-        exaggeration: 1.0,
+      map.addLayer(
+        {
+          id: hillshadeLayerId,
+          type: 'hillshade',
+          source: hillshadeSourceId,
+          paint: {
+            'hillshade-shadow-color': '#473B24',
+            'hillshade-exaggeration': 0.35,
+            'hillshade-highlight-color': 'rgba(255,255,255,0.2)',
+            'hillshade-accent-color': 'rgba(120,95,58,0.18)',
+          },
+        },
+        'waterway_line_label'
+      );
+      map.addLayer({
+        id: gridCellConnectorLayerId,
+        type: 'line',
+        source: gridCellConnectorSourceId,
+        paint: {
+          'line-color': 'rgba(99, 102, 241, 0.32)',
+          'line-width': 1.5,
+        },
       });
-
       const initialOmUrl = buildOpenMeteoUrl({
         domain: $weatherMapStore.domain,
         variable: $weatherMapStore.variable,
         datetime: $weatherMapStore.datetime,
         domainInfo: $weatherMapStore.domainInfo,
       });
-
-      console.log('initial OmUrl', initialOmUrl);
 
       map.addSource('omFileSource', {
         url: 'om://' + initialOmUrl,
@@ -147,52 +396,234 @@
         },
         'waterway-tunnel'
       );
-      console.log('added weather layer');
-    });
 
-    map.on('dataloading', () => {
-      updateCurrentBounds(map.getBounds());
+      setTerrainVisibility(isTerrainEnabled);
+      terrainControl.setEnabled(isTerrainEnabled);
+      updateSelectedGridCellMarker();
     });
   });
 
   onDestroy(() => {
-    if (locationUnsubscribe) {
-      locationUnsubscribe();
+    if (unsubscribe) {
+      unsubscribe();
     }
-
+    if (selectedGridCellMarker) {
+      selectedGridCellMarker.remove();
+    }
+    if (distanceMarker) {
+      distanceMarker.remove();
+    }
     if (map) {
+      map.off('zoom', handleMapViewChange);
+      map.off('move', handleMapViewChange);
       map.remove();
     }
   });
 </script>
 
-<div bind:this={mapContainer} id="map" class="h-full w-full"></div>
+<div class="relative h-full w-full">
+  <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
+
+  <div class="chart-toggle-anchor pointer-events-none absolute left-[4.65rem] z-10 md:left-[4.9rem]">
+    <button
+      type="button"
+      class:chart-open={chartOpen}
+      class="pointer-events-auto flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white/92 px-3 py-2 text-left text-slate-700 shadow-lg backdrop-blur-md transition hover:bg-white"
+      on:click={() => onToggleChart?.()}
+      aria-label={chartOpen ? 'Hide forecast chart panel' : 'Show forecast chart panel'}
+      title={chartOpen ? 'Hide forecast chart panel' : 'Show forecast chart panel'}
+    >
+      <span
+        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"
+        aria-hidden="true"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6.5h12m-3-3 3 3-3 3" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6m3-3-3 3 3 3" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 17.5h12m-3-3 3 3-3 3" />
+        </svg>
+      </span>
+      <span class="min-w-0">
+        <span class="block text-[11px] font-semibold tracking-[0.18em] text-slate-500 uppercase">Forecast</span>
+        <span class="block text-sm font-semibold text-slate-800"
+          >{chartOpen ? 'Hide chart panel' : 'Show chart panel'}</span
+        >
+      </span>
+    </button>
+  </div>
+</div>
 
 <style>
+  :global(.maplibregl-ctrl-top-left) {
+    top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+    left: calc(env(safe-area-inset-left, 0px) + 0.75rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  :global(.maplibregl-ctrl-top-left .maplibregl-ctrl) {
+    margin: 0;
+  }
+
+  :global(.maplibregl-ctrl-group--floating) {
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.18);
+  }
+
+  :global(.maplibregl-ctrl-group) {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+  }
+
   :global(.maplibregl-ctrl-group button) {
-    background-color: white;
+    background-color: transparent;
     border: none;
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    border-radius: 6px;
     color: #374151;
-    transition: all 0.2s ease;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  :global(.maplibregl-ctrl-group button + button) {
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
   }
 
   :global(.maplibregl-ctrl-group button:hover:not(:disabled)) {
     background: #f8fafc;
-    color: #3b82f6;
+    color: #2563eb;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
   :global(.maplibregl-ctrl-group button:active) {
     transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  :global(.selected-location-marker) {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    cursor: grab;
+  }
+
+  :global(.selected-location-marker:active) {
+    cursor: grabbing;
+  }
+
+  :global(.selected-location-marker__outer) {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: rgba(37, 99, 235, 0.18);
+    border: 1.5px solid rgba(59, 130, 246, 0.95);
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.18);
+  }
+
+  :global(.selected-location-marker__inner) {
+    position: absolute;
+    inset: 4px;
+    border-radius: 9999px;
+    border: 1px solid rgba(191, 219, 254, 0.95);
+    background: rgba(125, 211, 252, 0.12);
+  }
+
+  :global(.selected-location-marker__core) {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: rgba(224, 242, 254, 0.95);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.24);
+  }
+
+  :global(.selected-location-marker__elevation) {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(30, 41, 59, 0.85);
+    color: #f8fafc;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+  }
+
+  :global(.selected-grid-cell-marker) {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  :global(.selected-grid-cell-marker__ring) {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.04);
+    border: 1.5px solid rgba(71, 85, 105, 0.72);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  }
+
+  :global(.selected-grid-cell-marker__dot) {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    border-radius: 9999px;
+    background: rgba(51, 65, 85, 0.88);
+    transform: translate(-50%, -50%);
+  }
+
+  :global(.selected-grid-cell-marker__badge) {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 0.4rem);
+    transform: translateY(-50%);
+    padding: 0.14rem 0.38rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    color: rgb(51, 65, 85);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(6px);
+  }
+
+  :global(.grid-cell-distance-badge) {
+    padding: 0.18rem 0.45rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    color: rgb(51, 65, 85);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(6px);
+    pointer-events: none;
   }
 
   :global(.maplibregl-ctrl-geolocate.loading) {
@@ -218,13 +649,32 @@
     color: #059669;
   }
 
-  :global(.maplibregl-ctrl-geolocate:disabled) {
+  :global(.maplibregl-ctrl-terrain-toggle.is-active) {
+    color: #2563eb;
+  }
+
+  :global(.maplibregl-ctrl-group button:disabled) {
     cursor: not-allowed;
     opacity: 0.6;
+    transform: none;
   }
 
   :global(.location-spinner) {
     animation: spin 1s linear infinite;
+  }
+
+  .chart-toggle-anchor {
+    top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  }
+
+  button.chart-open {
+    border-color: rgba(99, 102, 241, 0.25);
+    background: rgba(238, 242, 255, 0.96);
+  }
+
+  button.chart-open span:first-child {
+    background: rgb(224, 231, 255);
+    color: rgb(79, 70, 229);
   }
 
   @keyframes spin {

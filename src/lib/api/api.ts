@@ -3,15 +3,17 @@ import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
 import {
   type VerticalProfile,
   type WeatherModel,
+  type CellSelection,
   type Location,
   isFlat,
   isProfile,
   type ProfileVariables,
   type FlatVariable,
   type HourlyData,
-  type WeatherDataType,
+  type WindChartData,
+  type SkewTWeatherData,
 } from './types';
-import { getVariablesForModel } from './variables';
+import { getVariablesForModel, makeProfileVar } from './variables';
 import type { MaxAltitude } from '$lib/meteo/types';
 
 export interface HourlyParams {
@@ -76,10 +78,10 @@ export function createQueryParams(
   location: Location,
   hourlyParams: HourlyParams,
   model: WeatherModel,
+  cellSelection: CellSelection,
   start: Date,
   numberOfDays: number
 ) {
-  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const endDate = new Date(start.getTime() + (numberOfDays - 1) * 24 * 60 * 60 * 1000);
 
   return {
@@ -90,25 +92,51 @@ export function createQueryParams(
     start_date: formatDateToYYYYMMDD(start),
     end_date: formatDateToYYYYMMDD(endDate),
     models: model,
-    timezone: localTimezone,
+    cell_selection: cellSelection,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 }
 
-export async function fetchWeatherData(
+export async function fetchModelGridElevation(
+  location: Location,
+  model: WeatherModel,
+  cellSelection: CellSelection
+): Promise<number> {
+  const params = {
+    latitude: location.latitude,
+    longitude: location.longitude,
+    models: model,
+    cell_selection: cellSelection,
+    forecast_days: 1,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    elevation: 'nan',
+  };
+
+  const responses = await fetchWeatherApi(url, params);
+  const response = responses[0];
+  return response.elevation();
+}
+
+export async function fetchWindChartData(
   location: Location,
   model: WeatherModel = 'icon_d2',
   start: Date,
   numberOfDays: number = 1,
-  maxAltitude: MaxAltitude = 4000
-): Promise<WeatherDataType> {
+  maxAltitude: MaxAltitude = 4000,
+  cellSelection: CellSelection = 'nearest'
+): Promise<WindChartData> {
   const modelVariables = getVariablesForModel(model, maxAltitude);
   const hourlyParams = createHourlyParams(modelVariables);
-  const params = createQueryParams(location, hourlyParams, model, start, numberOfDays);
+  const params = createQueryParams(location, hourlyParams, model, cellSelection, start, numberOfDays);
 
   const responses = await fetchWeatherApi(url, params);
   const response = responses[0];
 
   const timezone = response.timezoneAbbreviation() ?? 'UTC';
+  const selectedGridCell: Location = {
+    latitude: response.latitude(),
+    longitude: response.longitude(),
+  };
 
   const sunriseInt: number = Number(response.daily()!.variables(0)?.valuesInt64(0));
   const sunsetInt: number = Number(response.daily()!.variables(1)?.valuesInt64(0));
@@ -118,7 +146,7 @@ export async function fetchWeatherData(
   const elevation = response.elevation();
 
   const hourly = response.hourly()!;
-  const weatherData: WeatherDataType = {
+  const windChartData: WindChartData = {
     elevation: elevation,
     hourly: {
       time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map((t) => new Date(t * 1000)),
@@ -132,7 +160,91 @@ export async function fetchWeatherData(
     timezoneAbbr: timezone,
     sunrise: sunrise,
     sunset: sunset,
+    selectedGridCell,
   };
 
-  return weatherData;
+  return windChartData;
+}
+
+// ─── Skew-T data fetching ────────────────────────────────────────────────────
+
+function getSkewTVariablesForModel(model: WeatherModel, maxAltitude: MaxAltitude): ProfileVariables[] {
+  return [
+    makeProfileVar('temperatureProfile', 'temperature', model, maxAltitude),
+    makeProfileVar('dewpointProfile', 'dew_point', model, maxAltitude),
+    makeProfileVar('windSpeedProfile', 'wind_speed', model, maxAltitude),
+    makeProfileVar('windDirectionProfile', 'wind_direction', model, maxAltitude),
+    makeProfileVar('cloudCoverProfile', 'cloud_cover', model, maxAltitude),
+    makeProfileVar('geopotentialHeightProfile', 'geopotential_height', model, maxAltitude),
+  ];
+}
+
+export async function fetchSkewTData(
+  location: Location,
+  model: WeatherModel = 'icon_d2',
+  start: Date,
+  maxAltitude: MaxAltitude = 4000,
+  cellSelection: CellSelection = 'nearest'
+): Promise<SkewTWeatherData> {
+  const variables = getSkewTVariablesForModel(model, maxAltitude);
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const params = {
+    hourly: [...variables.flatMap((v) => v.apiNames), 'temperature_2m', 'dew_point_2m'],
+    latitude: location.latitude,
+    longitude: location.longitude,
+    start_date: formatDateToYYYYMMDD(start),
+    end_date: formatDateToYYYYMMDD(start),
+    models: model,
+    cell_selection: cellSelection,
+    timezone: localTimezone,
+  };
+
+  const responses = await fetchWeatherApi(url, params);
+  const response = responses[0];
+
+  const timezone = response.timezoneAbbreviation() ?? 'UTC';
+  const elevation = response.elevation();
+
+  const hourly = response.hourly()!;
+  const times = range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
+    (t) => new Date(t * 1000)
+  );
+
+  const hourlyParams = params.hourly as string[];
+
+  const result: SkewTWeatherData['hourly'] = {
+    time: times,
+    temperatureProfile: {},
+    dewpointProfile: {},
+    windSpeedProfile: {},
+    windDirectionProfile: {},
+    cloudCoverProfile: {},
+    geopotentialHeightProfile: {},
+    temperature_2m: new Float32Array(times.length),
+    dewpoint_2m: new Float32Array(times.length),
+  };
+
+  variables.forEach((v) => {
+    v.apiNames.forEach((apiName) => {
+      const position = hourlyParams.findIndex((p) => p === apiName);
+      if (position === -1) return;
+      const values = hourly.variables(position)!.valuesArray()!;
+      const match = apiName.match(/_(\d+hPa)$/);
+      if (!match) return;
+      const levelKey = `_${match[1]}`;
+      (result as unknown as Record<string, Record<string, Float32Array>>)[v.key][levelKey] = values;
+    });
+  });
+
+  const temp2mPos = hourlyParams.findIndex((p) => p === 'temperature_2m');
+  const dew2mPos = hourlyParams.findIndex((p) => p === 'dew_point_2m');
+  if (temp2mPos >= 0) result.temperature_2m = hourly.variables(temp2mPos)!.valuesArray()!;
+  if (dew2mPos >= 0) result.dewpoint_2m = hourly.variables(dew2mPos)!.valuesArray()!;
+
+  return {
+    hourly: result,
+    elevation,
+    timezoneAbbr: timezone,
+  };
 }
