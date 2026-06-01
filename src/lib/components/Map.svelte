@@ -1,13 +1,22 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import maplibregl, { NavigationControl, type Map, type Marker } from 'maplibre-gl';
+  import maplibregl, { NavigationControl, type Map, type Marker, type RequestParameters } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import type { LngLatLike } from 'maplibre-gl';
+  import { defaultOmProtocolSettings, omProtocol } from '@openmeteo/weather-map-layer';
+  import { Protocol } from 'pmtiles';
   import { base } from '$app/paths';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
-
   import { AboutControl, GithubControl, LocationControlManager, TerrainControl } from './Controls';
+  import type { WeatherMapManager, WeatherMapState } from '$lib/services/weatherMap/manager';
+  import type { Subscriber, Unsubscriber } from 'svelte/store';
+  import { buildOpenMeteoUrl } from '$lib/services/weatherMap/om_url';
+
+  export let weatherMapManager: WeatherMapManager;
+  export let weatherMapStore: {
+    subscribe: (this: void, run: Subscriber<WeatherMapState>, invalidate?: () => void) => Unsubscriber;
+  };
+  export let rasterTileSource: maplibregl.RasterTileSource | undefined;
   export let latitude: number;
   export let longitude: number;
   export let chartOpen = false;
@@ -45,12 +54,10 @@
     const dLon = toRadians(b.longitude - a.longitude);
     const lat1 = toRadians(a.latitude);
     const lat2 = toRadians(b.latitude);
-
     const sinLat = Math.sin(dLat / 2);
     const sinLon = Math.sin(dLon / 2);
     const haversine = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
     const arc = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-
     return earthRadiusMeters * arc;
   }
 
@@ -63,10 +70,8 @@
   function queryElevation(lat: number, lng: number) {
     if (!map || !map.isStyleLoaded() || !isTerrainEnabled) return;
     const elev = map.queryTerrainElevation([lng, lat]);
-
     if (elev == null) return;
-    const rounded = Math.round(elev);
-    lastTerrainElevation = rounded;
+    lastTerrainElevation = Math.round(elev);
     updateElevationBadge();
   }
 
@@ -89,18 +94,11 @@
     latitude = nextLatitude;
     longitude = nextLongitude;
     onLocationChange?.({ latitude: nextLatitude, longitude: nextLongitude });
+    weatherMapManager.setLocation({ latitude: nextLatitude, longitude: nextLongitude });
     if (marker) {
       marker.setLngLat([nextLongitude, nextLatitude]);
     }
     queryElevation(nextLatitude, nextLongitude);
-  }
-
-  function handleLocationDetected(location: Location) {
-    const { latitude: lat, longitude: lng } = location;
-    updatePosition(lat, lng);
-    if (map) {
-      map.flyTo({ center: [lng, lat], zoom: 10 });
-    }
   }
 
   function updateGridCellConnector() {
@@ -109,7 +107,6 @@
     }
 
     const source = map.getSource(gridCellConnectorSourceId) as maplibregl.GeoJSONSource;
-    const selectedLocation = { latitude, longitude };
 
     if (!selectedGridCell) {
       source.setData({
@@ -153,8 +150,8 @@
       return;
     }
 
-    const midpoint: LngLatLike = [(longitude + gridCellLongitude) / 2, (latitude + gridCellLatitude) / 2];
-    const distanceLabel = formatDistance(getHaversineDistanceMeters(selectedLocation, selectedGridCell));
+    const midpoint: [number, number] = [(longitude + gridCellLongitude) / 2, (latitude + gridCellLatitude) / 2];
+    const distanceLabel = formatDistance(getHaversineDistanceMeters({ latitude, longitude }, selectedGridCell));
 
     if (!distanceMarker) {
       const element = document.createElement('div');
@@ -179,7 +176,7 @@
       return;
     }
 
-    const lngLat: LngLatLike = [selectedGridCell.longitude, selectedGridCell.latitude];
+    const lngLat: [number, number] = [selectedGridCell.longitude, selectedGridCell.latitude];
     const badgeText = modelGridElevation != null ? `Grid cell · ${Math.round(modelGridElevation)} m` : 'Grid cell';
 
     if (!selectedGridCellMarker) {
@@ -233,21 +230,36 @@
     }
   }
 
-  // Watch for prop changes and update map
-  $: if (map && marker && (latitude !== marker.getLngLat().lat || longitude !== marker.getLngLat().lng)) {
-    const newPos = { lat: latitude, lng: longitude };
-    marker.setLngLat(newPos);
-    map.setCenter(newPos);
-  }
-
-  $: void (selectedGridCell, latitude, longitude, modelGridElevation, map, updateSelectedGridCellMarker());
-  $: void (gridCellElevation, modelGridElevation, updateElevationBadge());
-
   function handleMapViewChange() {
     updateGridCellConnector();
   }
 
+  function handleLocationDetected(location: Location) {
+    const { latitude: lat, longitude: lng } = location;
+    updatePosition(lat, lng);
+    if (map) {
+      map.flyTo({ center: [lng, lat], zoom: 10 });
+    }
+  }
+
   onMount(async () => {
+    const protocol = new Protocol();
+
+    // Terrain Sources via mapterhorn protocol
+    maplibregl.addProtocol('mapterhorn', async (params: RequestParameters, abortController: AbortController) => {
+      const [z, x, y] = params.url.replace('mapterhorn://', '').split('/').map(Number);
+      const name = z <= 12 ? 'planet' : `6-${x >> (z - 6)}-${y >> (z - 6)}`;
+      const url = `pmtiles://https://mapterhorn.servert.ch/${name}.pmtiles/${z}/${x}/${y}.webp`;
+      return await protocol.tile({ ...params, url }, abortController);
+    });
+
+    // Add OpenMeteo Protocol for weather maps
+    const omProtocolOptions = defaultOmProtocolSettings;
+    omProtocolOptions.fileReaderConfig.useSAB = true;
+    maplibregl.addProtocol('om', (params: RequestParameters, abortController: AbortController) =>
+      omProtocol(params, abortController, omProtocolOptions)
+    );
+
     map = new maplibregl.Map({
       container: mapContainer,
       style: 'https://tiles.openfreemap.org/styles/positron',
@@ -318,7 +330,6 @@
     });
     map.on('zoom', handleMapViewChange);
     map.on('move', handleMapViewChange);
-
     unsubscribe = locationStore.subscribe((state: LocationState) => {
       locationControlManager.updateState(state);
     });
@@ -362,6 +373,33 @@
           'line-width': 1.5,
         },
       });
+      const initialOmUrl = buildOpenMeteoUrl({
+        domain: $weatherMapStore.domain,
+        variable: $weatherMapStore.variable,
+        datetime: $weatherMapStore.datetime,
+        domainInfo: $weatherMapStore.domainInfo,
+      });
+
+      map.addSource('omFileSource', {
+        url: 'om://' + initialOmUrl,
+        type: 'raster',
+        tileSize: 256,
+        maxzoom: 12,
+      });
+      rasterTileSource = map.getSource('omFileSource')!;
+
+      map.addLayer(
+        {
+          id: 'omFileLayer',
+          type: 'raster',
+          source: 'omFileSource',
+          paint: {
+            'raster-opacity': 0.6,
+          },
+        },
+        'waterway_line_label'
+      );
+
       setTerrainVisibility(isTerrainEnabled);
       terrainControl.setEnabled(isTerrainEnabled);
       updateSelectedGridCellMarker();

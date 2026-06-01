@@ -3,15 +3,28 @@
   import { page } from '$app/stores';
   import { afterNavigate, replaceState } from '$app/navigation';
   import { isMobile } from '$lib/stores/media';
-  import LocationMap from '$lib/components/LocationMap.svelte';
+  import type { RasterTileSource } from 'maplibre-gl';
+  import { domainOptions } from '@openmeteo/weather-map-layer';
+  import Map from '$lib/components/Map.svelte';
+  import MapControls from '$lib/components/MapControls.svelte';
+  import TimeSlider from '$lib/components/TimeSlider.svelte';
+  import { updateWeatherLayer } from '$lib/services/weatherMap/url';
+  import { buildOpenMeteoUrl } from '$lib/services/weatherMap/om_url';
+  import { WeatherMapManager, type WeatherMapState } from '$lib/services/weatherMap/manager';
+  import type { Subscriber, Unsubscriber } from 'svelte/store';
   import ChartContainer from '$lib/components/ChartContainer.svelte';
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
   import { getInitialParameters } from '$lib/services/defaults';
   import { type PageParameters } from '$lib/services/types';
   import { fetchWindChartData, fetchModelGridElevation, fetchSkewTData } from '$lib/api/api';
-  import type { Location, WindChartData, SkewTWeatherData } from '$lib/api/types';
+  import type { Location, WindChartData, SkewTWeatherData, WeatherModel } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
+
+  const weatherMapManager = new WeatherMapManager($page.url.searchParams);
+  const weatherMapStore: {
+    subscribe: (this: void, run: Subscriber<WeatherMapState>, invalidate?: () => void) => Unsubscriber;
+  } = { subscribe: weatherMapManager.subscribe };
 
   let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
   let showChart = $state(false);
@@ -23,6 +36,7 @@
   let isSkewTLoading = $state(false);
   let error: string | null = $state(null);
 
+  let rasterTileSource = $state<RasterTileSource | undefined>();
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
 
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
@@ -41,6 +55,7 @@
     params.set('hour', selectedHour.toString());
     return `?${params.toString()}`;
   });
+
   function syncURL() {
     const search = urlSearch;
     const currentSearch = window.location.search;
@@ -66,6 +81,21 @@
     showChart = !showChart;
   }
 
+  function handleDomainChange(domainValue: string) {
+    const selectedDomain = domainOptions.find((d) => d.value === domainValue);
+    if (selectedDomain) {
+      weatherMapManager.setDomain(selectedDomain);
+    }
+  }
+
+  function handleBaseVariableChange(baseVariable: string) {
+    weatherMapManager.setBaseVariable(baseVariable);
+  }
+
+  function handleLevelChange(level: string) {
+    weatherMapManager.setLevel(level);
+  }
+
   function updateLocation(location: Location) {
     parameters.location = location;
 
@@ -76,6 +106,18 @@
       };
     }
   }
+
+  $effect(() => {
+    if (rasterTileSource && $weatherMapStore.domainInfo) {
+      const omUrl = buildOpenMeteoUrl({
+        domain: $weatherMapStore.domain,
+        variable: $weatherMapStore.variable,
+        datetime: $weatherMapStore.datetime,
+        domainInfo: $weatherMapStore.domainInfo,
+      });
+      updateWeatherLayer(rasterTileSource, omUrl);
+    }
+  });
 
   $effect(() => {
     void parameters.location.latitude;
@@ -168,10 +210,54 @@
 </svelte:head>
 
 <div class="h-screen w-full overflow-hidden bg-slate-100">
+  {#if $isMobile}
+    <div class="z-10 w-full bg-white/80 p-2 shadow-sm">
+      <MapControls
+        currentDomain={$weatherMapStore.domain}
+        currentBaseVariable={$weatherMapStore.baseVariable}
+        currentLevel={$weatherMapStore.level}
+        domainInfo={$weatherMapStore.domainInfo}
+        availableLevels={$weatherMapStore.availableLevels}
+        onDomainChange={handleDomainChange}
+        onBaseVariableChange={handleBaseVariableChange}
+        onLevelChange={handleLevelChange}
+        latitude={$weatherMapStore.location.latitude}
+        longitude={$weatherMapStore.location.longitude}
+        onOpenChart={toggleChartPanel}
+      />
+    </div>
+  {/if}
   <ResizablePaneGroup direction={$isMobile ? 'vertical' : 'horizontal'}>
     <ResizablePane defaultSize={showChart ? ($isMobile ? 15 : 50) : 100} minSize={$isMobile ? 10 : 30}>
       <div class="relative h-full w-full overflow-hidden bg-slate-200">
-        <LocationMap
+        {#if !$isMobile}
+          <div class="absolute inset-x-0 top-0 z-10 bg-white/80 p-4 shadow-sm">
+            <MapControls
+              currentDomain={$weatherMapStore.domain}
+              currentBaseVariable={$weatherMapStore.baseVariable}
+              currentLevel={$weatherMapStore.level}
+              domainInfo={$weatherMapStore.domainInfo}
+              availableLevels={$weatherMapStore.availableLevels}
+              onDomainChange={handleDomainChange}
+              onBaseVariableChange={handleBaseVariableChange}
+              onLevelChange={handleLevelChange}
+              latitude={$weatherMapStore.location.latitude}
+              longitude={$weatherMapStore.location.longitude}
+              selectedDay={$weatherMapStore.selectedDay}
+              selectedModel={$weatherMapStore.selectedModel}
+              onLocationChange={(loc: Location) => weatherMapManager.setLocation(loc)}
+              onSelectedDayChange={(day: number) => weatherMapManager.setSelectedDay(day)}
+              onSelectedModelChange={(model: WeatherModel) => weatherMapManager.setSelectedModel(model)}
+              maxAltitude={parameters.maxAltitude}
+              onMaxAltitudeChange={(alt) => (parameters.maxAltitude = alt)}
+              onOpenChart={toggleChartPanel}
+            />
+          </div>
+        {/if}
+        <Map
+          {weatherMapManager}
+          {weatherMapStore}
+          bind:rasterTileSource
           latitude={parameters.location.latitude}
           longitude={parameters.location.longitude}
           bind:chartOpen={showChart}
@@ -181,6 +267,7 @@
           onToggleChart={toggleChartPanel}
           onLocationChange={updateLocation}
         />
+        <TimeSlider {weatherMapManager} {weatherMapStore} />
       </div>
     </ResizablePane>
 
