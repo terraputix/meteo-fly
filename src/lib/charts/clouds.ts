@@ -1,50 +1,33 @@
-import type { WeatherDataType } from '$lib/api/types';
-import { pressureLevels, getAtLevel } from './pressureLevels';
+import type { WindChartData, WeatherModel } from '$lib/api/types';
+import { getAtLevel } from '$lib/api/types';
+import { getNativeLevelsForModel } from '$lib/meteo/pressureLevels';
 
 export interface CloudCoverData {
-  x1: Date;
-  x2: Date;
-  y1: number;
-  y2: number;
+  time: Date;
+  height: number;
   value: number;
 }
 
-export function getCloudCoverData(weatherData: WeatherDataType): Array<CloudCoverData> {
+export function getCloudCoverData(
+  windChartData: WindChartData,
+  model: WeatherModel,
+  maxAltitude: number = 4500
+): Array<CloudCoverData> {
   const data: CloudCoverData[] = [];
-  const levels = pressureLevels;
-  const times = weatherData.hourly.time;
+  const times = windChartData.hourly.time;
+  const levels = getNativeLevelsForModel(model, maxAltitude);
 
-  const cloudCoverData = levels.map((level) => getAtLevel(weatherData.hourly.cloudCoverProfile, level.hPa));
-
-  times.forEach((time, i) => {
-    const nextTime = times[i + 1] || new Date(time.getTime() + 3600000); // Next time or +1 hour
-
-    levels.forEach((level, j) => {
-      const cloudCoverArray = cloudCoverData[j];
-      const cloudCover = cloudCoverArray[i];
-      const nextLevel = levels[j + 1];
-      const y1 = level.heightMeters;
-      const y2 = nextLevel ? nextLevel.heightMeters : level.heightMeters + 500; // Estimate next level
-
+  levels.forEach((level) => {
+    const values = getAtLevel(windChartData.hourly.cloudCoverProfile, level.hPa);
+    if (!values) return;
+    times.forEach((time, i) => {
       data.push({
-        x1: time,
-        x2: nextTime,
-        y1: y1,
-        y2: y2,
-        value: parseFloat(cloudCover.toFixed(0)),
+        time,
+        height: level.heightMeters,
+        value: parseFloat((values[i] ?? 0).toFixed(1)),
       });
     });
   });
 
-  // prepend an additional 0 value at a height below the first level for proper display of the first level
-  times.forEach((time, i) => {
-    data.push({
-      x1: time,
-      x2: times[i + 1] || new Date(time.getTime() + 3600000),
-      y1: levels[0].heightMeters - 250,
-      y2: levels[0].heightMeters,
-      value: 0,
-    });
-  });
   return data;
 }

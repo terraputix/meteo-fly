@@ -1,0 +1,242 @@
+import { goto } from '$app/navigation';
+import type { IControl, Map } from 'maplibre-gl';
+import { locationActions } from '$lib/services/location/store';
+import type { LocationState } from '$lib/services/location/store';
+import type { Location } from '$lib/api/types';
+
+interface BaseControlOptions {
+  title: string;
+  className: string;
+}
+
+interface LocationControlOptions extends BaseControlOptions {
+  onLocationDetected?: (location: Location) => void;
+}
+
+interface TerrainControlOptions extends BaseControlOptions {
+  onToggle?: (enabled: boolean) => void;
+  initialEnabled?: boolean;
+}
+
+interface AboutControlOptions extends BaseControlOptions {
+  url: string;
+}
+
+abstract class BaseButtonControl implements IControl {
+  protected button!: HTMLButtonElement;
+  protected container!: HTMLDivElement;
+  protected map?: Map;
+
+  constructor(protected options: BaseControlOptions) {}
+
+  onAdd(map: Map) {
+    this.map = map;
+    this.container = document.createElement('div');
+    this.container.className = 'maplibregl-ctrl maplibregl-ctrl-group maplibregl-ctrl-group--floating';
+
+    this.button = document.createElement('button');
+    this.button.className = `maplibregl-ctrl-icon ${this.options.className}`;
+    this.button.type = 'button';
+    this.button.title = this.options.title;
+    this.button.setAttribute('aria-label', this.options.title);
+    this.button.addEventListener('click', this.handleClick);
+
+    this.container.appendChild(this.button);
+    this.render();
+
+    return this.container;
+  }
+
+  onRemove() {
+    this.button?.removeEventListener('click', this.handleClick);
+    this.container?.parentNode?.removeChild(this.container);
+    this.map = undefined;
+  }
+
+  protected abstract onButtonClick(): void | Promise<void>;
+  protected abstract render(): void;
+
+  private handleClick = () => {
+    void this.onButtonClick();
+  };
+}
+
+export class LocationControlManager extends BaseButtonControl {
+  constructor(private locationOptions: LocationControlOptions) {
+    super(locationOptions);
+  }
+
+  protected async onButtonClick() {
+    try {
+      await locationActions.detectLocation();
+    } catch (error) {
+      console.error('Location detection failed:', error);
+    }
+  }
+
+  updateState(state: LocationState) {
+    if (!this.button) return;
+
+    if (state.isDetecting) {
+      this.setButtonState('loading');
+    } else if (state.error) {
+      this.setButtonState('error', state.error);
+    } else if (state.current) {
+      this.locationOptions.onLocationDetected?.(state.current);
+      this.setButtonState('success', undefined, state.accuracy ?? undefined);
+    } else {
+      this.setButtonState('idle');
+    }
+  }
+
+  protected render() {
+    this.setButtonState('idle');
+  }
+
+  private setButtonState(state: 'idle' | 'loading' | 'error' | 'success', error?: string, accuracy?: number) {
+    this.button.disabled = false;
+    this.button.classList.remove('loading', 'error', 'success');
+
+    switch (state) {
+      case 'loading':
+        this.button.innerHTML = this.getLoadingIcon();
+        this.button.disabled = true;
+        this.button.classList.add('loading');
+        this.button.title = 'Detecting location...';
+        this.button.setAttribute('aria-label', 'Detecting location');
+        break;
+      case 'error':
+        this.button.innerHTML = this.getErrorIcon();
+        this.button.classList.add('error');
+        this.button.title = `Error: ${error}. Click to retry.`;
+        this.button.setAttribute('aria-label', 'Retry location detection');
+        break;
+      case 'success':
+        this.button.innerHTML = this.getSuccessIcon();
+        this.button.classList.add('success');
+        this.button.title = `Location detected (±${Math.round(accuracy || 0)}m). Click to refresh.`;
+        this.button.setAttribute('aria-label', 'Refresh location');
+        break;
+      case 'idle':
+      default:
+        this.button.innerHTML = this.getIdleIcon();
+        this.button.title = this.options.title;
+        this.button.setAttribute('aria-label', this.options.title);
+        break;
+    }
+  }
+
+  private getIdleIcon() {
+    return `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="8" stroke-width="2"/>
+        <circle cx="12" cy="12" r="3" fill="currentColor"/>
+        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    `;
+  }
+
+  private getLoadingIcon() {
+    return `
+      <svg class="location-spinner" width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+        <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+      </svg>
+    `;
+  }
+
+  private getErrorIcon() {
+    return `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="8" stroke-width="2"/>
+        <path d="M12 8v4M12 16h.01" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    `;
+  }
+
+  private getSuccessIcon() {
+    return `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="8" stroke-width="2"/>
+        <circle cx="12" cy="12" r="3" fill="currentColor"/>
+        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    `;
+  }
+}
+
+export class TerrainControl extends BaseButtonControl {
+  private enabled: boolean;
+
+  constructor(private terrainOptions: TerrainControlOptions) {
+    super(terrainOptions);
+    this.enabled = terrainOptions.initialEnabled ?? true;
+  }
+
+  protected onButtonClick() {
+    this.enabled = !this.enabled;
+    this.render();
+    this.terrainOptions.onToggle?.(this.enabled);
+  }
+
+  setEnabled(enabled: boolean) {
+    this.enabled = enabled;
+    if (this.button) {
+      this.render();
+    }
+  }
+
+  protected render() {
+    this.button.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M3 18l6-7 4 5 4-8 4 10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    this.button.classList.toggle('is-active', this.enabled);
+    const title = this.enabled ? 'Disable terrain and hillshade' : 'Enable terrain and hillshade';
+    this.button.title = title;
+    this.button.setAttribute('aria-label', title);
+  }
+}
+
+export class AboutControl extends BaseButtonControl {
+  constructor(private aboutOptions: AboutControlOptions) {
+    super(aboutOptions);
+  }
+
+  protected onButtonClick() {
+    // eslint-disable-next-line svelte/no-navigation-without-resolve
+    goto(this.aboutOptions.url);
+  }
+
+  protected render() {
+    this.button.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="9" stroke-width="2" />
+        <path d="M12 16v-4M12 9h.01" stroke-width="2" stroke-linecap="round" />
+      </svg>
+    `;
+    this.button.title = this.aboutOptions.title;
+    this.button.setAttribute('aria-label', this.aboutOptions.title);
+  }
+}
+
+export class GithubControl extends BaseButtonControl {
+  constructor(private githubOptions: AboutControlOptions) {
+    super(githubOptions);
+  }
+
+  protected onButtonClick() {
+    window.location.href = this.githubOptions.url;
+  }
+
+  protected render() {
+    this.button.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+      </svg>
+    `;
+    this.button.title = this.githubOptions.title;
+    this.button.setAttribute('aria-label', this.githubOptions.title);
+  }
+}

@@ -2,8 +2,8 @@
 
 <script lang="ts">
   import WindChart from './WindChart.svelte';
-  import { fetchWeatherData } from '$lib/api/api';
-  import type { WeatherDataType, WeatherModel } from '$lib/api/types';
+  import { fetchWindChartData } from '$lib/api/api';
+  import type { WindChartData, WeatherModel } from '$lib/api/types';
   import { addDays } from '$lib/utils/date';
 
   export let latitude: number;
@@ -11,7 +11,7 @@
   export let model: WeatherModel;
   export let day: number = 1;
 
-  let weatherData: WeatherDataType | null = null;
+  let windChartData: WindChartData | null = null;
   let loading = false;
 
   $: startDate = addDays(new Date(), day - 1);
@@ -19,9 +19,9 @@
   async function updateWeather() {
     loading = true;
     try {
-      weatherData = await fetchWeatherData({ latitude, longitude }, model, startDate);
+      windChartData = await fetchWindChartData({ latitude, longitude }, model, startDate);
     } catch {
-      weatherData = null;
+      windChartData = null;
     } finally {
       loading = false;
     }
@@ -34,8 +34,8 @@
 </script>
 
 <div>
-  {#if weatherData}
-    <WindChart {weatherData} />
+  {#if windChartData}
+    <WindChart {windChartData} />
   {:else}
     <div>No data available.</div>
   {/if}

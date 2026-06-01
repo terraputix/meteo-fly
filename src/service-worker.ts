@@ -1,39 +1,83 @@
 /// <reference lib="webworker" />
+import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing';
+import { clientsClaim } from 'workbox-core';
 
-import { build, files, version } from '$service-worker';
+declare const self: ServiceWorkerGlobalScope;
 
-const ASSETS = [...build, ...files];
+cleanupOutdatedCaches();
+precacheAndRoute(self.__WB_MANIFEST);
 
-const CACHE = `cache-${version}`;
+self.skipWaiting();
+clientsClaim();
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
-});
+const CACHE_NAME = 'weather-api-cache';
+const CACHED_AT_HEADER = 'x-meteo-fly-cached-at';
+const FRESH_MS = 5 * 60 * 1000;
+const STALE_MS = 24 * 60 * 60 * 1000;
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then(async (keys) => {
-      for (const key of keys) {
-        if (key !== CACHE) await caches.delete(key);
+function getCacheAge(response: Response): number | null {
+  const val = response.headers.get(CACHED_AT_HEADER);
+  if (!val) return null;
+  return Date.now() - parseInt(val, 10);
+}
+
+registerRoute(
+  /^https:\/\/api\.open-meteo\.com\/v1\/forecast/,
+  async ({ request }) => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request);
+
+    if (cached) {
+      const age = getCacheAge(cached);
+
+      if (age !== null && age < FRESH_MS) {
+        return cached;
       }
-    })
-  );
-});
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+      if (age !== null && age < STALE_MS) {
+        try {
+          const res = await fetch(request);
+          if (res.ok) {
+            const resClone = res.clone();
+            const headers = new Headers(res.headers);
+            headers.set(CACHED_AT_HEADER, String(Date.now()));
+            await cache.put(
+              request,
+              new Response(resClone.body, {
+                status: res.status,
+                statusText: res.statusText,
+                headers,
+              })
+            );
+            return res;
+          }
+        } catch {
+          /* offline — fall back to stale */
+        }
+        return cached;
+      }
+    }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networked = fetch(event.request)
-        .then((response) => {
-          const cache = caches.open(CACHE);
-          cache.then((cache) => cache.put(event.request, response.clone()));
-          return response;
-        })
-        .catch(() => cached);
-
-      return cached || networked;
-    })
-  );
-});
+    try {
+      const res = await fetch(request);
+      if (res.ok) {
+        const resClone = res.clone();
+        const headers = new Headers(res.headers);
+        headers.set(CACHED_AT_HEADER, String(Date.now()));
+        await cache.put(
+          request,
+          new Response(resClone.body, {
+            status: res.status,
+            statusText: res.statusText,
+            headers,
+          })
+        );
+      }
+      return res;
+    } catch {
+      return cached ?? new Response(null, { status: 503 });
+    }
+  },
+  'GET'
+);
