@@ -25,9 +25,10 @@ export function getAtLevel(data: VerticalProfile, pressure: number): Float32Arra
   return data[`_${pressure}hPa` as VerticalProfileKey];
 }
 
-export interface WeatherDataType {
+export interface WindChartData {
   hourly: HourlyData;
   elevation: number;
+  modelGridElevation?: number;
   timezoneAbbr: string;
   sunrise: Date;
   sunset: Date;
@@ -39,7 +40,6 @@ export interface HourlyData {
   cloudCoverProfile: VerticalProfile;
   windSpeedProfile: VerticalProfile;
   windDirectionProfile: VerticalProfile;
-  verticalVelocityProfile: VerticalProfile | undefined;
   precipitation: Float32Array;
   temperature_2m: Float32Array;
   dewpoint_2m: Float32Array;
@@ -55,6 +55,22 @@ export interface HourlyData {
   // windDirection80m: Float32Array;
   // windDirection120m: Float32Array;
   // windDirection180m: Float32Array;
+}
+
+export interface SkewTWeatherData {
+  hourly: {
+    time: Date[];
+    temperatureProfile: VerticalProfile;
+    dewpointProfile: VerticalProfile;
+    windSpeedProfile: VerticalProfile;
+    windDirectionProfile: VerticalProfile;
+    cloudCoverProfile: VerticalProfile;
+    geopotentialHeightProfile: VerticalProfile;
+    temperature_2m: Float32Array;
+    dewpoint_2m: Float32Array;
+  };
+  elevation: number;
+  timezoneAbbr: string;
 }
 
 export type HourlyKeys = keyof HourlyData;

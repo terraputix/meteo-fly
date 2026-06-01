@@ -3,19 +3,24 @@
   import maplibregl, { NavigationControl, type Map, type Marker } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { LngLatLike } from 'maplibre-gl';
+  import { base } from '$app/paths';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
   import {
+    AboutControl,
+    GithubControl,
     LocationControlManager,
     TerrainControl,
     ModelTerrainControl,
     registerPmtilesProtocol,
-  } from './LocationControl';
+  } from './Controls';
   export let latitude: number;
   export let longitude: number;
   export let chartOpen = false;
   export let selectedGridCell: Location | null = null;
+  export let gridCellElevation: number | undefined = undefined;
+  export let modelGridElevation: number | undefined = undefined;
   export let onLocationChange: ((location: Location) => void) | undefined = undefined;
   export let onToggleChart: (() => void) | undefined = undefined;
   export let terrain = true;
@@ -31,14 +36,19 @@
   const modelTerrainUrl = 'pmtiles://https://modelelevations.meteo-fly.com/DWD_ICON_SURFACE.pmtiles';
   const defaultTerrainExaggeration = 1;
   const earthRadiusMeters = 6371000;
+  const aboutUrl = `${base}/about`;
+  const githubUrl = 'https://github.com/terraputix/meteo-fly';
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
+  let elevationBadge: HTMLDivElement | undefined;
   let selectedGridCellMarker: Marker | null = null;
   let distanceMarker: Marker | null = null;
   let unsubscribe: () => void;
   let terrainControlRef: TerrainControl;
   let modelTerrainControlRef: ModelTerrainControl;
+  let isTerrainEnabled = true;
+  let lastTerrainElevation: number | undefined;
 
   function toRadians(value: number) {
     return (value * Math.PI) / 180;
@@ -64,6 +74,29 @@
       : `${Math.round(distanceMeters)} m`;
   }
 
+  function queryElevation(lat: number, lng: number) {
+    if (!map || !map.isStyleLoaded() || !isTerrainEnabled) return;
+    const elev = map.queryTerrainElevation([lng, lat]);
+
+    if (elev == null) return;
+    const rounded = Math.round(elev);
+    lastTerrainElevation = rounded;
+    updateElevationBadge();
+  }
+
+  function updateElevationBadge() {
+    if (!elevationBadge) return;
+    const parts: string[] = [];
+    if (lastTerrainElevation != null) parts.push(`Map ${lastTerrainElevation}m`);
+    if (gridCellElevation != null) parts.push(`API DEM ${Math.round(gridCellElevation)}m`);
+    if (parts.length === 0) {
+      elevationBadge.style.display = 'none';
+      return;
+    }
+    elevationBadge.style.display = '';
+    elevationBadge.textContent = parts.join(' · ');
+  }
+
   function updatePosition(lat: number, lng: number) {
     const nextLatitude = parseFloat(lat.toFixed(5));
     const nextLongitude = parseFloat(lng.toFixed(5));
@@ -73,6 +106,7 @@
     if (marker) {
       marker.setLngLat([nextLongitude, nextLatitude]);
     }
+    queryElevation(nextLatitude, nextLongitude);
   }
 
   function handleLocationDetected(location: Location) {
@@ -160,6 +194,7 @@
     }
 
     const lngLat: LngLatLike = [selectedGridCell.longitude, selectedGridCell.latitude];
+    const badgeText = modelGridElevation != null ? `Grid cell · ${Math.round(modelGridElevation)} m` : 'Grid cell';
 
     if (!selectedGridCellMarker) {
       const element = document.createElement('div');
@@ -173,15 +208,20 @@
       })
         .setLngLat(lngLat)
         .addTo(map);
+
+      const badgeEl = element.querySelector('.selected-grid-cell-marker__badge');
+      if (badgeEl) badgeEl.textContent = badgeText;
     } else {
       selectedGridCellMarker.setLngLat(lngLat);
+      const badgeEl = selectedGridCellMarker.getElement().querySelector('.selected-grid-cell-marker__badge');
+      if (badgeEl) badgeEl.textContent = badgeText;
     }
 
     updateGridCellConnector();
   }
 
   function applyTerrainState() {
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
 
     if (map.getLayer(hillshadeLayerId)) {
       map.setLayoutProperty(hillshadeLayerId, 'visibility', terrain ? 'visible' : 'none');
@@ -224,7 +264,8 @@
     map.setCenter(newPos);
   }
 
-  $: (selectedGridCell, latitude, longitude, map, updateSelectedGridCellMarker());
+  $: void (selectedGridCell, latitude, longitude, modelGridElevation, map, updateSelectedGridCellMarker());
+  $: void (gridCellElevation, modelGridElevation, updateElevationBadge());
 
   function handleMapViewChange() {
     updateGridCellConnector();
@@ -268,15 +309,31 @@
     });
     modelTerrainControlRef = modelTerrainControl;
 
+    const aboutControl = new AboutControl({
+      title: 'About',
+      className: 'maplibregl-ctrl-about',
+      url: aboutUrl,
+    });
+    const githubControl = new GithubControl({
+      title: 'GitHub',
+      className: 'maplibregl-ctrl-github',
+      url: githubUrl,
+    });
+
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
     map.addControl(modelTerrainControl, 'top-left');
+    map.addControl(aboutControl, 'top-right');
+    map.addControl(githubControl, 'top-right');
 
     const selectedLocationElement = document.createElement('div');
     selectedLocationElement.className = 'selected-location-marker';
     selectedLocationElement.innerHTML =
       '<span class="selected-location-marker__outer"></span><span class="selected-location-marker__inner"></span><span class="selected-location-marker__core"></span>';
 
+    elevationBadge = document.createElement('div');
+    elevationBadge.className = 'selected-location-marker__elevation';
+    selectedLocationElement.appendChild(elevationBadge);
     marker = new maplibregl.Marker({
       element: selectedLocationElement,
       draggable: true,
@@ -510,6 +567,23 @@
     background: rgba(224, 242, 254, 0.95);
     transform: translate(-50%, -50%);
     box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.24);
+  }
+
+  :global(.selected-location-marker__elevation) {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(30, 41, 59, 0.85);
+    color: #f8fafc;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
   }
 
   :global(.selected-grid-cell-marker) {

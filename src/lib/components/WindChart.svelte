@@ -2,14 +2,14 @@
   import * as echarts from 'echarts';
   import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
   import { buildWindChartOption, getChartHeight } from '$lib/charts/buildWindChartOption';
-  import type { WeatherDataType } from '$lib/api/types';
+  import type { WindChartData } from '$lib/api/types';
   import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
   import Legend from './Legend.svelte';
 
   import type { WeatherModel } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
 
-  export let weatherData: WeatherDataType | null = null;
+  export let windChartData: WindChartData | null = null;
   export let maxAltitude: MaxAltitude = 4000;
   export let model: WeatherModel = 'icon_d2';
   export let isLoading = false;
@@ -43,7 +43,7 @@
   // ─── Svelte action ────────────────────────────────────────────────────────
 
   type RenderChartParams = {
-    data: WeatherDataType | null;
+    data: WindChartData | null;
     windHeight: number;
     maxAltitude: MaxAltitude;
     model: WeatherModel;
@@ -63,7 +63,7 @@
       node.innerHTML = '';
     }
 
-    async function draw(currentData: WeatherDataType) {
+    async function draw(currentData: WindChartData) {
       isRendering = true;
       destroyChart();
 
@@ -73,7 +73,7 @@
       cancellation = signal;
 
       try {
-        const response = await runChartWorker({ weatherData: currentData, maxAltitude, model }, signal);
+        const response = await runChartWorker({ windChartData: currentData, maxAltitude, model }, signal);
         if (signal.cancelled) return;
 
         if (!response.success) {
@@ -84,8 +84,9 @@
         const {
           cloudData,
           windData,
-          cloudBase,
+          lcl,
           elevation,
+          modelGridElevation,
           timezoneAbbr,
           temperatureChartData,
           rainCloudChartData,
@@ -98,7 +99,7 @@
 
         chart = echarts.init(canvas);
 
-        const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, cloudBase);
+        const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
         const activeState: ActiveState = createActiveState();
 
         chart.setOption(
@@ -107,7 +108,7 @@
             rainCloudChartData,
             windData,
             cloudData,
-            cloudBase,
+            lcl,
             elevation,
             timezoneAbbr,
             xDomain,
@@ -115,7 +116,8 @@
             activeState,
             windHeight,
             maxAltitude,
-            model
+            model,
+            modelGridElevation
           )
         );
 
@@ -196,7 +198,7 @@
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
   <div
-    use:renderChart={{ data: weatherData, windHeight, maxAltitude, model }}
+    use:renderChart={{ data: windChartData, windHeight, maxAltitude, model }}
     class="chart-content"
     style="opacity: {isBusy ? 0 : 1}; height: {totalHeight}px;"
   ></div>

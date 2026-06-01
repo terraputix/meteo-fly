@@ -1,6 +1,7 @@
 # Agents.md — meteo-fly
 
 ## Project Overview
+
 **meteo-fly** is a browser-based weather visualization tool for paragliders and hang gliders. It combines an interactive map with a detailed meteogram panel for wind, cloud, rain, humidity, and cloud-base analysis.
 
 - **Framework**: SvelteKit with Svelte 5 and TypeScript
@@ -16,6 +17,7 @@
 ---
 
 ## Repository Layout
+
 - `src/routes/+layout.svelte`: global shell, metadata, and PWA registration
 - `src/routes/+page.svelte`: main page state, URL sync, and weather fetch lifecycle
 - `src/lib/api/`: Open-Meteo API integration, request config, and response types
@@ -33,6 +35,7 @@
 ---
 
 ## Core Architecture
+
 - **Single-page client app**: Keep everything browser-compatible. Do not introduce server runtime files.
 - **State source of truth**: Page parameters drive selected location, day, model, and max altitude; they are mirrored to URL params and persisted locally.
 - **Data flow**: `+page.svelte` fetches weather data, passes it into `ChartContainer.svelte`, then `WindChart.svelte` offloads heavy chart preparation to `src/lib/workers/chartWorker.ts`.
@@ -46,6 +49,7 @@
 ## Guiding Principles & Conventions
 
 ### General Rules
+
 - **Be brief**: Keep responses concise.
 - **DRY**: Reuse existing types, constants, helpers, and chart/meteo utilities.
 - **No useless comments**: Avoid obvious comments and change/implementation summaries in code.
@@ -53,6 +57,7 @@
 - **Keep docs current**: Update this file when project architecture or conventions materially change.
 
 ### Coding Style
+
 - **Svelte 5**: Prefer runes-style APIs for new or refactored Svelte code when consistent with the file.
 - **TypeScript**: No `any`. Reuse existing domain types from `src/lib/api/types.ts`, `src/lib/meteo/types.ts`, and service types.
 - **Styling**: Prefer Tailwind utility classes. For more complex UI building blocks, prefer existing `shadcn-svelte` components in `src/lib/components/ui/` before creating custom primitives. Avoid adding `<style>` blocks unless an existing component already uses one and a utility-only approach is impractical.
@@ -61,6 +66,7 @@
 - **Charts**: Extend existing ECharts option/data factories instead of introducing a second charting system.
 
 ### Testing & Quality
+
 - **Unit tests**: New pure logic in `src/lib/meteo/`, `src/lib/api/`, or other pure utility modules should include corresponding Vitest coverage.
 - **Validation**: After meaningful changes, run `npm run check`, `npm run lint`, and `npm test` when practical.
 - **Formatting**: Follow project formatting preferences from Prettier/ESLint: single quotes and 120-char width.
@@ -70,34 +76,40 @@
 ## Making Changes
 
 ### Adding or Updating a Weather Model
+
 1. Update the `WeatherModel` union in `src/lib/api/types.ts`.
 2. Update API variable/model configuration in `src/lib/api/variables.ts` and related API logic if needed.
 3. Update model selectors in `src/lib/components/ChartContainer.svelte`.
 4. Verify any model-specific chart or data assumptions still hold.
 
 ### Map & Location
-- Map UI lives primarily in `src/lib/components/LocationMap.svelte` and `src/lib/components/LocationControl.ts`.
+
+- Map UI lives primarily in `src/lib/components/LocationMap.svelte` and `src/lib/components/Controls.ts`.
 - Location state and geolocation behavior live in `src/lib/services/location/`.
 
 ### Charting
+
 - UI container: `src/lib/components/ChartContainer.svelte`
 - Rendering and worker orchestration: `src/lib/components/WindChart.svelte`
 - Worker entrypoint: `src/lib/workers/chartWorker.ts`
 - Pure chart builders/helpers: `src/lib/charts/`
 
 ### Shared UI Primitives
+
 - For some more complex UI components, use `shadcn-svelte` primitives from `src/lib/components/ui/`.
 - Existing examples include `src/lib/components/ui/switch/switch.svelte` and the resizable panel components in `src/lib/components/ui/resizable/`.
 - When adding a new `shadcn-svelte` component, use the library CLI to generate it into `src/lib/components/ui/`, then adapt the generated files to the project's conventions such as `$lib/` imports, existing styling patterns, and Svelte 5 usage where appropriate.
 - Prefer extending generated `shadcn-svelte` primitives locally instead of duplicating or reimplementing the same component patterns elsewhere in the app.
 
 ### PWA / Metadata
+
 - Manifest and service worker caching are configured in `vite.config.ts`.
 - Registration and document head metadata are handled in `src/routes/+layout.svelte`.
 
 ---
 
 ## Commands
+
 ```sh
 npm install
 npm run dev
@@ -112,6 +124,7 @@ npm test
 ---
 
 ## What to Avoid
+
 - **No server runtime**: Do not add `+server.ts`, `+page.server.ts`, or server-only dependencies.
 - **No charting bloat**: Keep charting within the existing ECharts-based chart helpers and option builders.
 - **No side effects in pure modules**: Keep meteo/chart helpers deterministic and worker-friendly.

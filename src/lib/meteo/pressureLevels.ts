@@ -16,6 +16,11 @@ export function hPaToMeters(hPa: number): number {
   return Math.round(ISA_T0_OVER_L * (1 - Math.pow((hPa * 100) / ISA_P0_PA, ISA_EXPONENT)));
 }
 
+export function metersToHPa(heightMeters: number): number {
+  const pascals = ISA_P0_PA * Math.pow(1 - heightMeters / ISA_T0_OVER_L, 1 / ISA_EXPONENT);
+  return Math.round(pascals / 100);
+}
+
 const ALL_PRESSURE_LEVELS = [
   1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 675, 650, 625, 600, 575, 550, 525, 500, 475, 450,
   425, 400, 375, 350, 325, 300,

@@ -2,7 +2,12 @@ import type { FlatVariable, ProfileVariables, WeatherModel } from './types';
 import { getNativeLevelsForFetch } from '$lib/meteo/pressureLevels';
 import type { MaxAltitude } from '$lib/meteo/types';
 
-function makeProfileVar(key: string, prefix: string, model: WeatherModel, maxAltitude: number): ProfileVariables {
+export function makeProfileVar(
+  key: string,
+  prefix: string,
+  model: WeatherModel,
+  maxAltitude: number
+): ProfileVariables {
   const levels = getNativeLevelsForFetch(model, maxAltitude);
   return {
     key,
@@ -32,9 +37,6 @@ export function getVariablesForModel(
   ];
 
   const modelSpecificVars: (ProfileVariables | FlatVariable)[] = (() => {
-    // if (model === 'gfs_seamless') {
-    //   return [makeProfileVar('verticalVelocityProfile', 'vertical_velocity', model, maxAltitude)];
-    // }
     return [];
   })();
 

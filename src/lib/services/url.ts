@@ -1,4 +1,4 @@
-import type { PageParameters } from './types';
+import type { PageParameters, ChartView } from './types';
 import { defaultCellSelection, defaultDay, defaultLocation, defaultWeatherModel } from './defaults';
 import type { CellSelection, WeatherModel, Location } from '$lib/api/types';
 import type { MaxAltitude } from '$lib/meteo/types';
@@ -12,6 +12,8 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
   const cellSelection = params.get('cellSelection');
   const terrainParam = params.get('terrain');
   const modelTerrainParam = params.get('modelTerrain');
+  const view = params.get('view');
+  const hourStr = params.get('hour');
 
   if (!(lat && lon && day && model)) {
     return null;
@@ -25,6 +27,8 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
     cellSelection === 'nearest' || cellSelection === 'land' ? cellSelection : defaultCellSelection;
   const terrain = terrainParam !== null ? terrainParam === '1' : true;
   const modelTerrain = modelTerrainParam === '1';
+  const chartView: ChartView | undefined = view === 'wind' || view === 'skewt' ? view : undefined;
+  const hour = hourStr ? Number(hourStr) : undefined;
 
   return {
     location,
@@ -34,5 +38,7 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
     cellSelection: selectedCellSelection,
     terrain,
     modelTerrain,
+    chartView,
+    hour,
   };
 }

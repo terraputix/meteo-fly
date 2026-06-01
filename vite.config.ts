@@ -1,14 +1,16 @@
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { VitePWA } from 'vite-plugin-pwa';
+import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 
 export default defineConfig({
   plugins: [
     tailwindcss(),
     sveltekit(),
-    VitePWA({
-      strategies: 'generateSW',
+    SvelteKitPWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'service-worker.ts',
       registerType: 'autoUpdate',
       manifest: {
         name: 'Meteo-Fly',
@@ -24,7 +26,7 @@ export default defineConfig({
         theme_color: '#4f46e5',
         lang: 'en',
         dir: 'ltr',
-        categories: ['weather', 'utilities', 'productivity'],
+        categories: ['weather', 'paragliding', 'hang gliding', 'utilities'],
         icons: [
           {
             src: '/icons/icon-192x192.png',
@@ -40,36 +42,12 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        // Raise the limit to 3 MiB to accommodate the echarts bundle
+      injectManifest: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        // Precache all build assets and static files
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        // Network-first for Open-Meteo weather API calls so fresh data is
-        // always preferred but a cached response is used as fallback
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\.open-meteo\.com\/v1\/forecast/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'weather-api-cache',
-              networkTimeoutSeconds: 10,
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 3, // 3 hours
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-        ],
-        cleanupOutdatedCaches: true,
-        skipWaiting: true,
-        clientsClaim: true,
       },
       devOptions: {
-        enabled: false,
+        enabled: true,
       },
     }),
   ],
