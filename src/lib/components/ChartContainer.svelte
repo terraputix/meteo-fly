@@ -125,7 +125,7 @@
       <WindChart {windChartData} {maxAltitude} {model} isLoading={isWindChartLoading} />
     {:else if skewTData && traceHours.length > 0}
       <div class="mb-3">
-        <HourSlider bind:hour {traceHours} timezoneAbbr={skewTData?.timezoneAbbr ?? ''} />
+        <HourSlider bind:hour bind:selectedDay {traceHours} timezoneAbbr={skewTData?.timezoneAbbr ?? ''} />
       </div>
       <SkewTChart {skewTData} {hour} isLoading={isSkewTLoading} />
     {:else if isSkewTLoading}

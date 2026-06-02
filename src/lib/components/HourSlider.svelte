@@ -1,10 +1,12 @@
 <script lang="ts">
   let {
     hour = $bindable(0),
+    selectedDay = $bindable(),
     traceHours,
     timezoneAbbr = '',
   }: {
     hour?: number;
+    selectedDay: number;
     traceHours: Date[];
     timezoneAbbr?: string;
   } = $props();
@@ -19,11 +21,21 @@
   }
 
   function prevTrace() {
-    if (hour > 0) hour--;
+    if (hour > 0) {
+      hour--;
+    } else if (selectedDay > -13) {
+      selectedDay--;
+      hour = 23;
+    }
   }
 
   function nextTrace() {
-    if (hour < traceHours.length - 1) hour++;
+    if (hour < traceHours.length - 1) {
+      hour++;
+    } else if (selectedDay < 8) {
+      selectedDay++;
+      hour = 0;
+    }
   }
 
   function handleSliderInput(e: Event) {
@@ -36,7 +48,7 @@
   <span class="text-xs font-medium text-slate-500">Time</span>
   <button
     onclick={prevTrace}
-    disabled={hour <= 0}
+    disabled={hour <= 0 && selectedDay <= -13}
     class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
     aria-label="Previous hour"
   >
@@ -54,7 +66,7 @@
   />
   <button
     onclick={nextTrace}
-    disabled={hour >= traceHours.length - 1}
+    disabled={hour >= traceHours.length - 1 && selectedDay >= 8}
     class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
     aria-label="Next hour"
   >
