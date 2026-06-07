@@ -29,7 +29,7 @@
   >
     <span class="ml-auto min-w-0 max-w-28 truncate text-xs font-semibold text-slate-800">{currentName}</span>
     <span
-      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"
+      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"
       aria-hidden="true"
     >
       <GridIcon class="h-4 w-4" />

@@ -404,7 +404,7 @@
         >
       </span>
       <span
-        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"
+        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"
         aria-hidden="true"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -428,10 +428,10 @@
       aria-label="About"
       title="About"
     >
-      <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600" aria-hidden="true">
+      <span class="flex h-7 w-7 items-center justify-center text-slate-500" aria-hidden="true">
         <svg
-          width="16"
-          height="16"
+          width="20"
+          height="20"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -661,13 +661,13 @@
   }
 
   button.chart-open {
-    border-color: rgba(99, 102, 241, 0.25);
-    background: rgba(238, 242, 255, 0.96);
+    border-color: rgba(148, 163, 184, 0.4);
+    background: rgba(248, 250, 252, 0.96);
   }
 
   button.chart-open span:last-child {
-    background: rgb(224, 231, 255);
-    color: rgb(79, 70, 229);
+    background: rgb(226, 232, 240);
+    color: rgb(71, 85, 105);
   }
 
   @keyframes spin {

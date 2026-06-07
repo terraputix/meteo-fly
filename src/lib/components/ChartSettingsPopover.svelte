@@ -35,8 +35,8 @@
     aria-label="Chart settings"
     title="Chart settings"
   >
-    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600" aria-hidden="true">
-      <SettingsIcon class="h-4 w-4" />
+    <span class="flex h-7 w-7 items-center justify-center text-slate-500" aria-hidden="true">
+      <SettingsIcon class="h-5 w-5" />
     </span>
   </Popover.Trigger>
 
