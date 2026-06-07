@@ -1,34 +1,18 @@
 <script lang="ts">
-  import type { CellSelection, WeatherModel } from '$lib/api/types';
+  import type { CellSelection } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
 
   let {
-    model = $bindable<WeatherModel>('icon_d2'),
     maxAltitude = $bindable<MaxAltitude>(4000),
     cellSelection = $bindable<CellSelection>('nearest'),
     latitude,
     longitude,
   }: {
-    model?: WeatherModel;
     maxAltitude?: MaxAltitude;
     cellSelection?: CellSelection;
     latitude?: number;
     longitude?: number;
   } = $props();
-
-  const models: { id: WeatherModel; name: string }[] = [
-    { id: 'icon_seamless', name: 'ICON Seamless' },
-    { id: 'icon_d2', name: 'ICON D2' },
-    { id: 'icon_eu', name: 'ICON EU' },
-    { id: 'icon_global', name: 'ICON Global' },
-    { id: 'gfs_seamless', name: 'GFS Seamless' },
-    { id: 'meteofrance_seamless', name: 'MeteoFrance' },
-    { id: 'ecmwf_ifs025', name: 'ECMWF IFS 0.25°' },
-    { id: 'ecmwf_aifs025_single', name: 'ECMWF AIFS 0.25°' },
-    { id: 'ukmo_seamless', name: 'UKMO' },
-    { id: 'gem_seamless', name: 'GEM' },
-    { id: 'cma_grapes_global', name: 'CMA GRAPES' },
-  ];
 
   const altitudes: { value: MaxAltitude; name: string }[] = [
     { value: 3000, name: '3000m (700hPa)' },
@@ -44,18 +28,6 @@
     { value: 'nearest', label: 'Nearest' },
   ];
 </script>
-
-<label class="flex min-w-0 flex-col gap-1.5">
-  <span class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Model</span>
-  <select
-    bind:value={model}
-    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-  >
-    {#each models as m (m.id)}
-      <option value={m.id}>{m.name}</option>
-    {/each}
-  </select>
-</label>
 
 <label class="flex min-w-0 flex-col gap-1.5">
   <span class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Top height</span>

@@ -2,11 +2,11 @@
   import type { CellSelection, WindChartData, WeatherModel, SkewTWeatherData } from '$lib/api/types';
   import WindChart from './WindChart.svelte';
   import SkewTChart from './SkewTChart.svelte';
-  import DayNavigator from './DayNavigator.svelte';
-  import ChartSettings from './ChartSettings.svelte';
-  import HourSlider from './HourSlider.svelte';
+  import BottomControls from './BottomControls.svelte';
   import Footer from './Footer.svelte';
+  import { windColors, windMaxSpeed } from '$lib/charts/scales';
   import { browser } from '$app/environment';
+  import { tick } from 'svelte';
   import { buildSkewTData } from '$lib/meteo/skewT';
   import type { MaxAltitude } from '$lib/meteo/types';
   import type { ChartView } from '$lib/services/types';
@@ -21,8 +21,6 @@
     maxAltitude = $bindable(4000),
     model = $bindable<WeatherModel>('icon_d2'),
     cellSelection = $bindable<CellSelection>('nearest'),
-    latitude = $bindable(),
-    longitude = $bindable(),
     chartView = $bindable<ChartView>('wind'),
     hour = $bindable(0),
     onClose,
@@ -36,8 +34,6 @@
     maxAltitude?: MaxAltitude;
     model?: WeatherModel;
     cellSelection?: CellSelection;
-    latitude: number;
-    longitude: number;
     chartView?: ChartView;
     hour?: number;
     onClose?: () => void;
@@ -49,7 +45,20 @@
   });
   let traceHours = $derived(skewTData?.traces.map((t) => t.time) ?? []);
 
-  let showMobileSettings = $state(false);
+  let legendOpen = $state(false);
+
+  const cloudGradient =
+    'linear-gradient(to right, rgba(100,120,145,0), rgba(100,120,145,0.45) 50%, rgba(100,120,145,0.85))';
+
+  const step = 100 / windColors.length;
+  const windGradient = `linear-gradient(to right, ${windColors
+    .flatMap((color, i) => {
+      const start = (i * step).toFixed(1) + '%';
+      const end = ((i + 1) * step).toFixed(1) + '%';
+      return [`${color} ${start}`, `${color} ${end}`];
+    })
+    .join(', ')})`;
+
   let scrollContainer: HTMLDivElement | undefined;
 
   $effect(() => {
@@ -64,9 +73,10 @@
     void maxAltitude;
     void model;
     void cellSelection;
-    void showMobileSettings;
     if (scrollContainer && browser && window.innerWidth < 640) {
-      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      tick().then(() => {
+        scrollContainer!.scrollTop = scrollContainer!.scrollHeight;
+      });
     }
   });
 </script>
@@ -75,18 +85,6 @@
   bind:this={scrollContainer}
   class="relative mx-auto flex h-full max-w-3xl flex-col overflow-y-auto rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
 >
-  <div class="border-b border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 py-3 sm:px-5 sm:py-4">
-    <div
-      class="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 shadow-inner shadow-slate-100 sm:flex sm:gap-3 sm:p-2.5"
-    >
-      <DayNavigator bind:selectedDay {startDate} onclose={onClose} />
-    </div>
-
-    <div class="mt-0 hidden sm:grid sm:grid-cols-3 sm:gap-3">
-      <ChartSettings bind:model bind:maxAltitude bind:cellSelection />
-    </div>
-  </div>
-
   <div class="bg-white px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
     <div class="mb-2 flex items-center justify-center">
       <div class="inline-flex rounded-xl bg-slate-100 p-1">
@@ -123,11 +121,53 @@
 
     {#if chartView === 'wind'}
       <WindChart {windChartData} {maxAltitude} {model} isLoading={isWindChartLoading} />
+      <Footer>
+        {#snippet heading()}
+          <button
+            type="button"
+            class="text-left text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase transition-opacity hover:opacity-100"
+            class:opacity-60={!legendOpen}
+            class:opacity-100={legendOpen}
+            onclick={() => (legendOpen = !legendOpen)}
+          >
+            {legendOpen ? '▼' : '▶'} Legend
+          </button>
+        {/snippet}
+        {#snippet body()}
+          {#if legendOpen}
+            <div class="flex w-full flex-wrap justify-center gap-x-10 gap-y-4 pt-4">
+              <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
+                <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
+                  Clouds <small class="lowercase opacity-60">%</small>
+                </span>
+                <div class="flex flex-1 flex-col gap-0.75">
+                  <div
+                    class="h-1.25 w-full rounded-full border border-slate-200"
+                    style="background: {cloudGradient};"
+                  ></div>
+                  <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
+                    <span>0</span><span>100</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
+                <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
+                  Wind <small class="lowercase opacity-60">km/h</small>
+                </span>
+                <div class="flex flex-1 flex-col gap-0.75">
+                  <div class="h-1.25 w-full rounded-full" style="background: {windGradient};"></div>
+                  <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
+                    <span>0</span><span>{windMaxSpeed}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {/if}
+        {/snippet}
+      </Footer>
     {:else if skewTData && traceHours.length > 0}
-      <div class="mb-3">
-        <HourSlider bind:hour bind:selectedDay {traceHours} timezoneAbbr={skewTData?.timezoneAbbr ?? ''} />
-      </div>
       <SkewTChart {skewTData} {hour} isLoading={isSkewTLoading} />
+      <Footer />
     {:else if isSkewTLoading}
       <div class="flex h-64 items-center justify-center">
         <div class="text-sm text-slate-500">Loading sounding data...</div>
@@ -137,36 +177,16 @@
         <div class="text-sm text-slate-500">No sounding data available</div>
       </div>
     {/if}
-
-    <div class="mt-0.5 sm:mt-1">
-      <Footer />
-    </div>
   </div>
 
-  <div class="mt-auto border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 py-2 sm:hidden">
-    <div
-      class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 shadow-inner shadow-slate-100"
-    >
-      <DayNavigator bind:selectedDay {startDate} onclose={onClose} compact />
-    </div>
-
-    <button
-      type="button"
-      class="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
-      onclick={() => (showMobileSettings = !showMobileSettings)}
-      aria-expanded={showMobileSettings}
-      aria-controls="chart-mobile-settings"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M7 12h10M10 18h4" />
-      </svg>
-      Settings
-    </button>
-
-    {#if showMobileSettings}
-      <div id="chart-mobile-settings" class="mt-2 grid grid-cols-1 gap-2">
-        <ChartSettings bind:model bind:maxAltitude bind:cellSelection {latitude} {longitude} />
-      </div>
-    {/if}
+  <div class="mt-auto border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:px-5">
+    <BottomControls
+      bind:selectedDay
+      {startDate}
+      bind:hour
+      {traceHours}
+      timezoneAbbr={skewTData?.timezoneAbbr ?? ''}
+      onclose={onClose}
+    />
   </div>
 </div>

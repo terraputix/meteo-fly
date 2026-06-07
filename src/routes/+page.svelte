@@ -175,6 +175,9 @@
           latitude={parameters.location.latitude}
           longitude={parameters.location.longitude}
           bind:chartOpen={showChart}
+          bind:model={parameters.selectedModel}
+          bind:maxAltitude={parameters.maxAltitude}
+          bind:cellSelection={parameters.cellSelection}
           selectedGridCell={windChartData?.selectedGridCell ?? null}
           gridCellElevation={windChartData?.elevation}
           modelGridElevation={windChartData?.modelGridElevation}
@@ -203,8 +206,6 @@
             bind:maxAltitude={parameters.maxAltitude}
             bind:model={parameters.selectedModel}
             bind:cellSelection={parameters.cellSelection}
-            bind:latitude={parameters.location.latitude}
-            bind:longitude={parameters.location.longitude}
             bind:chartView
             bind:hour={selectedHour}
             onClose={() => (showChart = false)}

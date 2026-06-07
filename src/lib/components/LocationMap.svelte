@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { goto } from '$app/navigation';
   import maplibregl, { NavigationControl, type Map, type Marker } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { LngLatLike } from 'maplibre-gl';
@@ -7,13 +8,20 @@
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
-  import { AboutControl, GithubControl, LocationControlManager, TerrainControl } from './Controls';
+  import { LocationControlManager, TerrainControl } from './Controls';
+  import ModelSelector from './ModelSelector.svelte';
+  import ChartSettingsPopover from './ChartSettingsPopover.svelte';
+  import type { WeatherModel, CellSelection } from '$lib/api/types';
+  import type { MaxAltitude } from '$lib/meteo/types';
   export let latitude: number;
   export let longitude: number;
   export let chartOpen = false;
   export let selectedGridCell: Location | null = null;
   export let gridCellElevation: number | undefined = undefined;
   export let modelGridElevation: number | undefined = undefined;
+  export let model: WeatherModel = 'icon_d2';
+  export let maxAltitude: MaxAltitude = 4000;
+  export let cellSelection: CellSelection = 'nearest';
   export let onLocationChange: ((location: Location) => void) | undefined = undefined;
   export let onToggleChart: (() => void) | undefined = undefined;
 
@@ -25,7 +33,6 @@
   const defaultTerrainExaggeration = 1;
   const earthRadiusMeters = 6371000;
   const aboutUrl = `${base}/about`;
-  const githubUrl = 'https://github.com/terraputix/meteo-fly';
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
@@ -275,21 +282,9 @@
       initialEnabled: isTerrainEnabled,
       onToggle: setTerrainVisibility,
     });
-    const aboutControl = new AboutControl({
-      title: 'About',
-      className: 'maplibregl-ctrl-about',
-      url: aboutUrl,
-    });
-    const githubControl = new GithubControl({
-      title: 'GitHub',
-      className: 'maplibregl-ctrl-github',
-      url: githubUrl,
-    });
 
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
-    map.addControl(aboutControl, 'top-right');
-    map.addControl(githubControl, 'top-right');
 
     const selectedLocationElement = document.createElement('div');
     selectedLocationElement.className = 'selected-location-marker';
@@ -389,30 +384,63 @@
 <div class="relative h-full w-full">
   <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
 
-  <div class="chart-toggle-anchor pointer-events-none absolute left-[4.65rem] z-10 md:left-[4.9rem]">
+  <div class="controls-stack pointer-events-none absolute right-3 z-10 flex flex-col items-end gap-2">
+    <div class="pointer-events-auto">
+      <ModelSelector bind:model />
+    </div>
+
     <button
       type="button"
       class:chart-open={chartOpen}
-      class="pointer-events-auto flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white/92 px-3 py-2 text-left text-slate-700 shadow-lg backdrop-blur-md transition hover:bg-white"
-      on:click={() => onToggleChart?.()}
+      class="pointer-events-auto flex w-full items-center gap-2 rounded-xl border border-slate-200/80 bg-white/92 px-2.5 py-2 text-left text-slate-700 shadow-lg backdrop-blur-md transition hover:bg-white"
+      onclick={() => onToggleChart?.()}
       aria-label={chartOpen ? 'Hide forecast chart panel' : 'Show forecast chart panel'}
       title={chartOpen ? 'Hide forecast chart panel' : 'Show forecast chart panel'}
     >
+      <span class="ml-auto min-w-0 text-right">
+        <span class="block text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase">Forecast</span>
+        <span class="block text-xs font-semibold text-slate-800"
+          >{chartOpen ? 'Hide chart panel' : 'Show chart panel'}</span
+        >
+      </span>
       <span
-        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"
+        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"
         aria-hidden="true"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6.5h12m-3-3 3 3-3 3" />
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6m3-3-3 3 3 3" />
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 17.5h12m-3-3 3 3-3 3" />
         </svg>
       </span>
-      <span class="min-w-0">
-        <span class="block text-[11px] font-semibold tracking-[0.18em] text-slate-500 uppercase">Forecast</span>
-        <span class="block text-sm font-semibold text-slate-800"
-          >{chartOpen ? 'Hide chart panel' : 'Show chart panel'}</span
+    </button>
+
+    <div class="pointer-events-auto">
+      <ChartSettingsPopover bind:maxAltitude bind:cellSelection />
+    </div>
+
+    <button
+      type="button"
+      class="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white/92 shadow-lg backdrop-blur-md transition hover:bg-white"
+      onclick={() =>
+        // eslint-disable-next-line svelte/no-navigation-without-resolve
+        goto(aboutUrl)}
+      aria-label="About"
+      title="About"
+    >
+      <span class="flex h-7 w-7 items-center justify-center text-slate-500" aria-hidden="true">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
         >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 16v-4M12 9h.01" />
+        </svg>
       </span>
     </button>
   </div>
@@ -628,18 +656,18 @@
     animation: spin 1s linear infinite;
   }
 
-  .chart-toggle-anchor {
+  .controls-stack {
     top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
   }
 
   button.chart-open {
-    border-color: rgba(99, 102, 241, 0.25);
-    background: rgba(238, 242, 255, 0.96);
+    border-color: rgba(148, 163, 184, 0.4);
+    background: rgba(248, 250, 252, 0.96);
   }
 
-  button.chart-open span:first-child {
-    background: rgb(224, 231, 255);
-    color: rgb(79, 70, 229);
+  button.chart-open span:last-child {
+    background: rgb(226, 232, 240);
+    color: rgb(71, 85, 105);
   }
 
   @keyframes spin {
