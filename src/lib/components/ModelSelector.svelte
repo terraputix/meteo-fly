@@ -23,20 +23,20 @@
 
 <Popover.Root bind:open>
   <Popover.Trigger
-    class="pointer-events-auto flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/92 px-2.5 py-2 text-left text-slate-700 shadow-lg backdrop-blur-md transition hover:bg-white"
+    class="pointer-events-auto flex w-full items-center gap-2 rounded-xl border border-slate-200/80 bg-white/92 px-2.5 py-2 text-left text-slate-700 shadow-lg backdrop-blur-md transition hover:bg-white"
     aria-label="Select weather model"
     title="Select weather model"
   >
+    <span class="ml-auto min-w-0 max-w-28 truncate text-xs font-semibold text-slate-800">{currentName}</span>
     <span
       class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"
       aria-hidden="true"
     >
       <GridIcon class="h-4 w-4" />
     </span>
-    <span class="min-w-0 max-w-28 truncate text-xs font-semibold text-slate-800">{currentName}</span>
   </Popover.Trigger>
 
-  <Popover.Content side="bottom" align="start" class="w-56 p-1.5" sideOffset={6}>
+  <Popover.Content side="bottom" align="end" class="w-56 p-1.5" sideOffset={6}>
     <div class="text-xs font-semibold tracking-wide text-slate-500 uppercase px-2 py-1.5">Select Model</div>
     <div class="mt-0.5 flex flex-col gap-0.5">
       {#each MODEL_OPTIONS as m (m.id)}

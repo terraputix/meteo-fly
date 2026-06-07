@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { goto } from '$app/navigation';
   import maplibregl, { NavigationControl, type Map, type Marker } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { LngLatLike } from 'maplibre-gl';
@@ -7,7 +8,7 @@
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
-  import { AboutControl, LocationControlManager, TerrainControl } from './Controls';
+  import { LocationControlManager, TerrainControl } from './Controls';
   import ModelSelector from './ModelSelector.svelte';
   import ChartSettingsPopover from './ChartSettingsPopover.svelte';
   import type { WeatherModel, CellSelection } from '$lib/api/types';
@@ -281,15 +282,9 @@
       initialEnabled: isTerrainEnabled,
       onToggle: setTerrainVisibility,
     });
-    const aboutControl = new AboutControl({
-      title: 'About',
-      className: 'maplibregl-ctrl-about',
-      url: aboutUrl,
-    });
 
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
-    map.addControl(aboutControl, 'top-right');
 
     const selectedLocationElement = document.createElement('div');
     selectedLocationElement.className = 'selected-location-marker';
@@ -389,15 +384,25 @@
 <div class="relative h-full w-full">
   <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
 
-  <div class="chart-toggle-anchor pointer-events-none absolute left-[4.65rem] z-10 md:left-[4.9rem]">
+  <div class="controls-stack pointer-events-none absolute right-3 z-10 flex flex-col items-end gap-2">
+    <div class="pointer-events-auto">
+      <ModelSelector bind:model />
+    </div>
+
     <button
       type="button"
       class:chart-open={chartOpen}
-      class="pointer-events-auto flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/92 px-2.5 py-2 text-left text-slate-700 shadow-lg backdrop-blur-md transition hover:bg-white"
-      on:click={() => onToggleChart?.()}
+      class="pointer-events-auto flex w-full items-center gap-2 rounded-xl border border-slate-200/80 bg-white/92 px-2.5 py-2 text-left text-slate-700 shadow-lg backdrop-blur-md transition hover:bg-white"
+      onclick={() => onToggleChart?.()}
       aria-label={chartOpen ? 'Hide forecast chart panel' : 'Show forecast chart panel'}
       title={chartOpen ? 'Hide forecast chart panel' : 'Show forecast chart panel'}
     >
+      <span class="ml-auto min-w-0 text-right">
+        <span class="block text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase">Forecast</span>
+        <span class="block text-xs font-semibold text-slate-800"
+          >{chartOpen ? 'Hide chart panel' : 'Show chart panel'}</span
+        >
+      </span>
       <span
         class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"
         aria-hidden="true"
@@ -408,21 +413,36 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 17.5h12m-3-3 3 3-3 3" />
         </svg>
       </span>
-      <span class="min-w-0">
-        <span class="block text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase">Forecast</span>
-        <span class="block text-xs font-semibold text-slate-800"
-          >{chartOpen ? 'Hide chart panel' : 'Show chart panel'}</span
+    </button>
+
+    <div class="pointer-events-auto">
+      <ChartSettingsPopover bind:maxAltitude bind:cellSelection />
+    </div>
+
+    <button
+      type="button"
+      class="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white/92 shadow-lg backdrop-blur-md transition hover:bg-white"
+      onclick={() =>
+        // eslint-disable-next-line svelte/no-navigation-without-resolve
+        goto(aboutUrl)}
+      aria-label="About"
+      title="About"
+    >
+      <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600" aria-hidden="true">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
         >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 16v-4M12 9h.01" />
+        </svg>
       </span>
     </button>
-  </div>
-
-  <div class="model-selector-anchor pointer-events-none absolute left-[4.65rem] z-10 md:left-[4.9rem]">
-    <ModelSelector bind:model />
-  </div>
-
-  <div class="settings-anchor pointer-events-none absolute left-[4.65rem] z-10 md:left-[4.9rem]">
-    <ChartSettingsPopover bind:maxAltitude bind:cellSelection />
   </div>
 </div>
 
@@ -636,7 +656,7 @@
     animation: spin 1s linear infinite;
   }
 
-  .chart-toggle-anchor {
+  .controls-stack {
     top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
   }
 
@@ -645,7 +665,7 @@
     background: rgba(238, 242, 255, 0.96);
   }
 
-  button.chart-open span:first-child {
+  button.chart-open span:last-child {
     background: rgb(224, 231, 255);
     color: rgb(79, 70, 229);
   }
@@ -657,13 +677,5 @@
     to {
       transform: rotate(360deg);
     }
-  }
-
-  .model-selector-anchor {
-    top: calc(env(safe-area-inset-top, 0px) + 4.75rem);
-  }
-
-  .settings-anchor {
-    top: calc(env(safe-area-inset-top, 0px) + 8.5rem);
   }
 </style>
