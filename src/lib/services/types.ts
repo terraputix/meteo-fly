@@ -11,4 +11,5 @@ export interface PageParameters {
   cellSelection: CellSelection;
   chartView?: ChartView;
   hour?: number;
+  daylightOnly?: boolean;
 }

@@ -7,6 +7,7 @@ export interface ChartWorkerInput {
   windChartData: WindChartData;
   maxAltitude: MaxAltitude;
   model: WeatherModel;
+  daylightOnly?: boolean;
 }
 
 export interface TemperatureChartData {

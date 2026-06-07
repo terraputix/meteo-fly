@@ -12,6 +12,7 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
   const cellSelection = params.get('cellSelection');
   const view = params.get('view');
   const hourStr = params.get('hour');
+  const daylightStr = params.get('daylight');
 
   if (!(lat && lon && day && model)) {
     return null;
@@ -31,6 +32,7 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
     cellSelection === 'nearest' || cellSelection === 'land' ? cellSelection : defaultCellSelection;
   const chartView: ChartView | undefined = view === 'wind' || view === 'skewt' ? view : undefined;
   const hour = hourStr ? Number(hourStr) : undefined;
+  const daylightOnly = daylightStr === '1';
 
   return {
     location,
@@ -40,5 +42,6 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
     cellSelection: selectedCellSelection,
     chartView,
     hour,
+    daylightOnly,
   };
 }

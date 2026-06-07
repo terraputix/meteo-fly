@@ -22,6 +22,7 @@
   export let model: WeatherModel = 'icon_d2';
   export let maxAltitude: MaxAltitude = 4000;
   export let cellSelection: CellSelection = 'nearest';
+  export let daylightOnly: boolean = false;
   export let onLocationChange: ((location: Location) => void) | undefined = undefined;
   export let onToggleChart: (() => void) | undefined = undefined;
 
@@ -416,7 +417,7 @@
     </button>
 
     <div class="pointer-events-auto">
-      <ChartSettingsPopover bind:maxAltitude bind:cellSelection />
+      <ChartSettingsPopover bind:maxAltitude bind:cellSelection bind:daylightOnly />
     </div>
 
     <button
