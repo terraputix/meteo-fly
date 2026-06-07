@@ -5,6 +5,7 @@
   import BottomControls from './BottomControls.svelte';
   import Footer from './Footer.svelte';
   import { browser } from '$app/environment';
+  import { tick } from 'svelte';
   import { buildSkewTData } from '$lib/meteo/skewT';
   import type { MaxAltitude } from '$lib/meteo/types';
   import type { ChartView } from '$lib/services/types';
@@ -58,7 +59,9 @@
     void model;
     void cellSelection;
     if (scrollContainer && browser && window.innerWidth < 640) {
-      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      tick().then(() => {
+        scrollContainer!.scrollTop = scrollContainer!.scrollHeight;
+      });
     }
   });
 </script>
