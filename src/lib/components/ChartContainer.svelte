@@ -2,8 +2,7 @@
   import type { CellSelection, WindChartData, WeatherModel, SkewTWeatherData } from '$lib/api/types';
   import WindChart from './WindChart.svelte';
   import SkewTChart from './SkewTChart.svelte';
-  import DayNavigator from './DayNavigator.svelte';
-  import HourSlider from './HourSlider.svelte';
+  import BottomControls from './BottomControls.svelte';
   import Footer from './Footer.svelte';
   import { browser } from '$app/environment';
   import { buildSkewTData } from '$lib/meteo/skewT';
@@ -68,13 +67,7 @@
   bind:this={scrollContainer}
   class="relative mx-auto flex h-full max-w-3xl flex-col overflow-y-auto rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
 >
-  <div class="border-b border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 py-3 sm:px-5 sm:py-4">
-    <div
-      class="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 shadow-inner shadow-slate-100 sm:flex sm:gap-3 sm:p-2.5"
-    >
-      <DayNavigator bind:selectedDay {startDate} onclose={onClose} />
-    </div>
-  </div>
+  <div class="border-b border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 py-3 sm:px-5 sm:py-4"></div>
 
   <div class="bg-white px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
     <div class="mb-2 flex items-center justify-center">
@@ -129,20 +122,14 @@
     </div>
   </div>
 
-  {#if chartView === 'skewt' && skewTData && traceHours.length > 0}
-    <div class="hidden border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-5 py-2 sm:block">
-      <HourSlider bind:hour bind:selectedDay {traceHours} timezoneAbbr={skewTData?.timezoneAbbr ?? ''} />
-    </div>
-  {/if}
-
-  <div class="mt-auto border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:hidden">
-    {#if chartView === 'skewt' && skewTData && traceHours.length > 0}
-      <HourSlider bind:hour bind:selectedDay {traceHours} timezoneAbbr={skewTData?.timezoneAbbr ?? ''} />
-    {/if}
-    <div
-      class="mt-1 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 shadow-inner shadow-slate-100"
-    >
-      <DayNavigator bind:selectedDay {startDate} onclose={onClose} compact />
-    </div>
+  <div class="mt-auto border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:px-5">
+    <BottomControls
+      bind:selectedDay
+      {startDate}
+      bind:hour
+      {traceHours}
+      timezoneAbbr={skewTData?.timezoneAbbr ?? ''}
+      onclose={onClose}
+    />
   </div>
 </div>
