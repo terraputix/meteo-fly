@@ -28,7 +28,7 @@
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
 
   const urlSearch = $derived.by(() => {
-    const { location, selectedDay, selectedModel, maxAltitude, cellSelection } = parameters;
+    const { location, selectedDay, selectedModel, maxAltitude, cellSelection, daylightOnly } = parameters;
     const params = new SvelteURLSearchParams({
       lat: location.latitude.toString(),
       lon: location.longitude.toString(),
@@ -39,6 +39,7 @@
       view: chartView,
     });
     params.set('hour', selectedHour.toString());
+    if (daylightOnly) params.set('daylight', '1');
     return `?${params.toString()}`;
   });
   function syncURL() {
@@ -178,6 +179,7 @@
           bind:model={parameters.selectedModel}
           bind:maxAltitude={parameters.maxAltitude}
           bind:cellSelection={parameters.cellSelection}
+          bind:daylightOnly={parameters.daylightOnly}
           selectedGridCell={windChartData?.selectedGridCell ?? null}
           gridCellElevation={windChartData?.elevation}
           modelGridElevation={windChartData?.modelGridElevation}
@@ -208,6 +210,7 @@
             bind:cellSelection={parameters.cellSelection}
             bind:chartView
             bind:hour={selectedHour}
+            bind:daylightOnly={parameters.daylightOnly}
             onClose={() => (showChart = false)}
           />
         </div>

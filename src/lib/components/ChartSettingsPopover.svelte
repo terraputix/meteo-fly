@@ -7,9 +7,11 @@
   let {
     maxAltitude = $bindable<MaxAltitude>(4000),
     cellSelection = $bindable<CellSelection>('nearest'),
+    daylightOnly = $bindable(false),
   }: {
     maxAltitude?: MaxAltitude;
     cellSelection?: CellSelection;
+    daylightOnly?: boolean;
   } = $props();
 
   let open = $state(false);
@@ -80,6 +82,28 @@
           {/each}
         </div>
       </div>
+
+      <label class="flex cursor-pointer items-center justify-between gap-3">
+        <span class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Daylight hours</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={daylightOnly}
+          aria-label="Toggle daylight hours only"
+          class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors"
+          class:bg-indigo-600={daylightOnly}
+          class:bg-slate-200={!daylightOnly}
+          onclick={() => {
+            daylightOnly = !daylightOnly;
+            open = false;
+          }}
+        >
+          <span
+            class="inline-block h-3.5 w-3.5 translate-x-0.5 transform rounded-full bg-white shadow-sm transition-transform"
+            class:translate-x-[18px]={daylightOnly}
+          ></span>
+        </button>
+      </label>
     </div>
   </Popover.Content>
 </Popover.Root>

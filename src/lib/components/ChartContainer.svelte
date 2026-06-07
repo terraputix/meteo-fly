@@ -23,6 +23,7 @@
     cellSelection = $bindable<CellSelection>('nearest'),
     chartView = $bindable<ChartView>('wind'),
     hour = $bindable(0),
+    daylightOnly = $bindable(false),
     onClose,
   }: {
     windChartData: WindChartData;
@@ -36,6 +37,7 @@
     cellSelection?: CellSelection;
     chartView?: ChartView;
     hour?: number;
+    daylightOnly?: boolean;
     onClose?: () => void;
   } = $props();
 
@@ -120,7 +122,7 @@
     </div>
 
     {#if chartView === 'wind'}
-      <WindChart {windChartData} {maxAltitude} {model} isLoading={isWindChartLoading} />
+      <WindChart {windChartData} {maxAltitude} {model} {daylightOnly} isLoading={isWindChartLoading} />
       <Footer>
         {#snippet heading()}
           <button

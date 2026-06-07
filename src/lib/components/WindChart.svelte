@@ -12,11 +12,13 @@
     maxAltitude = 4000,
     model = 'icon_seamless',
     isLoading = false,
+    daylightOnly = false,
   }: {
     windChartData: WindChartData | null;
     maxAltitude: MaxAltitude;
     model: WeatherModel;
     isLoading: boolean;
+    daylightOnly?: boolean;
   } = $props();
 
   let isRendering = $state(false);
@@ -52,6 +54,7 @@
     windHeight: number;
     maxAltitude: MaxAltitude;
     model: WeatherModel;
+    daylightOnly: boolean;
   };
 
   function renderChart(node: HTMLElement, params: RenderChartParams) {
@@ -59,6 +62,7 @@
     let resizeObserver: ResizeObserver | null = null;
     let cancellation: { cancelled: boolean } | null = null;
     let prevData = params.data;
+    let prevDaylightOnly = params.daylightOnly;
 
     function destroyChart() {
       resizeObserver?.disconnect();
@@ -78,7 +82,7 @@
       cancellation = signal;
 
       try {
-        const response = await runChartWorker({ windChartData: currentData, maxAltitude, model }, signal);
+        const response = await runChartWorker({ windChartData: currentData, maxAltitude, model, daylightOnly }, signal);
         if (signal.cancelled) return;
 
         if (!response.success) {
@@ -176,8 +180,9 @@
       update(newParams: RenderChartParams) {
         model = newParams.model;
         maxAltitude = newParams.maxAltitude;
-        if (newParams.data !== prevData) {
+        if (newParams.data !== prevData || newParams.daylightOnly !== prevDaylightOnly) {
           prevData = newParams.data;
+          prevDaylightOnly = newParams.daylightOnly;
           if (newParams.data) {
             draw(newParams.data);
           } else {
@@ -203,7 +208,7 @@
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
   <div
-    use:renderChart={{ data: windChartData, windHeight, maxAltitude, model }}
+    use:renderChart={{ data: windChartData, windHeight, maxAltitude, model, daylightOnly }}
     class="chart-content"
     style="opacity: {isBusy ? 0 : 1}; height: {totalHeight}px;"
   ></div>

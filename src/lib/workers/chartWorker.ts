@@ -2,7 +2,7 @@ import { getCloudCoverData } from '$lib/charts/clouds';
 import { getWindFieldAllLevels } from '$lib/charts/wind';
 import { calculateLclWeather } from '$lib/meteo/lcl';
 
-import type { WindChartData } from '$lib/api/types';
+import type { WindChartData, VerticalProfile } from '$lib/api/types';
 import type {
   ChartWorkerInput,
   ChartWorkerSuccessOutput,
@@ -11,6 +11,50 @@ import type {
   RainCloudChartData,
 } from './chartWorker.types';
 import { addSeconds } from '$lib/utils/dateExtensions';
+
+function filterDaylightHours(data: WindChartData): WindChartData {
+  const sunriseMs = data.sunrise.getTime() - 3600_000;
+  const sunsetMs = data.sunset.getTime() + 3600_000;
+
+  const indices: number[] = [];
+  for (let i = 0; i < data.hourly.time.length; i++) {
+    const t = data.hourly.time[i].getTime();
+    if (t >= sunriseMs && t <= sunsetMs) {
+      indices.push(i);
+    }
+  }
+
+  function pickArray(arr: Float32Array): Float32Array {
+    return new Float32Array(indices.map((i) => arr[i]));
+  }
+
+  function pickDates(arr: Date[]): Date[] {
+    return indices.map((i) => arr[i]);
+  }
+
+  function pickProfile(profile: VerticalProfile): VerticalProfile {
+    return Object.fromEntries(
+      Object.entries(profile).map(([key, arr]) => [key, pickArray(arr as Float32Array)])
+    ) as VerticalProfile;
+  }
+
+  return {
+    ...data,
+    hourly: {
+      time: pickDates(data.hourly.time),
+      cloudCoverProfile: pickProfile(data.hourly.cloudCoverProfile),
+      windSpeedProfile: pickProfile(data.hourly.windSpeedProfile),
+      windDirectionProfile: pickProfile(data.hourly.windDirectionProfile),
+      precipitation: pickArray(data.hourly.precipitation),
+      temperature_2m: pickArray(data.hourly.temperature_2m),
+      dewpoint_2m: pickArray(data.hourly.dewpoint_2m),
+      relativeHumidity_2m: pickArray(data.hourly.relativeHumidity_2m),
+      cloudCoverLow: pickArray(data.hourly.cloudCoverLow),
+      cloudCoverMid: pickArray(data.hourly.cloudCoverMid),
+      cloudCoverHigh: pickArray(data.hourly.cloudCoverHigh),
+    },
+  };
+}
 
 function prepareTemperatureData(data: WindChartData): TemperatureChartData {
   return {
@@ -65,7 +109,15 @@ function prepareRainAndCloudData(data: WindChartData): RainCloudChartData {
   };
 }
 
-function calculateDomains(windData: Array<{ time: Date }>): [Date, Date] {
+function calculateDomains(
+  windData: Array<{ time: Date }>,
+  sunrise?: Date,
+  sunset?: Date,
+  daylightOnly?: boolean
+): [Date, Date] {
+  if (daylightOnly && sunrise && sunset) {
+    return [addSeconds(sunrise, -3600), addSeconds(sunset, 3600)];
+  }
   const times = windData.map((d) => d.time.getTime());
   const xMin = addSeconds(new Date(Math.min(...times)), -1800);
   const xMax = addSeconds(new Date(Math.max(...times)), 1800);
@@ -73,17 +125,19 @@ function calculateDomains(windData: Array<{ time: Date }>): [Date, Date] {
 }
 
 self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
-  const { windChartData, maxAltitude, model } = e.data;
+  const { windChartData, maxAltitude, model, daylightOnly } = e.data;
 
   try {
-    const cloudData = getCloudCoverData(windChartData, model, maxAltitude);
-    const windData = getWindFieldAllLevels(windChartData, model, maxAltitude);
-    const lcl = calculateLclWeather(windChartData);
+    const data = daylightOnly ? filterDaylightHours(windChartData) : windChartData;
 
-    const xDomain = calculateDomains(windData);
+    const cloudData = getCloudCoverData(data, model, maxAltitude);
+    const windData = getWindFieldAllLevels(data, model, maxAltitude);
+    const lcl = calculateLclWeather(data);
 
-    const temperatureChartData = prepareTemperatureData(windChartData);
-    const rainCloudChartData = prepareRainAndCloudData(windChartData);
+    const xDomain = calculateDomains(windData, windChartData.sunrise, windChartData.sunset, daylightOnly);
+
+    const temperatureChartData = prepareTemperatureData(data);
+    const rainCloudChartData = prepareRainAndCloudData(data);
 
     const successResponse: ChartWorkerSuccessOutput = {
       success: true,
