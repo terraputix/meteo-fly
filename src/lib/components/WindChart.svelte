@@ -4,22 +4,27 @@
   import { buildWindChartOption, getChartHeight } from '$lib/charts/buildWindChartOption';
   import type { WindChartData } from '$lib/api/types';
   import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
-  import Legend from './Legend.svelte';
-
   import type { WeatherModel } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
 
-  export let windChartData: WindChartData | null = null;
-  export let maxAltitude: MaxAltitude = 4000;
-  export let model: WeatherModel = 'icon_d2';
-  export let isLoading = false;
+  let {
+    windChartData = null,
+    maxAltitude = 4000,
+    model = 'icon_seamless',
+    isLoading = false,
+  }: {
+    windChartData: WindChartData | null;
+    maxAltitude: MaxAltitude;
+    model: WeatherModel;
+    isLoading: boolean;
+  } = $props();
 
-  let isRendering = false;
+  let isRendering = $state(false);
 
-  $: isBusy = isLoading || isRendering;
+  let isBusy = $derived(isLoading || isRendering);
 
-  $: windHeight = Math.ceil(maxAltitude / 10);
-  $: totalHeight = getChartHeight(windHeight);
+  let windHeight = $derived(Math.ceil(maxAltitude / 10));
+  let totalHeight = $derived(getChartHeight(windHeight));
 
   // ─── Worker helper ────────────────────────────────────────────────────────
 
@@ -203,8 +208,6 @@
     style="opacity: {isBusy ? 0 : 1}; height: {totalHeight}px;"
   ></div>
 </div>
-
-<Legend />
 
 <style>
   .chart-container {

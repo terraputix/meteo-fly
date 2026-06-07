@@ -4,6 +4,7 @@
   import SkewTChart from './SkewTChart.svelte';
   import BottomControls from './BottomControls.svelte';
   import Footer from './Footer.svelte';
+  import { windColors, windMaxSpeed } from '$lib/charts/scales';
   import { browser } from '$app/environment';
   import { tick } from 'svelte';
   import { buildSkewTData } from '$lib/meteo/skewT';
@@ -43,6 +44,20 @@
     return buildSkewTData(skewTWeatherData, model, maxAltitude, windChartData.modelGridElevation);
   });
   let traceHours = $derived(skewTData?.traces.map((t) => t.time) ?? []);
+
+  let legendOpen = $state(false);
+
+  const cloudGradient =
+    'linear-gradient(to right, rgba(100,120,145,0), rgba(100,120,145,0.45) 50%, rgba(100,120,145,0.85))';
+
+  const step = 100 / windColors.length;
+  const windGradient = `linear-gradient(to right, ${windColors
+    .flatMap((color, i) => {
+      const start = (i * step).toFixed(1) + '%';
+      const end = ((i + 1) * step).toFixed(1) + '%';
+      return [`${color} ${start}`, `${color} ${end}`];
+    })
+    .join(', ')})`;
 
   let scrollContainer: HTMLDivElement | undefined;
 
@@ -106,8 +121,53 @@
 
     {#if chartView === 'wind'}
       <WindChart {windChartData} {maxAltitude} {model} isLoading={isWindChartLoading} />
+      <Footer>
+        {#snippet heading()}
+          <button
+            type="button"
+            class="text-left text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase transition-opacity hover:opacity-100"
+            class:opacity-60={!legendOpen}
+            class:opacity-100={legendOpen}
+            onclick={() => (legendOpen = !legendOpen)}
+          >
+            {legendOpen ? '▼' : '▶'} Legend
+          </button>
+        {/snippet}
+        {#snippet body()}
+          {#if legendOpen}
+            <div class="flex w-full flex-wrap justify-center gap-x-10 gap-y-4 pt-4">
+              <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
+                <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
+                  Clouds <small class="lowercase opacity-60">%</small>
+                </span>
+                <div class="flex flex-1 flex-col gap-0.75">
+                  <div
+                    class="h-1.25 w-full rounded-full border border-slate-200"
+                    style="background: {cloudGradient};"
+                  ></div>
+                  <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
+                    <span>0</span><span>100</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
+                <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
+                  Wind <small class="lowercase opacity-60">km/h</small>
+                </span>
+                <div class="flex flex-1 flex-col gap-0.75">
+                  <div class="h-1.25 w-full rounded-full" style="background: {windGradient};"></div>
+                  <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
+                    <span>0</span><span>{windMaxSpeed}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {/if}
+        {/snippet}
+      </Footer>
     {:else if skewTData && traceHours.length > 0}
       <SkewTChart {skewTData} {hour} isLoading={isSkewTLoading} />
+      <Footer />
     {:else if isSkewTLoading}
       <div class="flex h-64 items-center justify-center">
         <div class="text-sm text-slate-500">Loading sounding data...</div>
@@ -117,10 +177,6 @@
         <div class="text-sm text-slate-500">No sounding data available</div>
       </div>
     {/if}
-
-    <div class="mt-0.5 sm:mt-1">
-      <Footer />
-    </div>
   </div>
 
   <div class="mt-auto border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:px-5">
