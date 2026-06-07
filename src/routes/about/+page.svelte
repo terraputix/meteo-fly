@@ -150,6 +150,16 @@
           <li>All forecasts are guidance only. Always combine with live observations and local knowledge.</li>
         </ul>
       </div>
+
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-semibold text-slate-900">Open source</h2>
+        <p class="mt-3 text-sm text-slate-600 sm:text-base">
+          Meteo-Fly is open source software. The source code is available on
+          <a href="https://github.com/terraputix/meteo-fly" class="underline" target="_blank" rel="noopener noreferrer"
+            >GitHub</a
+          >.
+        </p>
+      </div>
     </section>
   </div>
 </div>

@@ -7,7 +7,7 @@
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
-  import { AboutControl, GithubControl, LocationControlManager, TerrainControl } from './Controls';
+  import { AboutControl, LocationControlManager, TerrainControl } from './Controls';
   import ModelSelector from './ModelSelector.svelte';
   import ChartSettingsPopover from './ChartSettingsPopover.svelte';
   import type { WeatherModel, CellSelection } from '$lib/api/types';
@@ -32,7 +32,6 @@
   const defaultTerrainExaggeration = 1;
   const earthRadiusMeters = 6371000;
   const aboutUrl = `${base}/about`;
-  const githubUrl = 'https://github.com/terraputix/meteo-fly';
   let mapContainer: HTMLElement;
   let map: Map;
   let marker: Marker;
@@ -287,16 +286,10 @@
       className: 'maplibregl-ctrl-about',
       url: aboutUrl,
     });
-    const githubControl = new GithubControl({
-      title: 'GitHub',
-      className: 'maplibregl-ctrl-github',
-      url: githubUrl,
-    });
 
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
     map.addControl(aboutControl, 'top-right');
-    map.addControl(githubControl, 'top-right');
 
     const selectedLocationElement = document.createElement('div');
     selectedLocationElement.className = 'selected-location-marker';
