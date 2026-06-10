@@ -5,6 +5,7 @@
     hour = $bindable(0),
     traceHours = [],
     timezoneAbbr = '',
+    maxForecastDays = 8,
     onclose = undefined,
   }: {
     selectedDay: number;
@@ -12,6 +13,7 @@
     hour?: number;
     traceHours?: Date[];
     timezoneAbbr?: string;
+    maxForecastDays?: number;
     onclose?: () => void;
   } = $props();
 
@@ -24,7 +26,7 @@
 
   function handleNextDay(e: MouseEvent) {
     e.preventDefault();
-    if (selectedDay < 8) selectedDay += 1;
+    if (selectedDay < maxForecastDays) selectedDay += 1;
   }
 
   function handlePrevDay(e: MouseEvent) {
@@ -53,7 +55,7 @@
   function nextTrace() {
     if (hour < traceHours.length - 1) {
       hour++;
-    } else if (selectedDay < 8) {
+    } else if (selectedDay < maxForecastDays) {
       selectedDay++;
       hour = 0;
     }
@@ -89,7 +91,7 @@
       />
       <button
         onclick={nextTrace}
-        disabled={hour >= traceHours.length - 1 && selectedDay >= 8}
+        disabled={hour >= traceHours.length - 1 && selectedDay >= maxForecastDays}
         class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Next hour"
       >
@@ -143,7 +145,7 @@
 
     <button
       onclick={handleNextDay}
-      disabled={selectedDay >= 8}
+      disabled={selectedDay >= maxForecastDays}
       class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10"
       aria-label="Next day"
     >
