@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { CellSelection, WindChartData, WeatherModel, SkewTWeatherData } from '$lib/api/types';
+  import { MODEL_FORECAST_DAYS } from '$lib/api/models';
   import WindChart from './WindChart.svelte';
   import SkewTChart from './SkewTChart.svelte';
   import BottomControls from './BottomControls.svelte';
@@ -46,6 +47,13 @@
     return buildSkewTData(skewTWeatherData, model, maxAltitude, windChartData.modelGridElevation);
   });
   let traceHours = $derived(skewTData?.traces.map((t) => t.time) ?? []);
+  let maxForecastDays = $derived(MODEL_FORECAST_DAYS[model]);
+
+  $effect(() => {
+    if (selectedDay > maxForecastDays) {
+      selectedDay = maxForecastDays;
+    }
+  });
 
   let legendOpen = $state(false);
 
@@ -188,6 +196,7 @@
       bind:hour
       {traceHours}
       timezoneAbbr={skewTData?.timezoneAbbr ?? ''}
+      {maxForecastDays}
       onclose={onClose}
     />
   </div>

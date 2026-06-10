@@ -18,3 +18,17 @@ export const MODEL_OPTIONS: ModelOption[] = [
   { id: 'gem_seamless', name: 'GEM' },
   { id: 'cma_grapes_global', name: 'CMA GRAPES' },
 ];
+
+export const MODEL_FORECAST_DAYS: Record<WeatherModel, number> = {
+  icon_d2: 2,
+  icon_seamless: 8,
+  icon_eu: 5,
+  icon_global: 8,
+  meteofrance_seamless: 5,
+  gfs_seamless: 16,
+  ukmo_seamless: 8,
+  cma_grapes_global: 5,
+  gem_seamless: 10,
+  ecmwf_ifs025: 15,
+  ecmwf_aifs025_single: 15,
+};
