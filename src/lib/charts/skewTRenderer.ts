@@ -808,7 +808,7 @@ export function renderHoverOverlay(
         }
       }
       if (pts.length >= 2) {
-        drawLine(ctx, pts, CHART_COLORS.isohume, 1.2, [2, 4], 0.85);
+        drawLine(ctx, pts, CHART_COLORS.isohume, 1.5, [4, 4], 0.9);
         const labelText = `q = ${(q * 1000).toFixed(1)} g/kg`;
         if (elevP >= p0 && elevP <= maxP) {
           const es_elev = (w_kg * elevP) / (EPS + w_kg);
@@ -841,7 +841,7 @@ export function renderHoverOverlay(
       }
     }
     if (dryPts.length >= 2) {
-      drawLine(ctx, dryPts, '#f80', 1.5, [6, 4]);
+      drawLine(ctx, dryPts, CHART_COLORS.dryAdiabat, 1.5, [6, 4]);
       const thetaC = thetaK - 273.15;
       const labelText = `θ = ${thetaC.toFixed(1)}°C`;
       if (elevP >= hoverP && elevP <= maxP) {
@@ -867,7 +867,7 @@ export function renderHoverOverlay(
       if (p <= minP) break;
     }
     if (moistPts.length >= 2) {
-      drawLine(ctx, moistPts, '#f80', 1.5, [6, 4]);
+      drawLine(ctx, moistPts, CHART_COLORS.moistAdiabat, 1.5, [6, 4]);
     }
   }
 
