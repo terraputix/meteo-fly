@@ -9,6 +9,8 @@ updates:
     open-pull-requests-limit: 10
     commit-message:
       prefix: 'deps'
+    cooldown:
+      default-days: 7
     groups:
       all-dev-deps:
         dependency-type: 'development'
