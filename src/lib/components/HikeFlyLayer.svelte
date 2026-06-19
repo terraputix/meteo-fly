@@ -71,6 +71,8 @@
     if (!map) return;
     map.off('mousemove', onLayerHover);
     map.off('mouseleave', onLayerLeave);
+    map.off('move', updateHoverTooltip);
+    map.off('zoom', updateHoverTooltip);
     map.getCanvas().style.cursor = '';
   }
 
@@ -249,6 +251,8 @@
 
       map.on('mousemove', onLayerHover);
       map.on('mouseleave', onLayerLeave);
+      map.on('move', updateHoverTooltip);
+      map.on('zoom', updateHoverTooltip);
     } catch (err) {
       console.error('Hike&fly compute error:', err);
     } finally {
@@ -257,8 +261,7 @@
   }
 
   // --- Hover tooltip ---
-  let hoveredFeature: { heightAGL: number; terrainElevation: number } | null = $state(null);
-  let hoverPos: { x: number; y: number } | null = $state(null);
+  let hoveredFeature: { heightAGL: number; terrainElevation: number; lat: number; lng: number } | null = $state(null);
 
   function onLayerHover(e: MapLayerMouseEvent) {
     if (!map || !active || !takeoff) return;
@@ -266,23 +269,44 @@
     const cell = pointLookup.get(k);
     if (!cell) {
       hoveredFeature = null;
-      hoverPos = null;
       map.getCanvas().style.cursor = '';
       return;
     }
     hoveredFeature = {
       heightAGL: cell.heightAGL,
       terrainElevation: cell.terrainElevation,
+      lat: e.lngLat.lat,
+      lng: e.lngLat.lng,
     };
-    hoverPos = { x: e.point.x + 14, y: e.point.y - 10 };
     map.getCanvas().style.cursor = 'crosshair';
   }
 
   function onLayerLeave() {
     hoveredFeature = null;
-    hoverPos = null;
     if (map) map.getCanvas().style.cursor = '';
   }
+
+  // Update tooltip position on any map move/zoom to keep it pinned to the hovered cell
+  let hoverPos: { x: number; y: number } | null = $state(null);
+  function updateHoverTooltip() {
+    if (!map || !hoveredFeature) {
+      hoverPos = null;
+      return;
+    }
+    let { lat, lng } = hoveredFeature;
+    // keep it inside viewport
+    const p = map.project([lng, lat]);
+    const container = map.getContainer();
+    if (p.x < 0 || p.y < 0 || p.x > container.clientWidth || p.y > container.clientHeight) {
+      hoverPos = null;
+      return;
+    }
+    hoverPos = { x: p.x + 14, y: p.y - 10 };
+  }
+  $effect(() => {
+    void hoveredFeature;
+    updateHoverTooltip();
+  });
 
   $effect(() => {
     if (active && takeoff) {
