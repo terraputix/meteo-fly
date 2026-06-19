@@ -358,6 +358,31 @@
           'line-width': 1.5,
         },
       });
+      map.addLayer({
+        id: 'mountain_peak_label',
+        type: 'symbol',
+        source: 'openmaptiles',
+        'source-layer': 'mountain_peak',
+        minzoom: 7,
+        layout: {
+          'text-field': [
+            'case',
+            ['has', 'name:nonlatin'],
+            ['concat', ['get', 'name:latin'], '\n', ['get', 'name:nonlatin']],
+            ['coalesce', ['get', 'name_en'], ['get', 'name']],
+          ],
+          'text-font': ['Noto Sans Italic'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 7, 9, 14, 13],
+          'text-max-width': 6,
+          'text-anchor': 'center',
+          'text-offset': [0, 0],
+        },
+        paint: {
+          'text-color': 'hsl(30, 8%, 35%)',
+          'text-halo-color': 'rgba(255,255,255,0.85)',
+          'text-halo-width': 1.5,
+        },
+      });
       setTerrainVisibility(isTerrainEnabled);
       terrainControl.setEnabled(isTerrainEnabled);
       updateSelectedGridCellMarker();
