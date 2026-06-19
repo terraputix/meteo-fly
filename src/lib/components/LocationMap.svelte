@@ -8,23 +8,42 @@
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
+  import { isMobile } from '$lib/stores/media';
   import { LocationControlManager, TerrainControl } from './Controls';
   import ModelSelector from './ModelSelector.svelte';
   import ChartSettingsPopover from './ChartSettingsPopover.svelte';
+  import HikeFlyLayer from './HikeFlyLayer.svelte';
   import type { WeatherModel, CellSelection } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
-  export let latitude: number;
-  export let longitude: number;
-  export let chartOpen = false;
-  export let selectedGridCell: Location | null = null;
-  export let gridCellElevation: number | undefined = undefined;
-  export let modelGridElevation: number | undefined = undefined;
-  export let model: WeatherModel = 'icon_d2';
-  export let maxAltitude: MaxAltitude = 4000;
-  export let cellSelection: CellSelection = 'nearest';
-  export let daylightOnly: boolean = false;
-  export let onLocationChange: ((location: Location) => void) | undefined = undefined;
-  export let onToggleChart: (() => void) | undefined = undefined;
+  import { haversineDistance } from '$lib/meteo/hikeAndFly';
+
+  let {
+    latitude = $bindable(46.41526),
+    longitude = $bindable(8.10828),
+    chartOpen = $bindable(false),
+    selectedGridCell = $bindable(null as Location | null),
+    gridCellElevation = $bindable(undefined as number | undefined),
+    modelGridElevation = $bindable(undefined as number | undefined),
+    model = $bindable<WeatherModel>('icon_d2'),
+    maxAltitude = $bindable<MaxAltitude>(4000),
+    cellSelection = $bindable<CellSelection>('nearest'),
+    daylightOnly = $bindable(false),
+    onLocationChange = undefined as ((location: Location) => void) | undefined,
+    onToggleChart = undefined as (() => void) | undefined,
+  }: {
+    latitude?: number;
+    longitude?: number;
+    chartOpen?: boolean;
+    selectedGridCell?: Location | null;
+    gridCellElevation?: number | undefined;
+    modelGridElevation?: number | undefined;
+    model?: WeatherModel;
+    maxAltitude?: MaxAltitude;
+    cellSelection?: CellSelection;
+    daylightOnly?: boolean;
+    onLocationChange?: ((location: Location) => void) | undefined;
+    onToggleChart?: (() => void) | undefined;
+  } = $props();
 
   const terrainSourceId = 'terrainSource';
   const hillshadeSourceId = 'hillshadeSource';
@@ -32,10 +51,9 @@
   const gridCellConnectorSourceId = 'grid-cell-connector';
   const gridCellConnectorLayerId = 'grid-cell-connector-line';
   const defaultTerrainExaggeration = 1;
-  const earthRadiusMeters = 6371000;
   const aboutUrl = `${base}/about`;
   let mapContainer: HTMLElement;
-  let map: Map;
+  let map: Map = $state.raw(undefined!)!;
   let marker: Marker;
   let elevationBadge: HTMLDivElement | undefined;
   let selectedGridCellMarker: Marker | null = null;
@@ -44,22 +62,39 @@
   let isTerrainEnabled = true;
   let lastTerrainElevation: number | undefined;
 
-  function toRadians(value: number) {
-    return (value * Math.PI) / 180;
+  // Hike & fly state
+  let hikeFlyActive = $state(false);
+  let hikeFlyTakeoff: { latitude: number; longitude: number; elevation: number } | null = $state(null);
+  let contextMenuPos: { x: number; y: number } | null = $state(null);
+  let contextMenuLngLat: { lng: number; lat: number } | null = $state(null);
+  let contextMenuElevation: number | undefined = $state(undefined);
+
+  function onContextMenu(e: MouseEvent) {
+    e.preventDefault();
+    if (!map) return;
+    const rect = mapContainer.getBoundingClientRect();
+    const lngLat = map.unproject([e.clientX - rect.left, e.clientY - rect.top]);
+    contextMenuLngLat = { lng: lngLat.lng, lat: lngLat.lat };
+    contextMenuPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const elev = map.queryTerrainElevation([lngLat.lng, lngLat.lat]);
+    contextMenuElevation = elev != null ? Math.round(elev) : undefined;
   }
 
-  function getHaversineDistanceMeters(a: Location, b: Location) {
-    const dLat = toRadians(b.latitude - a.latitude);
-    const dLon = toRadians(b.longitude - a.longitude);
-    const lat1 = toRadians(a.latitude);
-    const lat2 = toRadians(b.latitude);
+  function closeContextMenu() {
+    contextMenuPos = null;
+    contextMenuLngLat = null;
+    contextMenuElevation = undefined;
+  }
 
-    const sinLat = Math.sin(dLat / 2);
-    const sinLon = Math.sin(dLon / 2);
-    const haversine = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
-    const arc = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-
-    return earthRadiusMeters * arc;
+  function startHikeFly() {
+    if (!contextMenuLngLat || contextMenuElevation == null) return;
+    hikeFlyTakeoff = {
+      latitude: contextMenuLngLat.lat,
+      longitude: contextMenuLngLat.lng,
+      elevation: contextMenuElevation,
+    };
+    hikeFlyActive = true;
+    closeContextMenu();
   }
 
   function formatDistance(distanceMeters: number) {
@@ -117,7 +152,6 @@
     }
 
     const source = map.getSource(gridCellConnectorSourceId) as maplibregl.GeoJSONSource;
-    const selectedLocation = { latitude, longitude };
 
     if (!selectedGridCell) {
       source.setData({
@@ -162,7 +196,9 @@
     }
 
     const midpoint: LngLatLike = [(longitude + gridCellLongitude) / 2, (latitude + gridCellLatitude) / 2];
-    const distanceLabel = formatDistance(getHaversineDistanceMeters(selectedLocation, selectedGridCell));
+    const distanceLabel = formatDistance(
+      haversineDistance(latitude, longitude, selectedGridCell.latitude, selectedGridCell.longitude)
+    );
 
     if (!distanceMarker) {
       const element = document.createElement('div');
@@ -242,14 +278,26 @@
   }
 
   // Watch for prop changes and update map
-  $: if (map && marker && (latitude !== marker.getLngLat().lat || longitude !== marker.getLngLat().lng)) {
-    const newPos = { lat: latitude, lng: longitude };
-    marker.setLngLat(newPos);
-    map.setCenter(newPos);
-  }
+  $effect(() => {
+    if (map && marker && (latitude !== marker.getLngLat().lat || longitude !== marker.getLngLat().lng)) {
+      const newPos = { lat: latitude, lng: longitude };
+      marker.setLngLat(newPos);
+      map.setCenter(newPos);
+    }
+  });
 
-  $: void (selectedGridCell, latitude, longitude, modelGridElevation, map, updateSelectedGridCellMarker());
-  $: void (gridCellElevation, modelGridElevation, updateElevationBadge());
+  $effect(() => {
+    void selectedGridCell;
+    void latitude;
+    void longitude;
+    void modelGridElevation;
+    if (map) updateSelectedGridCellMarker();
+  });
+  $effect(() => {
+    void gridCellElevation;
+    void modelGridElevation;
+    updateElevationBadge();
+  });
 
   function handleMapViewChange() {
     updateGridCellConnector();
@@ -303,15 +351,20 @@
       .setLngLat([longitude, latitude])
       .addTo(map);
     marker.on('dragend', () => {
-      const pos = marker.getLngLat();
-      updatePosition(pos.lat, pos.lng);
+      if (!$isMobile || !hikeFlyActive) {
+        const pos = marker.getLngLat();
+        updatePosition(pos.lat, pos.lng);
+      }
     });
     updateSelectedGridCellMarker();
 
     map.on('click', (e: maplibregl.MapMouseEvent) => {
+      if ($isMobile && hikeFlyActive) return;
       const { lat, lng } = e.lngLat;
       updatePosition(lat, lng);
     });
+    mapContainer.addEventListener('contextmenu', onContextMenu);
+    document.addEventListener('click', closeContextMenu);
     map.on('zoom', handleMapViewChange);
     map.on('move', handleMapViewChange);
 
@@ -393,6 +446,8 @@
     if (unsubscribe) {
       unsubscribe();
     }
+    mapContainer.removeEventListener('contextmenu', onContextMenu);
+    document.removeEventListener('click', closeContextMenu);
     if (selectedGridCellMarker) {
       selectedGridCellMarker.remove();
     }
@@ -470,6 +525,44 @@
       </span>
     </button>
   </div>
+
+  {#if contextMenuPos}
+    <div
+      class="pointer-events-auto absolute z-30 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xl"
+      style="left: {contextMenuPos.x}px; top: {contextMenuPos.y}px; transform: translate(8px, -4px);"
+      role="presentation"
+      onclick={(e) => e.stopPropagation()}
+    >
+      <div class="mb-1 text-[10px] text-slate-400 whitespace-nowrap">
+        {contextMenuLngLat?.lat.toFixed(5)}, {contextMenuLngLat?.lng.toFixed(5)}
+        {#if contextMenuElevation != null}
+          · {contextMenuElevation}m
+        {:else}
+          · no terrain
+        {/if}
+      </div>
+      <button
+        type="button"
+        class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-700 transition hover:bg-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent"
+        disabled={contextMenuElevation == null}
+        onclick={startHikeFly}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M12 19V5M5 12l7-7 7 7" />
+        </svg>
+        Hike&Fly from here
+      </button>
+    </div>
+  {/if}
+
+  <HikeFlyLayer {map} bind:active={hikeFlyActive} bind:takeoff={hikeFlyTakeoff} />
 </div>
 
 <style>
