@@ -363,7 +363,7 @@
         type: 'symbol',
         source: 'openmaptiles',
         'source-layer': 'mountain_peak',
-        minzoom: 7,
+        minzoom: 10,
         layout: {
           'text-field': [
             'case',
