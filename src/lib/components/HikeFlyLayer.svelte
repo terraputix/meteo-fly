@@ -23,10 +23,13 @@
 
   function heightAGLToRgba(h: number): [number, number, number, number] {
     if (h <= 0) return [239, 68, 68, 140];
-    if (h <= 50) return [250, 204, 21, 140];
-    if (h <= 200) return [132, 204, 22, 140];
-    if (h <= 500) return [34, 197, 94, 140];
-    return [20, 184, 166, 165];
+    if (h <= 50) return [239, 120, 30, 145];
+    if (h <= 100) return [220, 204, 40, 145];
+    if (h <= 200) return [132, 204, 22, 150];
+    if (h <= 350) return [34, 197, 94, 155];
+    if (h <= 500) return [20, 184, 166, 160];
+    if (h <= 750) return [30, 100, 180, 165];
+    return [20, 50, 140, 170];
   }
 
   let {
