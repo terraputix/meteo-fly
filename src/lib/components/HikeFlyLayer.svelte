@@ -2,6 +2,7 @@
   import type { MapLayerMouseEvent } from 'maplibre-gl';
   import { onDestroy } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
+  import { isMobile } from '$lib/stores/media';
   import {
     generateReachableArea,
     visitKey,
@@ -305,26 +306,33 @@
 
 {#if active}
   <div
-    class="pointer-events-auto absolute bottom-2 left-2 z-20 flex flex-col gap-1.5 rounded-xl border border-slate-200/80 bg-white/92 px-3 py-2 text-xs shadow-lg backdrop-blur-md"
+    class="pointer-events-auto absolute z-20 flex flex-col rounded-xl border border-slate-200/80 bg-white/92 text-xs shadow-lg backdrop-blur-md
+      {$isMobile
+      ? 'bottom-0 left-0 right-0 rounded-none rounded-t-xl border-b-0 px-4 py-3 gap-2'
+      : 'bottom-2 left-2 px-3 py-2 gap-1.5'}"
   >
     <div class="flex items-center gap-2">
-      <span class="font-semibold text-slate-700">Hike & Fly</span>
+      <span class="font-semibold text-slate-700 {$isMobile ? 'text-sm' : ''}">Hike & Fly</span>
       {#if isComputing}
         <span class="text-slate-400">Computing…</span>
       {/if}
       <button
         type="button"
-        class="ml-auto text-slate-400 hover:text-slate-600"
+        class="ml-auto text-slate-400 hover:text-slate-600 {$isMobile
+          ? 'h-8 w-8 flex items-center justify-center rounded-lg hover:bg-slate-100'
+          : ''}"
         onclick={() => (active = false)}
         aria-label="Close hike & fly layer">✕</button
       >
     </div>
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <label class="flex items-center gap-1 text-slate-600">
-        <span>Glide</span>
+    <div class="flex {$isMobile ? 'flex-col gap-2' : 'flex-wrap items-center gap-x-3 gap-y-1'}">
+      <label class="flex items-center gap-1.5 text-slate-600 {$isMobile ? 'w-full' : ''}">
+        <span class="shrink-0 {$isMobile ? 'w-8 text-xs' : ''}">Glide</span>
         <button
           type="button"
-          class="flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-xs text-slate-500 hover:bg-slate-200 disabled:opacity-30"
+          class="flex {$isMobile
+            ? 'h-9 w-9'
+            : 'h-5 w-5'} items-center justify-center rounded bg-slate-100 text-xs text-slate-500 hover:bg-slate-200 disabled:opacity-30"
           onclick={() => {
             glideRatio = Math.max(2, +(glideRatio - 0.5).toFixed(1));
             scheduleCompute();
@@ -338,21 +346,38 @@
           step="0.5"
           bind:value={glideRatio}
           oninput={scheduleCompute}
-          class="h-1.5 w-16 accent-emerald-600"
+          class="{$isMobile ? 'h-2 flex-1' : 'h-1.5 w-20'} accent-emerald-600"
         />
         <button
           type="button"
-          class="flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-xs text-slate-500 hover:bg-slate-200 disabled:opacity-30"
+          class="flex {$isMobile
+            ? 'h-9 w-9'
+            : 'h-5 w-5'} items-center justify-center rounded bg-slate-100 text-xs text-slate-500 hover:bg-slate-200 disabled:opacity-30"
           onclick={() => {
-            glideRatio = Math.min(10, +(glideRatio + 0.5).toFixed(1));
+            glideRatio = Math.min(14, +(glideRatio + 0.5).toFixed(1));
             scheduleCompute();
           }}
-          disabled={glideRatio >= 10}>+</button
+          disabled={glideRatio >= 14}>+</button
         >
-        <span class="w-6 text-right tabular-nums text-slate-800">{glideRatio}:1</span>
+        <span class="w-12 text-right tabular-nums text-slate-800 {$isMobile ? 'text-sm' : ''}">{glideRatio}:1</span>
       </label>
-      <label class="flex items-center gap-1 text-slate-600">
-        <span>Grid</span>
+      <label class="flex items-center gap-1.5 text-slate-600 {$isMobile ? 'w-full' : ''}">
+        <span class="shrink-0 {$isMobile ? 'w-8 text-xs' : ''}">Grid</span>
+        <button
+          type="button"
+          class="flex {$isMobile
+            ? 'h-9 w-9'
+            : 'h-5 w-5'} items-center justify-center rounded bg-slate-100 text-xs text-slate-500 hover:bg-slate-200 disabled:opacity-30"
+          onclick={() => {
+            const values = [25, 50, 100, 200];
+            const idx = values.indexOf(stepMeters);
+            if (idx > 0) {
+              stepMeters = values[idx - 1];
+              scheduleCompute();
+            }
+          }}
+          disabled={stepMeters <= 25}>−</button
+        >
         <input
           type="range"
           min="0"
@@ -363,9 +388,24 @@
             stepMeters = [25, 50, 100, 200][+(e.target as HTMLInputElement).value];
             scheduleCompute();
           }}
-          class="h-1.5 w-24 accent-emerald-600"
+          class="{$isMobile ? 'h-2 flex-1' : 'h-1.5 w-20'} accent-emerald-600"
         />
-        <span class="w-10 text-right tabular-nums text-slate-800">{stepMeters}m</span>
+        <button
+          type="button"
+          class="flex {$isMobile
+            ? 'h-9 w-9'
+            : 'h-5 w-5'} items-center justify-center rounded bg-slate-100 text-xs text-slate-500 hover:bg-slate-200 disabled:opacity-30"
+          onclick={() => {
+            const values = [25, 50, 100, 200];
+            const idx = values.indexOf(stepMeters);
+            if (idx < values.length - 1) {
+              stepMeters = values[idx + 1];
+              scheduleCompute();
+            }
+          }}
+          disabled={stepMeters >= 200}>+</button
+        >
+        <span class="w-12 text-right tabular-nums text-slate-800 {$isMobile ? 'text-sm' : ''}">{stepMeters}m</span>
       </label>
     </div>
   </div>

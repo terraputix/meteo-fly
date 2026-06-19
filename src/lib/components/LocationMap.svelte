@@ -8,6 +8,7 @@
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
+  import { isMobile } from '$lib/stores/media';
   import { LocationControlManager, TerrainControl } from './Controls';
   import ModelSelector from './ModelSelector.svelte';
   import ChartSettingsPopover from './ChartSettingsPopover.svelte';
@@ -350,12 +351,15 @@
       .setLngLat([longitude, latitude])
       .addTo(map);
     marker.on('dragend', () => {
-      const pos = marker.getLngLat();
-      updatePosition(pos.lat, pos.lng);
+      if (!$isMobile || !hikeFlyActive) {
+        const pos = marker.getLngLat();
+        updatePosition(pos.lat, pos.lng);
+      }
     });
     updateSelectedGridCellMarker();
 
     map.on('click', (e: maplibregl.MapMouseEvent) => {
+      if ($isMobile && hikeFlyActive) return;
       const { lat, lng } = e.lngLat;
       updatePosition(lat, lng);
     });
