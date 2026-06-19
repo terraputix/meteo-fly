@@ -557,7 +557,7 @@
         >
           <path d="M12 19V5M5 12l7-7 7 7" />
         </svg>
-        Calculate hike & fly from here
+        Hike&Fly from here
       </button>
     </div>
   {/if}
