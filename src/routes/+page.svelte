@@ -26,6 +26,11 @@
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
 
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
+  const sunDateTime = $derived.by(() => {
+    const d = addDays(new Date(), parameters.selectedDay - 1);
+    d.setHours(0, 0, 0, 0);
+    return new Date(d.getTime() + selectedHour * 3_600_000);
+  });
 
   const urlSearch = $derived.by(() => {
     const { location, selectedDay, selectedModel, maxAltitude, cellSelection, daylightOnly } = parameters;
@@ -180,6 +185,7 @@
           bind:maxAltitude={parameters.maxAltitude}
           bind:cellSelection={parameters.cellSelection}
           bind:daylightOnly={parameters.daylightOnly}
+          {sunDateTime}
           selectedGridCell={windChartData?.selectedGridCell ?? null}
           gridCellElevation={windChartData?.elevation}
           modelGridElevation={windChartData?.modelGridElevation}
