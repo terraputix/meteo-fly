@@ -9,10 +9,12 @@
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
   import { isMobile } from '$lib/stores/media';
-  import { LocationControlManager, TerrainControl } from './Controls';
+  import { LocationControlManager, TerrainControl, SunControl } from './Controls';
   import ModelSelector from './ModelSelector.svelte';
   import ChartSettingsPopover from './ChartSettingsPopover.svelte';
   import HikeFlyLayer from './HikeFlyLayer.svelte';
+  import SunHillshadeCustomLayer from './SunHillshadeCustomLayer';
+  import { calcSunPosition } from '$lib/meteo/sunPosition';
   import type { WeatherModel, CellSelection } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
   import { haversineDistance } from '$lib/meteo/hikeAndFly';
@@ -28,6 +30,7 @@
     maxAltitude = $bindable<MaxAltitude>(4000),
     cellSelection = $bindable<CellSelection>('nearest'),
     daylightOnly = $bindable(false),
+    sunDateTime = $bindable(new Date()),
     onLocationChange = undefined as ((location: Location) => void) | undefined,
     onToggleChart = undefined as (() => void) | undefined,
   }: {
@@ -41,6 +44,7 @@
     maxAltitude?: MaxAltitude;
     cellSelection?: CellSelection;
     daylightOnly?: boolean;
+    sunDateTime?: Date;
     onLocationChange?: ((location: Location) => void) | undefined;
     onToggleChart?: (() => void) | undefined;
   } = $props();
@@ -65,6 +69,13 @@
   // Hike & fly state
   let hikeFlyActive = $state(false);
   let hikeFlyTakeoff: { latitude: number; longitude: number; elevation: number } | null = $state(null);
+
+  // Sun hillshade state
+  let sunHillshadeActive = $state(false);
+  let sunLayer: SunHillshadeCustomLayer | null = $state(null);
+  let sunAzimuth = $state(0);
+  let sunElevation = $state(0);
+  let sunMarker: Marker | null = $state(null);
   let contextMenuPos: { x: number; y: number } | null = $state(null);
   let contextMenuLngLat: { lng: number; lat: number } | null = $state(null);
   let contextMenuElevation: number | undefined = $state(undefined);
@@ -299,6 +310,109 @@
     updateElevationBadge();
   });
 
+  // Sun hillshade custom layer lifecycle
+  $effect(() => {
+    void sunHillshadeActive;
+    if (!map) return;
+
+    if (sunHillshadeActive && !sunLayer) {
+      const addLayer = () => {
+        if (!map.isStyleLoaded()) {
+          map.once('style.load', addLayer);
+          return;
+        }
+        const layer = new SunHillshadeCustomLayer();
+        map.addLayer(layer);
+        sunLayer = layer;
+      };
+      addLayer();
+    } else if (!sunHillshadeActive && sunLayer) {
+      try {
+        map.removeLayer(sunLayer.id);
+      } catch {
+        /* already removed */
+      }
+      sunLayer = null;
+    }
+  });
+
+  const DEG = Math.PI / 180;
+
+  function updateSunMarker() {
+    if (!map || !sunHillshadeActive) {
+      sunMarker?.remove();
+      sunMarker = null;
+      return;
+    }
+    const center = map.getCenter();
+    const px = map.project([center.lng, center.lat]);
+    const azRad = sunAzimuth * DEG;
+    const dx = Math.sin(azRad);
+    const dy = -Math.cos(azRad);
+    const canvas = map.getCanvas();
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
+
+    const MARGIN = 20;
+    let t = Infinity;
+    if (dx > 0) t = Math.min(t, (cw - px.x - MARGIN) / dx);
+    if (dx < 0) t = Math.min(t, (-px.x + MARGIN) / dx);
+    if (dy > 0) t = Math.min(t, (ch - px.y - MARGIN) / dy);
+    if (dy < 0) t = Math.min(t, (-px.y + MARGIN) / dy);
+
+    const offsetPx = {
+      x: px.x + t * dx,
+      y: px.y + t * dy,
+    };
+    const offsetLngLat = map.unproject([offsetPx.x, offsetPx.y]);
+
+    if (!sunMarker) {
+      const el = document.createElement('div');
+      el.className = 'sun-direction-marker';
+      sunMarker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(offsetLngLat).addTo(map);
+    } else {
+      sunMarker.setLngLat(offsetLngLat);
+    }
+  }
+
+  $effect(() => {
+    if (!sunLayer || !map) return;
+    void sunDateTime;
+    if (sunDateTime) {
+      const center = map.getCenter();
+      const pos = calcSunPosition(center.lat, center.lng, sunDateTime);
+      sunAzimuth = Math.round(pos.azimuth) % 360;
+      sunElevation = Math.round(pos.elevation);
+      sunLayer.updateSunTime(sunDateTime, center.lat, center.lng);
+      updateSunMarker();
+    }
+  });
+
+  $effect(() => {
+    if (!sunLayer || !map) return;
+    const onMoved = () => {
+      if (!sunLayer || !map) return;
+      const center = map.getCenter();
+      const pos = calcSunPosition(center.lat, center.lng, sunDateTime);
+      sunAzimuth = Math.round(pos.azimuth) % 360;
+      sunElevation = Math.round(pos.elevation);
+      sunLayer.updateSunTime(sunDateTime, center.lat, center.lng);
+      updateSunMarker();
+    };
+    map.on('moveend', onMoved);
+    return () => {
+      map.off('moveend', onMoved);
+    };
+  });
+
+  $effect(() => {
+    void sunHillshadeActive;
+    if (!sunHillshadeActive) {
+      sunMarker?.remove();
+      sunMarker = null;
+    }
+  });
+
   function handleMapViewChange() {
     updateGridCellConnector();
   }
@@ -331,9 +445,16 @@
       initialEnabled: isTerrainEnabled,
       onToggle: setTerrainVisibility,
     });
+    const sunControl = new SunControl({
+      title: 'Enable sun hillshade',
+      className: 'maplibregl-ctrl-sun-toggle',
+      initialEnabled: sunHillshadeActive,
+      onToggle: (enabled) => (sunHillshadeActive = enabled),
+    });
 
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
+    map.addControl(sunControl, 'top-left');
 
     const selectedLocationElement = document.createElement('div');
     selectedLocationElement.className = 'selected-location-marker';
@@ -446,6 +567,15 @@
     if (unsubscribe) {
       unsubscribe();
     }
+    if (sunLayer) {
+      try {
+        if (map) map.removeLayer(sunLayer.id);
+      } catch {
+        /* already gone */
+      }
+      sunLayer = null;
+    }
+    sunMarker?.remove();
     mapContainer.removeEventListener('contextmenu', onContextMenu);
     document.removeEventListener('click', closeContextMenu);
     if (selectedGridCellMarker) {
@@ -563,6 +693,42 @@
   {/if}
 
   <HikeFlyLayer {map} bind:active={hikeFlyActive} bind:takeoff={hikeFlyTakeoff} />
+
+  {#if sunHillshadeActive}
+    <div
+      class="pointer-events-auto absolute bottom-2 left-2 z-20 flex flex-col gap-1.5 rounded-xl border border-slate-200/80 bg-white/92 px-3 py-2 text-xs shadow-lg backdrop-blur-md"
+    >
+      <div class="flex items-center gap-2">
+        <span class="font-semibold text-slate-700">Sun Hillshade</span>
+        <button
+          type="button"
+          class="ml-auto text-slate-400 hover:text-slate-600"
+          onclick={() => (sunHillshadeActive = false)}
+          aria-label="Close sun hillshade layer">✕</button
+        >
+      </div>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
+        <span>
+          <span class="text-slate-600">Azimuth</span>
+          <span class="font-semibold text-slate-800">{sunAzimuth}°</span>
+        </span>
+        <span>
+          <span class="text-slate-600">Elevation</span>
+          <span class="font-semibold text-slate-800">{sunElevation}°</span>
+        </span>
+        {#if sunDateTime}
+          <span class="tabular-nums text-slate-600">
+            {sunDateTime.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+              ' ' +
+              String(sunDateTime.getHours()).padStart(2, '0')}:00
+          </span>
+        {/if}
+      </div>
+      {#if sunElevation <= 0}
+        <div class="text-amber-600">Sun is below horizon</div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -769,6 +935,15 @@
     cursor: not-allowed;
     opacity: 0.6;
     transform: none;
+  }
+
+  :global(.sun-direction-marker) {
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background: #facc15;
+    box-shadow: 0 0 12px 4px rgba(250, 204, 21, 0.5);
+    pointer-events: none;
   }
 
   :global(.location-spinner) {
