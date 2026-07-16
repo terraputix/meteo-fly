@@ -12,8 +12,9 @@
   import type { Location, WindChartData, SkewTWeatherData } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { createLatestRequest, isAbortError, type RequestHandle } from '$lib/services/latestRequest';
+  import { isWeatherCacheOutdatedMessage } from '$lib/services/weatherCache';
 
   let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
   let showChart = $state(false);
@@ -24,6 +25,7 @@
   let isWindChartLoading = $state(false);
   let isSkewTLoading = $state(false);
   let error: string | null = $state(null);
+  let outdatedCachedAt: number | null = $state(null);
 
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
   const windRequest = createLatestRequest();
@@ -38,6 +40,14 @@
   };
 
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
+  const outdatedCachedAtLabel = $derived(
+    outdatedCachedAt === null
+      ? ''
+      : new Intl.DateTimeFormat(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(outdatedCachedAt))
+  );
 
   const urlSearch = $derived.by(() => {
     const { location, selectedDay, selectedModel, maxAltitude, cellSelection, daylightOnly } = parameters;
@@ -125,6 +135,7 @@
     const request = windRequest.start();
     isWindChartLoading = true;
     error = null;
+    outdatedCachedAt = null;
     updateTimer = setTimeout(() => {
       updateTimer = null;
       void updateWindChart(requestParameters, request);
@@ -211,6 +222,19 @@
     }
   }
 
+  onMount(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (!isWeatherCacheOutdatedMessage(event.data)) return;
+      outdatedCachedAt =
+        outdatedCachedAt === null ? event.data.cachedAt : Math.min(outdatedCachedAt, event.data.cachedAt);
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+  });
+
   onDestroy(() => {
     clearTimeout(updateTimer ?? undefined);
     windRequest.cancel();
@@ -257,6 +281,11 @@
       <ResizableHandle withHandle />
       <ResizablePane defaultSize={50} minSize={$isMobile ? 10 : 30}>
         <div class="h-full overflow-y-auto bg-white p-0 sm:p-0">
+          {#if outdatedCachedAt !== null}
+            <div class="mx-3 mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
+              Showing cached weather data last fetched {outdatedCachedAtLabel}. The latest forecast could not be loaded.
+            </div>
+          {/if}
           {#if error}
             <div class="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
               {error}
