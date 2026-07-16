@@ -24,7 +24,7 @@
 - `src/lib/api/`: Open-Meteo API integration, request config, and response types
 - `src/lib/meteo/`: pure meteorological calculations and altitude/pressure helpers
 - `src/lib/charts/`: pure chart data preparation and ECharts option building
-- `src/lib/workers/`: Web Worker for off-main-thread chart data processing
+- `src/lib/workers/`: Web Workers and pure preparation helpers for off-main-thread chart and Hike & Fly processing
 - `src/lib/components/`: UI components including map, chart, legend, footer, and layout pieces
 - `src/lib/components/ui/`: shared `shadcn-svelte`-style UI primitives such as `switch` and `resizable`
 - `src/lib/services/`: defaults, URL/storage persistence, and location/geolocation state
@@ -40,7 +40,7 @@
 - **Single-page client app**: Keep everything browser-compatible. Do not introduce server runtime files.
 - **State source of truth**: Page parameters drive selected location, day, model, and max altitude; they are mirrored to URL params and persisted locally.
 - **Data flow**: `+page.svelte` fetches weather data, passes it into `ChartContainer.svelte`, then `WindChart.svelte` offloads heavy chart preparation to `src/lib/workers/chartWorker.ts`.
-- **Worker split**: Expensive shaping of wind/cloud/chart series belongs in pure helpers or the worker, not in UI components.
+- **Worker split**: Expensive chart shaping and Hike & Fly terrain/raster processing belong in pure helpers or workers, not in UI components.
 - **Chart stack**: Reuse existing chart builders and tooltip/state helpers before adding new rendering abstractions.
 - **Forecast models**: Supported models are defined canonically in `src/lib/api/types.ts`; UI selectors must stay aligned with that union.
 - **PWA**: Registration and update UI live in `+layout.svelte`; precache inputs live in `vite.config.ts`; navigation
