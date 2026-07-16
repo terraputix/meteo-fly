@@ -9,6 +9,7 @@ import {
   MAX_CACHE_AGE_SECONDS,
   MAX_CACHE_ENTRIES,
   WEATHER_CACHE_NAME,
+  type WeatherCacheDataset,
   type WeatherCacheOutdatedMessage,
 } from '$lib/services/weatherCache';
 
@@ -26,23 +27,26 @@ const expiration = new CacheExpiration(WEATHER_CACHE_NAME, {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(cleanupLegacyWeatherCaches(caches));
+  event.waitUntil(
+    Promise.allSettled([cleanupLegacyWeatherCaches(caches), expiration.expireEntries()]).then(() => undefined)
+  );
 });
 
 registerRoute(
   /^https:\/\/api\.open-meteo\.com\/v1\/forecast/,
   async ({ request, event }) => {
-    const notifyOutdated = async (cachedAt: number) => {
+    const notifyOutdated = async (dataset: WeatherCacheDataset, cachedAt: number) => {
       if (!('clientId' in event) || typeof event.clientId !== 'string' || !event.clientId) return;
       const client = await self.clients.get(event.clientId);
       const message: WeatherCacheOutdatedMessage = {
         type: 'weather-cache-outdated',
+        dataset,
         cachedAt,
       };
       client?.postMessage(message);
     };
 
-    return handleWeatherRequest(request, event, {
+    return handleWeatherRequest(request, {
       cacheStorage: caches,
       expiration,
       fetchRequest: fetch,

@@ -25,7 +25,8 @@
   let isWindChartLoading = $state(false);
   let isSkewTLoading = $state(false);
   let error: string | null = $state(null);
-  let outdatedCachedAt: number | null = $state(null);
+  let windOutdatedCachedAt: number | null = $state(null);
+  let skewTOutdatedCachedAt: number | null = $state(null);
 
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
   const windRequest = createLatestRequest();
@@ -40,6 +41,7 @@
   };
 
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
+  const outdatedCachedAt = $derived(chartView === 'wind' ? windOutdatedCachedAt : skewTOutdatedCachedAt);
   const outdatedCachedAtLabel = $derived(
     outdatedCachedAt === null
       ? ''
@@ -135,7 +137,7 @@
     const request = windRequest.start();
     isWindChartLoading = true;
     error = null;
-    outdatedCachedAt = null;
+    windOutdatedCachedAt = null;
     updateTimer = setTimeout(() => {
       updateTimer = null;
       void updateWindChart(requestParameters, request);
@@ -156,6 +158,7 @@
     const requestParameters = getWeatherRequestParameters();
     const request = skewTRequest.start();
     isSkewTLoading = true;
+    skewTOutdatedCachedAt = null;
     void updateSkewTData(requestParameters, request);
   });
 
@@ -227,8 +230,13 @@
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       if (!isWeatherCacheOutdatedMessage(event.data)) return;
-      outdatedCachedAt =
-        outdatedCachedAt === null ? event.data.cachedAt : Math.min(outdatedCachedAt, event.data.cachedAt);
+      if (event.data.dataset === 'wind') {
+        windOutdatedCachedAt =
+          windOutdatedCachedAt === null ? event.data.cachedAt : Math.min(windOutdatedCachedAt, event.data.cachedAt);
+      } else {
+        skewTOutdatedCachedAt =
+          skewTOutdatedCachedAt === null ? event.data.cachedAt : Math.min(skewTOutdatedCachedAt, event.data.cachedAt);
+      }
     };
 
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);

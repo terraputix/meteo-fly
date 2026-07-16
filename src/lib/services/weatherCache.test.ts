@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   CACHED_AT_HEADER,
+  CACHE_FIRST_MS,
   cleanupLegacyWeatherCaches,
-  FRESH_MS,
   handleWeatherRequest,
   isWeatherCacheOutdatedMessage,
   MAX_CACHE_AGE_SECONDS,
@@ -10,11 +10,11 @@ import {
   OUTDATED_WARNING_MS,
   WEATHER_CACHE_NAME,
   type WeatherCacheDependencies,
-  type WeatherCacheEvent,
   type WeatherCacheExpiration,
 } from './weatherCache';
 
-const REQUEST = new Request('https://api.open-meteo.com/v1/forecast?latitude=47');
+const REQUEST = new Request('https://api.open-meteo.com/v1/forecast?latitude=47&daily=sunrise');
+const SKEWT_REQUEST = new Request('https://api.open-meteo.com/v1/forecast?latitude=47&hourly=temperature');
 const NOW = Date.parse('2026-07-16T12:00:00Z');
 
 class MemoryCache {
@@ -44,8 +44,10 @@ class MemoryCache {
 class MemoryCacheStorage {
   readonly caches = new Map<string, MemoryCache>();
   readonly deleted: string[] = [];
+  openError: unknown = null;
 
   async open(cacheName: string): Promise<Cache> {
+    if (this.openError) throw this.openError;
     let cache = this.caches.get(cacheName);
     if (!cache) {
       cache = new MemoryCache();
@@ -75,22 +77,6 @@ function createCachedResponse(body: string, cachedAt: number): Response {
       [CACHED_AT_HEADER]: String(cachedAt),
     },
   });
-}
-
-function createEvent() {
-  const promises: Promise<unknown>[] = [];
-  const event: WeatherCacheEvent = {
-    waitUntil(promise) {
-      promises.push(promise);
-    },
-  };
-
-  return {
-    event,
-    async settle() {
-      await Promise.all(promises);
-    },
-  };
 }
 
 function createExpiration(): WeatherCacheExpiration {
@@ -123,12 +109,10 @@ describe('weather cache policy', () => {
 
   it('returns a fresh cached response without fetching', async () => {
     const cacheStorage = new MemoryCacheStorage();
-    cacheStorage.getWeatherCache().responses.set(REQUEST.url, createCachedResponse('cached', NOW - FRESH_MS + 1));
+    cacheStorage.getWeatherCache().responses.set(REQUEST.url, createCachedResponse('cached', NOW - CACHE_FIRST_MS + 1));
     const dependencies = createDependencies(cacheStorage);
-    const { event, settle } = createEvent();
 
-    const response = await handleWeatherRequest(REQUEST, event, dependencies);
-    await settle();
+    const response = await handleWeatherRequest(REQUEST, dependencies);
 
     expect(await response.text()).toBe('cached');
     expect(dependencies.fetchRequest).not.toHaveBeenCalled();
@@ -136,17 +120,15 @@ describe('weather cache policy', () => {
 
   it('refreshes a stale cached response from the network', async () => {
     const cacheStorage = new MemoryCacheStorage();
-    cacheStorage.getWeatherCache().responses.set(REQUEST.url, createCachedResponse('cached', NOW - FRESH_MS));
+    cacheStorage.getWeatherCache().responses.set(REQUEST.url, createCachedResponse('cached', NOW - CACHE_FIRST_MS));
     const expiration = createExpiration();
     const dependencies = createDependencies(cacheStorage, {
       expiration,
       fetchRequest: vi.fn().mockResolvedValue(new Response('network')),
     });
-    const { event, settle } = createEvent();
 
-    const response = await handleWeatherRequest(REQUEST, event, dependencies);
+    const response = await handleWeatherRequest(REQUEST, dependencies);
     expect(await response.text()).toBe('network');
-    await settle();
 
     const cached = await cacheStorage.getWeatherCache().match(REQUEST);
     expect(cached?.headers.get(CACHED_AT_HEADER)).toBe(String(NOW));
@@ -164,10 +146,8 @@ describe('weather cache policy', () => {
       fetchRequest: vi.fn().mockRejectedValue(new TypeError('offline')),
       notifyOutdated,
     });
-    const { event, settle } = createEvent();
 
-    const response = await handleWeatherRequest(REQUEST, event, dependencies);
-    await settle();
+    const response = await handleWeatherRequest(REQUEST, dependencies);
 
     expect(await response.text()).toBe('cached');
     expect(notifyOutdated).not.toHaveBeenCalled();
@@ -182,13 +162,40 @@ describe('weather cache policy', () => {
       fetchRequest: vi.fn().mockResolvedValue(new Response('unavailable', { status: 500 })),
       notifyOutdated,
     });
-    const { event, settle } = createEvent();
 
-    const response = await handleWeatherRequest(REQUEST, event, dependencies);
-    await settle();
+    const response = await handleWeatherRequest(REQUEST, dependencies);
 
     expect(await response.text()).toBe('cached');
-    expect(notifyOutdated).toHaveBeenCalledWith(cachedAt);
+    expect(notifyOutdated).toHaveBeenCalledWith('wind', cachedAt);
+  });
+
+  it('identifies outdated Skew-T fallback separately from wind data', async () => {
+    const cachedAt = NOW - OUTDATED_WARNING_MS;
+    const cacheStorage = new MemoryCacheStorage();
+    cacheStorage.getWeatherCache().responses.set(SKEWT_REQUEST.url, createCachedResponse('cached', cachedAt));
+    const notifyOutdated = vi.fn().mockResolvedValue(undefined);
+    const dependencies = createDependencies(cacheStorage, {
+      fetchRequest: vi.fn().mockRejectedValue(new TypeError('offline')),
+      notifyOutdated,
+    });
+
+    const response = await handleWeatherRequest(SKEWT_REQUEST, dependencies);
+
+    expect(await response.text()).toBe('cached');
+    expect(notifyOutdated).toHaveBeenCalledWith('skewt', cachedAt);
+  });
+
+  it('invokes the network fetch without binding the dependency object as its receiver', async () => {
+    const cacheStorage = new MemoryCacheStorage();
+    const fetchRequest = vi.fn(function (this: unknown) {
+      if (this !== undefined) throw new TypeError('Illegal invocation');
+      return Promise.resolve(new Response('network'));
+    });
+    const dependencies = createDependencies(cacheStorage, { fetchRequest });
+
+    const response = await handleWeatherRequest(REQUEST, dependencies);
+
+    expect(await response.text()).toBe('network');
   });
 
   it('rejects cached data at the 14-day boundary', async () => {
@@ -199,10 +206,8 @@ describe('weather cache policy', () => {
     const dependencies = createDependencies(cacheStorage, {
       fetchRequest: vi.fn().mockRejectedValue(new TypeError('offline')),
     });
-    const { event, settle } = createEvent();
 
-    const response = await handleWeatherRequest(REQUEST, event, dependencies);
-    await settle();
+    const response = await handleWeatherRequest(REQUEST, dependencies);
 
     expect(response.status).toBe(503);
     expect(await cacheStorage.getWeatherCache().match(REQUEST)).toBeUndefined();
@@ -214,10 +219,8 @@ describe('weather cache policy', () => {
     const dependencies = createDependencies(cacheStorage, {
       fetchRequest: vi.fn().mockRejectedValue(new TypeError('offline')),
     });
-    const { event, settle } = createEvent();
 
-    const response = await handleWeatherRequest(REQUEST, event, dependencies);
-    await settle();
+    const response = await handleWeatherRequest(REQUEST, dependencies);
 
     expect(response.status).toBe(503);
     expect(await cacheStorage.getWeatherCache().match(REQUEST)).toBeUndefined();
@@ -228,12 +231,22 @@ describe('weather cache policy', () => {
     const dependencies = createDependencies(cacheStorage, {
       fetchRequest: vi.fn().mockRejectedValue(new TypeError('offline')),
     });
-    const { event, settle } = createEvent();
 
-    const response = await handleWeatherRequest(REQUEST, event, dependencies);
-    await settle();
+    const response = await handleWeatherRequest(REQUEST, dependencies);
 
     expect(response.status).toBe(503);
+  });
+
+  it('uses the network when Cache Storage cannot be opened', async () => {
+    const cacheStorage = new MemoryCacheStorage();
+    cacheStorage.openError = new Error('cache unavailable');
+    const dependencies = createDependencies(cacheStorage, {
+      fetchRequest: vi.fn().mockResolvedValue(new Response('network')),
+    });
+
+    const response = await handleWeatherRequest(REQUEST, dependencies);
+
+    expect(await response.text()).toBe('network');
   });
 
   it('returns a successful network response when the cache write fails', async () => {
@@ -242,11 +255,9 @@ describe('weather cache policy', () => {
     const dependencies = createDependencies(cacheStorage, {
       fetchRequest: vi.fn().mockResolvedValue(new Response('network')),
     });
-    const { event, settle } = createEvent();
 
-    const response = await handleWeatherRequest(REQUEST, event, dependencies);
+    const response = await handleWeatherRequest(REQUEST, dependencies);
     expect(await response.text()).toBe('network');
-    await expect(settle()).resolves.toBeUndefined();
   });
 
   it('purges the weather cache and expiration metadata after a quota error', async () => {
@@ -257,11 +268,9 @@ describe('weather cache policy', () => {
       expiration,
       fetchRequest: vi.fn().mockResolvedValue(new Response('network')),
     });
-    const { event, settle } = createEvent();
 
-    const response = await handleWeatherRequest(REQUEST, event, dependencies);
+    const response = await handleWeatherRequest(REQUEST, dependencies);
     expect(await response.text()).toBe('network');
-    await settle();
 
     expect(cacheStorage.deleted).toContain(WEATHER_CACHE_NAME);
     expect(expiration.delete).toHaveBeenCalled();
@@ -283,8 +292,17 @@ describe('weather cache lifecycle and messages', () => {
   });
 
   it('recognizes only valid outdated-cache messages', () => {
-    expect(isWeatherCacheOutdatedMessage({ type: 'weather-cache-outdated', cachedAt: NOW })).toBe(true);
-    expect(isWeatherCacheOutdatedMessage({ type: 'weather-cache-outdated', cachedAt: NaN })).toBe(false);
-    expect(isWeatherCacheOutdatedMessage({ type: 'other', cachedAt: NOW })).toBe(false);
+    expect(isWeatherCacheOutdatedMessage({ type: 'weather-cache-outdated', dataset: 'wind', cachedAt: NOW })).toBe(
+      true
+    );
+    expect(isWeatherCacheOutdatedMessage({ type: 'weather-cache-outdated', dataset: 'skewt', cachedAt: NOW })).toBe(
+      true
+    );
+    expect(isWeatherCacheOutdatedMessage({ type: 'weather-cache-outdated', dataset: 'wind', cachedAt: NaN })).toBe(
+      false
+    );
+    expect(isWeatherCacheOutdatedMessage({ type: 'weather-cache-outdated', dataset: 'other', cachedAt: NOW })).toBe(
+      false
+    );
   });
 });
