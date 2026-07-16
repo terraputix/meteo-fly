@@ -1,4 +1,11 @@
-import { createElevationLookup, fetchDemTile, formatTileUrl, tilesForBbox, type DemTile } from '$lib/meteo/dem';
+import {
+  boundsForRadius,
+  createElevationLookup,
+  fetchDemTile,
+  formatTileUrl,
+  tilesForBbox,
+  type DemTile,
+} from '$lib/meteo/dem';
 import { visitKey } from '$lib/meteo/hikeAndFly';
 import { prepareHikeFlyData } from './prepareHikeFlyData';
 import type {
@@ -9,7 +16,6 @@ import type {
   HikeFlyWorkerSuccessOutput,
 } from './hikeFlyWorker.types';
 
-const EARTH_CIRCUMFERENCE = 40_075_017;
 const DEM_ZOOM = 12;
 const DEM_ENCODING = 'terrarium' as const;
 
@@ -30,13 +36,12 @@ async function compute(request: HikeFlyWorkerComputeRequest): Promise<void> {
 
   try {
     const maxGlideMeters = glideRatio * Math.max(takeoff.elevation, 100);
-    const degreesPerMeter = 360 / EARTH_CIRCUMFERENCE;
-    const marginDegrees = maxGlideMeters * degreesPerMeter * 1.2;
+    const bounds = boundsForRadius(takeoff.latitude, takeoff.longitude, maxGlideMeters, 1.2);
     const neededTiles = tilesForBbox(
-      takeoff.latitude - marginDegrees,
-      takeoff.latitude + marginDegrees,
-      takeoff.longitude - marginDegrees,
-      takeoff.longitude + marginDegrees,
+      bounds.minLatitude,
+      bounds.maxLatitude,
+      bounds.minLongitude,
+      bounds.maxLongitude,
       DEM_ZOOM
     );
 
