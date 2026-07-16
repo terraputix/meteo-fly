@@ -6,6 +6,7 @@ import { CacheExpiration, ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { classifyMapCacheResource, MAP_CACHE_NAMES, MAP_CACHE_POLICIES } from '$lib/services/mapCache';
+import { markUpdatePromptMigration } from '$lib/services/pwaUpdateMigration';
 import {
   cleanupLegacyWeatherCaches,
   handleWeatherRequest,
@@ -22,6 +23,17 @@ cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
 clientsClaim();
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    markUpdatePromptMigration(caches)
+      .then((shouldActivate) => (shouldActivate ? self.skipWaiting() : undefined))
+      .catch((error) => {
+        console.error('PWA update prompt migration failed', error);
+        return self.skipWaiting();
+      })
+  );
+});
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {

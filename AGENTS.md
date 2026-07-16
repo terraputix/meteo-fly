@@ -18,7 +18,8 @@
 
 ## Repository Layout
 
-- `src/routes/+layout.svelte`: global shell, metadata, and PWA registration
+- `src/routes/+layout.svelte`: global shell, metadata, PWA registration, and update/offline status
+- `src/service-worker.ts`: app-shell navigation, precaching, weather fallback, and bounded map runtime caches
 - `src/routes/+page.svelte`: main page state, URL sync, and weather fetch lifecycle
 - `src/lib/api/`: Open-Meteo API integration, request config, and response types
 - `src/lib/meteo/`: pure meteorological calculations and altitude/pressure helpers
@@ -42,7 +43,8 @@
 - **Worker split**: Expensive shaping of wind/cloud/chart series belongs in pure helpers or the worker, not in UI components.
 - **Chart stack**: Reuse existing chart builders and tooltip/state helpers before adding new rendering abstractions.
 - **Forecast models**: Supported models are defined canonically in `src/lib/api/types.ts`; UI selectors must stay aligned with that union.
-- **PWA**: Service worker registration happens in `+layout.svelte` and caching rules live in `vite.config.ts`.
+- **PWA**: Registration and update UI live in `+layout.svelte`; precache inputs live in `vite.config.ts`; navigation
+  fallback and runtime caching live in `src/service-worker.ts`.
 
 ---
 
@@ -103,8 +105,9 @@
 
 ### PWA / Metadata
 
-- Manifest and service worker caching are configured in `vite.config.ts`.
-- Registration and document head metadata are handled in `src/routes/+layout.svelte`.
+- Manifest and service-worker precache inputs are configured in `vite.config.ts`.
+- App-shell navigation and runtime cache policies are handled in `src/service-worker.ts`.
+- Registration, update prompts, offline status, and document head metadata are handled in `src/routes/+layout.svelte`.
 
 ---
 
