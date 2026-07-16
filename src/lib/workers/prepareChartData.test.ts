@@ -41,7 +41,32 @@ describe('chart worker preparation', () => {
     ]);
     expect(result.rainCloudChartData.cloudRects).toHaveLength(6);
     expect(result.rainCloudChartData.cloudRects[0].cloudCover).toBeNaN();
+    expect(result.rainCloudChartData.cloudRects[0]).toMatchObject({
+      x1: new Date('2026-07-16T09:30:00Z'),
+      x2: new Date('2026-07-16T10:30:00Z'),
+    });
     expect(result.windData).toEqual([]);
     expect(result.xDomain.every((date) => Number.isFinite(date.getTime()))).toBe(true);
+  });
+
+  it('aligns the daylight domain with the first and last retained hourly cells', () => {
+    const windChartData = createData();
+    windChartData.sunrise = new Date('2026-07-16T10:23:00Z');
+    windChartData.sunset = new Date('2026-07-16T10:37:00Z');
+
+    const result = prepareChartData({
+      windChartData,
+      maxAltitude: 4000,
+      model: 'icon_d2',
+      daylightOnly: true,
+    });
+
+    expect(result.temperatureChartData.temperatureData.map((point) => point.time)).toEqual([
+      new Date('2026-07-16T10:00:00Z'),
+      new Date('2026-07-16T11:00:00Z'),
+    ]);
+    expect(result.xDomain).toEqual([new Date('2026-07-16T09:30:00Z'), new Date('2026-07-16T11:30:00Z')]);
+    expect(result.rainCloudChartData.cloudRects.at(0)?.x1).toEqual(result.xDomain[0]);
+    expect(result.rainCloudChartData.cloudRects.at(-1)?.x2).toEqual(result.xDomain[1]);
   });
 });

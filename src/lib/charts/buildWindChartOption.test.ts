@@ -6,6 +6,7 @@ import { buildWindChartOption } from './buildWindChartOption';
 interface NamedSeries {
   name?: string;
   data?: unknown;
+  markLine?: { data?: unknown };
 }
 
 interface RainSeriesItem {
@@ -55,6 +56,11 @@ describe('wind chart option', () => {
     );
     const series = option.series as NamedSeries[];
 
+    expect(series.find((item) => item.name === '__anchor_rain')?.markLine?.data).toEqual([
+      [{ coord: [times[0].getTime(), 1] }, { coord: [times[1].getTime(), 1] }],
+      [{ coord: [times[0].getTime(), 2] }, { coord: [times[1].getTime(), 2] }],
+      [{ coord: [times[0].getTime(), 3] }, { coord: [times[1].getTime(), 3] }],
+    ]);
     expect(series.find((item) => item.name === 'LCL')).toMatchObject({
       data: [
         [times[0].getTime(), null],

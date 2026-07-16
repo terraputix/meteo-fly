@@ -97,11 +97,7 @@ function prepareRainAndCloudData(data: WindChartData): RainCloudChartData {
   };
 }
 
-function calculateDomains(times: Date[], sunrise?: Date, sunset?: Date, daylightOnly?: boolean): [Date, Date] {
-  if (daylightOnly && sunrise && sunset) {
-    return [addSeconds(sunrise, -3600), addSeconds(sunset, 3600)];
-  }
-
+function calculateDomains(times: Date[]): [Date, Date] {
   const timestamps = times.map((time) => time.getTime()).filter(Number.isFinite);
   if (timestamps.length === 0) {
     throw new Error('Cannot prepare chart without valid hourly timestamps');
@@ -125,6 +121,6 @@ export function prepareChartData(input: ChartWorkerInput): ChartWorkerSuccessOut
     timezoneAbbr: windChartData.timezoneAbbr,
     temperatureChartData: prepareTemperatureData(data),
     rainCloudChartData: prepareRainAndCloudData(data),
-    xDomain: calculateDomains(data.hourly.time, windChartData.sunrise, windChartData.sunset, daylightOnly),
+    xDomain: calculateDomains(data.hourly.time),
   };
 }

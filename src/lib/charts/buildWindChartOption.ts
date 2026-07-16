@@ -24,7 +24,7 @@ import type { LclPoint } from '$lib/meteo/lcl';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.
-export const MARGIN_LEFT = 40;
+export const MARGIN_LEFT = 56;
 export const MARGIN_RIGHT = 25;
 export const TEMP_HEIGHT_PX = 130;
 export const RAIN_HEIGHT_PX = 66;
@@ -296,9 +296,9 @@ export function buildWindChartOption(
       width: 1,
     },
     data: [
-      { yAxis: 1 }, // Line between Low and Mid
-      { yAxis: 2 }, // Line between Mid and High
-      { yAxis: 3 }, // Line between Mid and High
+      [{ coord: [xMin, 1] }, { coord: [xMax, 1] }],
+      [{ coord: [xMin, 2] }, { coord: [xMax, 2] }],
+      [{ coord: [xMin, 3] }, { coord: [xMax, 3] }],
     ],
   };
 
