@@ -1,5 +1,6 @@
 import { fetchWeatherApi } from 'openmeteo';
 import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
+import type { WeatherApiResponse } from '@openmeteo/sdk/weather-api-response';
 import {
   type VerticalProfile,
   type WeatherModel,
@@ -37,18 +38,17 @@ export function createHourlyParams(variables: (ProfileVariables | FlatVariable)[
 function getVariableFromHourly(
   hourlyParams: string[],
   hourlyResponse: VariablesWithTime,
-  variable: ProfileVariables | FlatVariable
+  variable: ProfileVariables | FlatVariable,
+  expectedLength: number
 ): Float32Array | VerticalProfile {
   if (isFlat(variable)) {
-    const position = hourlyParams.findIndex((v) => v === variable.apiName);
-    return hourlyResponse.variables(position)!.valuesArray()!;
+    const values = getHourlyValues(hourlyParams, hourlyResponse, variable.apiName, expectedLength);
+    return values ?? createMissingValues(expectedLength);
   } else if (isProfile(variable)) {
-    // Dynamically map each apiName to its hPa key – no hardcoded indices.
     const result: Partial<VerticalProfile> = {};
     variable.apiNames.forEach((apiName) => {
-      const position = hourlyParams.findIndex((v) => v === apiName);
-      const values = hourlyResponse.variables(position)!.valuesArray()!;
-      // Extract the hPa suffix: e.g. "wind_speed_1000hPa" → key "_1000hPa"
+      const values = getHourlyValues(hourlyParams, hourlyResponse, apiName, expectedLength);
+      if (!values) return;
       const match = apiName.match(/_(\d+hPa)$/);
       if (match) {
         const key = `_${match[1]}` as keyof VerticalProfile;
@@ -59,6 +59,83 @@ function getVariableFromHourly(
   } else {
     throw new Error('Unknown variable type');
   }
+}
+
+function createMissingValues(length: number): Float32Array {
+  const result = new Float32Array(length);
+  result.fill(NaN);
+  return result;
+}
+
+function normalizeValues(values: Float32Array, expectedLength: number): Float32Array {
+  if (values.length === expectedLength) return values;
+  const result = createMissingValues(expectedLength);
+  result.set(values.subarray(0, expectedLength));
+  return result;
+}
+
+function getHourlyValues(
+  hourlyParams: string[],
+  hourlyResponse: VariablesWithTime,
+  apiName: string,
+  expectedLength: number
+): Float32Array | null {
+  const position = hourlyParams.findIndex((v) => v === apiName);
+  if (position < 0) {
+    throw new Error(`Requested hourly variable "${apiName}" is not configured`);
+  }
+  if (position >= hourlyResponse.variablesLength()) return null;
+  const values = hourlyResponse.variables(position)?.valuesArray();
+  return values ? normalizeValues(values, expectedLength) : null;
+}
+
+function getFirstResponse(responses: WeatherApiResponse[], requestName: string): WeatherApiResponse {
+  const response = responses[0];
+  if (!response) {
+    throw new Error(`Open-Meteo returned no ${requestName} response`);
+  }
+  return response;
+}
+
+function getHourlySection(response: WeatherApiResponse, requestName: string): VariablesWithTime {
+  const hourly = response.hourly();
+  if (!hourly) {
+    throw new Error(`Open-Meteo ${requestName} response is missing hourly data`);
+  }
+  return hourly;
+}
+
+function createHourlyTimes(hourly: VariablesWithTime, requestName: string): Date[] {
+  const start = Number(hourly.time());
+  const end = Number(hourly.timeEnd());
+  const interval = hourly.interval();
+  const length = (end - start) / interval;
+
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    !Number.isFinite(interval) ||
+    interval <= 0 ||
+    end <= start ||
+    !Number.isInteger(length) ||
+    length <= 0
+  ) {
+    throw new Error(`Open-Meteo ${requestName} response has an invalid hourly timeline`);
+  }
+
+  return range(start, end, interval).map((t) => new Date(t * 1000));
+}
+
+function getDailyTime(daily: VariablesWithTime, position: number, name: string): Date {
+  const secondsValue = daily.variables(position)?.valuesInt64(0);
+  if (secondsValue == null) {
+    throw new Error(`Open-Meteo wind chart response is missing ${name} data`);
+  }
+  const seconds = Number(secondsValue);
+  if (!Number.isFinite(seconds)) {
+    throw new Error(`Open-Meteo wind chart response has invalid ${name} data`);
+  }
+  return new Date(seconds * 1000);
 }
 
 const url = 'https://api.open-meteo.com/v1/forecast';
@@ -146,7 +223,7 @@ export async function fetchWindChartData(
     undefined,
     signal ? { signal } : undefined
   );
-  const response = responses[0];
+  const response = getFirstResponse(responses, 'wind chart');
 
   const timezone = response.timezoneAbbreviation() ?? 'UTC';
   const selectedGridCell: Location = {
@@ -154,21 +231,24 @@ export async function fetchWindChartData(
     longitude: response.longitude(),
   };
 
-  const sunriseInt: number = Number(response.daily()!.variables(0)?.valuesInt64(0));
-  const sunsetInt: number = Number(response.daily()!.variables(1)?.valuesInt64(0));
-  const sunrise = new Date(sunriseInt * 1000);
-  const sunset = new Date(sunsetInt * 1000);
+  const daily = response.daily();
+  if (!daily) {
+    throw new Error('Open-Meteo wind chart response is missing daily data');
+  }
+  const sunrise = getDailyTime(daily, 0, 'sunrise');
+  const sunset = getDailyTime(daily, 1, 'sunset');
 
   const elevation = response.elevation();
 
-  const hourly = response.hourly()!;
+  const hourly = getHourlySection(response, 'wind chart');
+  const times = createHourlyTimes(hourly, 'wind chart');
   const windChartData: WindChartData = {
     elevation: elevation,
     hourly: {
-      time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map((t) => new Date(t * 1000)),
+      time: times,
       ...modelVariables.reduce((acc, v) => {
         const key = v.key as keyof HourlyData;
-        const value = getVariableFromHourly(hourlyParams.hourly, hourly, v)!;
+        const value = getVariableFromHourly(hourlyParams.hourly, hourly, v, times.length);
         acc[key] = value as Date[] & VerticalProfile & Float32Array;
         return acc;
       }, {} as Partial<HourlyData>),
@@ -225,15 +305,13 @@ export async function fetchSkewTData(
     undefined,
     signal ? { signal } : undefined
   );
-  const response = responses[0];
+  const response = getFirstResponse(responses, 'Skew-T');
 
   const timezone = response.timezoneAbbreviation() ?? 'UTC';
   const elevation = response.elevation();
 
-  const hourly = response.hourly()!;
-  const times = range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
-    (t) => new Date(t * 1000)
-  );
+  const hourly = getHourlySection(response, 'Skew-T');
+  const times = createHourlyTimes(hourly, 'Skew-T');
 
   const hourlyParams = params.hourly as string[];
 
@@ -245,15 +323,14 @@ export async function fetchSkewTData(
     windDirectionProfile: {},
     cloudCoverProfile: {},
     geopotentialHeightProfile: {},
-    temperature_2m: new Float32Array(times.length),
-    dewpoint_2m: new Float32Array(times.length),
+    temperature_2m: createMissingValues(times.length),
+    dewpoint_2m: createMissingValues(times.length),
   };
 
   variables.forEach((v) => {
     v.apiNames.forEach((apiName) => {
-      const position = hourlyParams.findIndex((p) => p === apiName);
-      if (position === -1) return;
-      const values = hourly.variables(position)!.valuesArray()!;
+      const values = getHourlyValues(hourlyParams, hourly, apiName, times.length);
+      if (!values) return;
       const match = apiName.match(/_(\d+hPa)$/);
       if (!match) return;
       const levelKey = `_${match[1]}`;
@@ -261,10 +338,14 @@ export async function fetchSkewTData(
     });
   });
 
-  const temp2mPos = hourlyParams.findIndex((p) => p === 'temperature_2m');
-  const dew2mPos = hourlyParams.findIndex((p) => p === 'dew_point_2m');
-  if (temp2mPos >= 0) result.temperature_2m = hourly.variables(temp2mPos)!.valuesArray()!;
-  if (dew2mPos >= 0) result.dewpoint_2m = hourly.variables(dew2mPos)!.valuesArray()!;
+  const temperature2m = getHourlyValues(hourlyParams, hourly, 'temperature_2m', times.length);
+  const dewpoint2m = getHourlyValues(hourlyParams, hourly, 'dew_point_2m', times.length);
+  if (temperature2m) {
+    result.temperature_2m = temperature2m;
+  }
+  if (dewpoint2m) {
+    result.dewpoint_2m = dewpoint2m;
+  }
 
   return {
     hourly: result,

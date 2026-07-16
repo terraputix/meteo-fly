@@ -20,6 +20,7 @@ import type { WeatherModel } from '$lib/api/types';
 import { getNativeLevelsForModel } from '$lib/meteo/pressureLevels';
 import { fmtTime } from '$lib/helpers';
 import type { MaxAltitude } from '$lib/meteo/types';
+import type { LclPoint } from '$lib/meteo/lcl';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.
@@ -90,7 +91,7 @@ export function buildWindChartOption(
   rainCloudChartData: RainCloudChartData,
   windData: WindFieldLevel[],
   cloudData: CloudCoverData[],
-  cloudBase: Array<{ time: Date; value: number }>,
+  cloudBase: LclPoint[],
   elevation: number,
   timezoneAbbr: string,
   xDomain: [Date, Date],
@@ -317,6 +318,7 @@ export function buildWindChartOption(
     silent: true,
     renderItem(params, api) {
       const item = cloudItems[params.dataIndex];
+      if (!Number.isFinite(item.cloudCover)) return { type: 'group', children: [] };
       const p1 = api.coord([item.x1, item.y2 * 3]);
       const p2 = api.coord([item.x2, item.y1 * 3]);
       const w = Math.max(0, p2[0] - p1[0]);
@@ -336,13 +338,8 @@ export function buildWindChartOption(
     tooltip: { show: false },
   };
 
-  type RainDot = { timeMs: number; rain: number };
-  const rainDots: RainDot[] = rainCloudChartData.rainDots.map((d) => ({
-    timeMs: d.time.getTime(),
-    rain: d.rain,
-  }));
-
   function rainDropCount(rain: number): number {
+    if (!Number.isFinite(rain) || rain <= 0) return 0;
     if (rain > 5) return 3;
     if (rain > 1) return 2;
     return 1;
@@ -360,12 +357,13 @@ export function buildWindChartOption(
     z: 3,
     tooltip: { show: false },
     silent: true,
-    renderItem(params, api) {
-      const dot = rainDots[params.dataIndex];
-      const count = rainDropCount(dot.rain);
+    renderItem(_params, api) {
+      const timeMs = Number(api.value(0));
+      const rain = Number(api.value(1));
+      const count = rainDropCount(rain);
 
       const drops = Array.from({ length: count }, (_, i) => {
-        const [cx, cy] = api.coord([dot.timeMs, i + 0.5]);
+        const [cx, cy] = api.coord([timeMs, i + 0.5]);
         return {
           type: 'path' as const,
           shape: { pathData: DROP_PATH, x: cx - DROP_W / 2, y: cy - DROP_H / 2, width: DROP_W, height: DROP_H },
@@ -373,9 +371,12 @@ export function buildWindChartOption(
         };
       });
 
-      return { type: 'group', children: drops };
+      return { type: 'group', $mergeChildren: false, children: drops };
     },
-    data: rainDots.map((_, i) => i),
+    data: rainCloudChartData.rainDots.map((dot) => {
+      const timeMs = dot.time.getTime();
+      return { id: timeMs.toString(), value: [timeMs, dot.rain] };
+    }),
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -411,7 +412,7 @@ export function buildWindChartOption(
     silent: true,
     renderItem(params, api) {
       const item = cloudItems2[params.dataIndex];
-      if (item.value <= 0) return { type: 'group', children: [] };
+      if (!Number.isFinite(item.value) || item.value <= 0) return { type: 'group', children: [] };
 
       const band = bandByHeight.get(item.height);
       if (!band) return { type: 'group', children: [] };
@@ -495,7 +496,7 @@ export function buildWindChartOption(
     xAxisIndex: 2,
     yAxisIndex: 3,
     color: CHART_COLORS.lcl,
-    data: cloudBase.map((d) => [d.time.getTime(), d.value] as [number, number]),
+    data: cloudBase.map((d) => [d.time.getTime(), d.value] as [number, number | null]),
     z: 4,
   });
 

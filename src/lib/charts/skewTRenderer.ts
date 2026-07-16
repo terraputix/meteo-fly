@@ -522,7 +522,7 @@ function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout
     const level = trace.levels[i];
     const nextLevel = trace.levels[i + 1];
     const avgCloud = (level.cloudCover + nextLevel.cloudCover) / 2;
-    if (avgCloud <= 2) continue;
+    if (!Number.isFinite(avgCloud) || avgCloud <= 2) continue;
 
     const y0 = pressureToCanvasY(layout, level.pressure);
     const y1 = pressureToCanvasY(layout, nextLevel.pressure);

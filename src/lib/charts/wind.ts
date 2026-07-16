@@ -58,12 +58,12 @@ export function getWindFieldAllLevels(
         }
       }
 
-      if (speed != null && direction != null && !isNaN(speed) && !isNaN(direction)) {
+      if (speed != null && direction != null && Number.isFinite(speed) && Number.isFinite(direction)) {
         data.push({
           time,
           height: level.heightMeters,
-          speed: parseFloat(speed.toFixed(2)),
-          direction: parseFloat(direction.toFixed(0)),
+          speed: Math.round(speed * 100) / 100,
+          direction: Math.round(direction),
           source: level.source,
         });
       }

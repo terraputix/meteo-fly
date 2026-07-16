@@ -38,7 +38,7 @@ export interface LineSerisDef {
   color: string;
   width?: number;
   lineType?: 'solid' | 'dashed';
-  data: [number, number][];
+  data: [number, number | null][];
   markArea?: LineSeriesOption['markArea'];
   z?: number;
   smooth?: boolean;
