@@ -18,6 +18,7 @@
     startDate,
     isWindChartLoading = false,
     isSkewTLoading = false,
+    skewTError = null,
     selectedDay = $bindable(),
     maxAltitude = $bindable(4000),
     model = $bindable<WeatherModel>('icon_d2'),
@@ -25,6 +26,7 @@
     chartView = $bindable<ChartView>('wind'),
     hour = $bindable(0),
     daylightOnly = $bindable(false),
+    onRetrySkewT,
     onClose,
   }: {
     windChartData: WindChartData;
@@ -32,6 +34,7 @@
     startDate: Date;
     isWindChartLoading?: boolean;
     isSkewTLoading?: boolean;
+    skewTError?: string | null;
     selectedDay: number;
     maxAltitude?: MaxAltitude;
     model?: WeatherModel;
@@ -39,6 +42,7 @@
     chartView?: ChartView;
     hour?: number;
     daylightOnly?: boolean;
+    onRetrySkewT?: () => void;
     onClose?: () => void;
   } = $props();
 
@@ -175,13 +179,29 @@
           {/if}
         {/snippet}
       </Footer>
-    {:else if skewTData && traceHours.length > 0}
-      <SkewTChart {skewTData} {hour} isLoading={isSkewTLoading} />
-      <Footer />
     {:else if isSkewTLoading}
       <div class="flex h-64 items-center justify-center">
         <div class="text-sm text-slate-500">Loading sounding data...</div>
       </div>
+    {:else if skewTError}
+      <div class="flex h-64 items-center justify-center px-4">
+        <div
+          class="flex max-w-md flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
+          role="alert"
+        >
+          <span>{skewTError}</span>
+          <button
+            type="button"
+            class="rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            onclick={onRetrySkewT}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    {:else if skewTData && traceHours.length > 0}
+      <SkewTChart {skewTData} {hour} isLoading={isSkewTLoading} />
+      <Footer />
     {:else}
       <div class="flex h-64 items-center justify-center">
         <div class="text-sm text-slate-500">No sounding data available</div>
