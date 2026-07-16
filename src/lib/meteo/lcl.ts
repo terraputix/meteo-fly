@@ -1,5 +1,10 @@
 import type { WindChartData } from '$lib/api/types';
 
+export interface LclPoint {
+  time: Date;
+  value: number | null;
+}
+
 /**
  * Calculates the Lifting Condensation Level (LCL) height using Espy's equation
  * @param temperature Temperature in degrees Celsius
@@ -7,15 +12,9 @@ import type { WindChartData } from '$lib/api/types';
  * @returns Height of LCL in meters
  */
 export function calculateLcl(temperature: number, dewpoint: number): number {
-  // Input validation
-  if (isNaN(temperature) || isNaN(dewpoint)) {
-    throw new Error('Temperature and dewpoint must be valid numbers');
-  }
+  if (!Number.isFinite(temperature) || !Number.isFinite(dewpoint)) return NaN;
 
   if (dewpoint > temperature) {
-    console.log('Dewpoint cannot be higher than temperature');
-    console.log('Dewpoint:', dewpoint);
-    console.log('Temperature:', temperature);
     return 0;
   }
 
@@ -25,8 +24,8 @@ export function calculateLcl(temperature: number, dewpoint: number): number {
   return Math.round(lclHeight);
 }
 
-export function calculateLclWeather(data: WindChartData): { time: Date; value: number }[] {
-  const lcls: { time: Date; value: number }[] = [];
+export function calculateLclWeather(data: WindChartData): LclPoint[] {
+  const lcls: LclPoint[] = [];
 
   const times = data.hourly.time;
   const temperatures = data.hourly.temperature_2m;
@@ -37,7 +36,8 @@ export function calculateLclWeather(data: WindChartData): { time: Date; value: n
     const dewpoint = dewpoints[i];
 
     const lcl = calculateLcl(temperature, dewpoint);
-    lcls.push({ time: times[i], value: lcl + data.elevation });
+    const value = lcl + data.elevation;
+    lcls.push({ time: times[i], value: Number.isFinite(value) ? value : null });
   }
 
   return lcls;

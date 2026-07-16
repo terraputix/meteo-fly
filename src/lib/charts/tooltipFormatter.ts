@@ -3,6 +3,7 @@ import type { WindFieldLevel } from '$lib/charts/wind';
 import { windColorScale } from '$lib/charts/scales';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { fmtTime } from '$lib/helpers';
+import type { LclPoint } from '$lib/meteo/lcl';
 
 // ─── Tooltip store ──────────────────────────────────────────────────────────
 // Pre-built look-up maps keyed by timestamp so the formatter is O(1).
@@ -23,7 +24,7 @@ export function buildTooltipStore(
   tempData: TemperatureChartData,
   rainData: RainCloudChartData,
   windData: WindFieldLevel[],
-  cloudBase: Array<{ time: Date; value: number }>
+  cloudBase: LclPoint[]
 ): TooltipStore {
   const tempByTime = new Map<number, { temp: number; dew: number; hum: number }>();
   tempData.temperatureData.forEach((d, i) => {
@@ -48,7 +49,9 @@ export function buildTooltipStore(
   });
 
   const lclByTime = new Map<number, number>();
-  cloudBase.forEach((d) => lclByTime.set(d.time.getTime(), d.value));
+  cloudBase.forEach((d) => {
+    if (d.value != null && Number.isFinite(d.value)) lclByTime.set(d.time.getTime(), d.value);
+  });
 
   const windByTimeHeight = new Map<string, { speed: number; direction: number }>();
   const windTimesSet = new Set<number>();

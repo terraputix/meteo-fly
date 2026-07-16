@@ -2,6 +2,7 @@ import type { WindChartData, WeatherModel } from '$lib/api/types';
 import type { MaxAltitude } from '$lib/meteo/types';
 import type { CloudCoverData } from '$lib/charts/clouds';
 import type { WindFieldLevel } from '$lib/charts/wind';
+import type { LclPoint } from '$lib/meteo/lcl';
 
 export interface ChartWorkerInput {
   windChartData: WindChartData;
@@ -43,7 +44,7 @@ export interface ChartWorkerSuccessOutput {
   data: {
     cloudData: CloudCoverData[];
     windData: WindFieldLevel[];
-    lcl: Array<{ time: Date; value: number }>;
+    lcl: LclPoint[];
     elevation: number;
     modelGridElevation: number | undefined;
     timezoneAbbr: string;

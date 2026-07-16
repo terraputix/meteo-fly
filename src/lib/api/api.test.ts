@@ -1,5 +1,7 @@
 import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest';
 import { fetchWeatherApi } from 'openmeteo';
+import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
+import type { WeatherApiResponse } from '@openmeteo/sdk/weather-api-response';
 import { getVariablesForModel } from './variables';
 import {
   createHourlyParams,
@@ -12,6 +14,55 @@ import {
 vi.mock('openmeteo', () => ({
   fetchWeatherApi: vi.fn(),
 }));
+
+function createHourlySection(
+  names: string[],
+  valuesByName: Record<string, number[] | null>,
+  length: number = 3,
+  interval: number = 3600
+): VariablesWithTime {
+  const variables = names.map((name) => {
+    const values = valuesByName[name];
+    if (values === undefined) return null;
+    return {
+      valuesArray: () => (values === null ? null : new Float32Array(values)),
+    };
+  });
+
+  return {
+    time: () => 1_752_643_200n,
+    timeEnd: () => 1_752_643_200n + BigInt(length * interval),
+    interval: () => interval,
+    variablesLength: () => variables.length,
+    variables: (position: number) => variables[position] ?? null,
+  } as unknown as VariablesWithTime;
+}
+
+function createDailySection(includeSunrise: boolean = true, includeSunset: boolean = true): VariablesWithTime {
+  const values = [includeSunrise ? 1_752_657_600n : null, includeSunset ? 1_752_715_200n : null];
+  return {
+    variables: (position: number) => ({
+      valuesInt64: () => values[position],
+    }),
+  } as unknown as VariablesWithTime;
+}
+
+function createResponse({
+  hourly = null,
+  daily = createDailySection(),
+}: {
+  hourly?: VariablesWithTime | null;
+  daily?: VariablesWithTime | null;
+}): WeatherApiResponse {
+  return {
+    timezoneAbbreviation: () => 'UTC',
+    latitude: () => 46.8,
+    longitude: () => 8.2,
+    elevation: () => 500,
+    hourly: () => hourly,
+    daily: () => daily,
+  } as unknown as WeatherApiResponse;
+}
 
 describe('API Configuration', () => {
   beforeEach(() => {
@@ -105,6 +156,118 @@ describe('API Configuration', () => {
 
       await expect(request(controller.signal)).rejects.toBe(abortError);
       expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[5]).toEqual({ signal: controller.signal });
+    });
+  });
+
+  describe('missing weather data', () => {
+    const location = { latitude: 46.8, longitude: 8.2 };
+    const start = new Date('2026-07-16T00:00:00Z');
+
+    it('pads a short flat variable and leaves missing pressure levels absent', async () => {
+      vi.mocked(fetchWeatherApi).mockImplementationOnce(async (_url, params) => {
+        const names = params.hourly as string[];
+        return [
+          createResponse({
+            hourly: createHourlySection(names, {
+              temperature_2m: [20],
+              wind_speed_1000hPa: [10],
+              wind_direction_1000hPa: null,
+            }),
+          }),
+        ];
+      });
+
+      const result = await fetchWindChartData(location, 'icon_d2', start);
+
+      expect(Array.from(result.hourly.temperature_2m)).toEqual([20, NaN, NaN]);
+      expect(Array.from(result.hourly.windSpeedProfile._1000hPa ?? [])).toEqual([10, NaN, NaN]);
+      expect(result.hourly.windDirectionProfile._1000hPa).toBeUndefined();
+      expect(Array.from(result.hourly.dewpoint_2m).every(Number.isNaN)).toBe(true);
+    });
+
+    it('allows Skew-T data with missing pressure-level and surface arrays', async () => {
+      vi.mocked(fetchWeatherApi).mockImplementationOnce(async (_url, params) => {
+        const names = params.hourly as string[];
+        return [
+          createResponse({
+            daily: null,
+            hourly: createHourlySection(names, {
+              temperature_1000hPa: [18, 19, 20],
+              dew_point_1000hPa: null,
+            }),
+          }),
+        ];
+      });
+
+      const result = await fetchSkewTData(location, 'icon_d2', start);
+
+      expect(result.hourly.temperatureProfile._1000hPa).toEqual(new Float32Array([18, 19, 20]));
+      expect(result.hourly.dewpointProfile._1000hPa).toBeUndefined();
+      expect(Array.from(result.hourly.temperature_2m).every(Number.isNaN)).toBe(true);
+    });
+
+    it.each([
+      ['no response', [], /no wind chart response/],
+      ['missing hourly data', [createResponse({ hourly: null })], /missing hourly data/],
+      [
+        'missing daily data',
+        [
+          createResponse({
+            hourly: createHourlySection(['temperature_2m'], { temperature_2m: [20, 21, 22] }),
+            daily: null,
+          }),
+        ],
+        /missing daily data/,
+      ],
+      [
+        'missing sunrise data',
+        [
+          createResponse({
+            hourly: createHourlySection(['temperature_2m'], { temperature_2m: [20, 21, 22] }),
+            daily: createDailySection(false, true),
+          }),
+        ],
+        /missing sunrise data/,
+      ],
+      [
+        'missing sunset data',
+        [
+          createResponse({
+            hourly: createHourlySection(['temperature_2m'], { temperature_2m: [20, 21, 22] }),
+            daily: createDailySection(true, false),
+          }),
+        ],
+        /missing sunset data/,
+      ],
+    ])('rejects a response with %s', async (_name, responses, error) => {
+      vi.mocked(fetchWeatherApi).mockResolvedValueOnce(responses);
+
+      await expect(fetchWindChartData(location, 'icon_d2', start)).rejects.toThrow(error);
+    });
+
+    it('accepts a structurally valid response with no usable values', async () => {
+      vi.mocked(fetchWeatherApi).mockImplementationOnce(async (_url, params) => {
+        const names = params.hourly as string[];
+        return [createResponse({ hourly: createHourlySection(names, {}) })];
+      });
+
+      const result = await fetchWindChartData(location, 'icon_d2', start);
+
+      expect(Array.from(result.hourly.temperature_2m).every(Number.isNaN)).toBe(true);
+      expect(result.hourly.windSpeedProfile).toEqual({});
+    });
+
+    it('rejects an invalid hourly timeline', async () => {
+      vi.mocked(fetchWeatherApi).mockImplementationOnce(async (_url, params) => {
+        const names = params.hourly as string[];
+        return [
+          createResponse({
+            hourly: createHourlySection(names, { temperature_2m: [20, 21, 22] }, 3, 0),
+          }),
+        ];
+      });
+
+      await expect(fetchWindChartData(location, 'icon_d2', start)).rejects.toThrow('invalid hourly timeline');
     });
   });
 });

@@ -147,8 +147,8 @@
   }
 
   function updatePosition(lat: number, lng: number) {
-    const nextLatitude = parseFloat(lat.toFixed(5));
-    const nextLongitude = parseFloat(lng.toFixed(5));
+    const nextLatitude = Math.round(lat * 100_000) / 100_000;
+    const nextLongitude = Math.round(lng * 100_000) / 100_000;
     latitude = nextLatitude;
     longitude = nextLongitude;
     onLocationChange?.({ latitude: nextLatitude, longitude: nextLongitude });

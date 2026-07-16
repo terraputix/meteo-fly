@@ -21,10 +21,12 @@ export function getCloudCoverData(
     const values = getAtLevel(windChartData.hourly.cloudCoverProfile, level.hPa);
     if (!values) return;
     times.forEach((time, i) => {
+      const value = values[i];
+      if (!Number.isFinite(value)) return;
       data.push({
         time,
         height: level.heightMeters,
-        value: parseFloat((values[i] ?? 0).toFixed(1)),
+        value,
       });
     });
   });
