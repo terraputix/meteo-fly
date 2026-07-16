@@ -32,6 +32,7 @@
   let panelTransitionTimer: ReturnType<typeof setTimeout> | null = null;
   let chartPane: PaneAPI | undefined;
   let renderChartPanel = $state(false);
+  let isChartPaneDragging = $state(false);
   const windRequest = createLatestRequest();
   const skewTRequest = createLatestRequest();
   const PANEL_TRANSITION_MS = 300;
@@ -232,6 +233,27 @@
     }
   }
 
+  function handleChartPaneDraggingChange(dragging: boolean) {
+    isChartPaneDragging = dragging;
+  }
+
+  function handleChartPaneCollapse() {
+    if (showChart) {
+      closeChartPanel();
+    }
+  }
+
+  function handleChartPaneExpand() {
+    if (!isChartPaneDragging || showChart) return;
+
+    clearPanelTransitionTimer();
+    renderChartPanel = true;
+    showChart = true;
+    if (!windChartData && !isWindChartLoading) {
+      scheduleWindChartUpdate(getWeatherRequestParameters());
+    }
+  }
+
   function handleChartPaneTransitionEnd(event: TransitionEvent) {
     if (event.propertyName === 'flex-grow' && !showChart) {
       finishClosingChartPanel();
@@ -243,7 +265,7 @@
   });
 
   $effect(() => {
-    if (showChart && chartPane) {
+    if (showChart && chartPane && !isChartPaneDragging) {
       chartPane.resize(chartPaneSizes[paneDirection]);
     }
   });
@@ -397,7 +419,7 @@
     <ResizablePane
       defaultSize={100}
       minSize={$isMobile ? 10 : 30}
-      class="transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none"
+      class={isChartPaneDragging ? '' : 'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'}
     >
       <div class="relative h-full w-full overflow-hidden bg-slate-200">
         <LocationMap
@@ -419,8 +441,9 @@
 
     <ResizableHandle
       withHandle
-      disabled={!showChart}
+      disabled={!showChart && !isChartPaneDragging}
       tabindex={showChart ? 0 : -1}
+      onDraggingChange={handleChartPaneDraggingChange}
       class="transition-opacity duration-200 motion-reduce:transition-none {showChart
         ? 'opacity-100'
         : 'pointer-events-none opacity-0'}"
@@ -431,9 +454,11 @@
       minSize={$isMobile ? 10 : 30}
       collapsedSize={0}
       collapsible
+      onCollapse={handleChartPaneCollapse}
+      onExpand={handleChartPaneExpand}
       onResize={handleChartPaneResize}
       ontransitionend={handleChartPaneTransitionEnd}
-      class="transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none"
+      class={isChartPaneDragging ? '' : 'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'}
     >
       {#if renderChartPanel}
         <div
