@@ -8,7 +8,16 @@ export interface WindData {
   direction: number;
 }
 
-export type MaxAltitude = 3000 | 4000 | 5000 | 6000 | 7000 | 8000;
+export const MAX_ALTITUDE_OPTIONS = [
+  { value: 3000, label: '3000m (700hPa)' },
+  { value: 4000, label: '4000m (625hPa)' },
+  { value: 5000, label: '5000m (550hPa)' },
+  { value: 6000, label: '6000m (475hPa)' },
+  { value: 7000, label: '7000m (400hPa)' },
+  { value: 8000, label: '8000m (350hPa)' },
+] as const;
+
+export type MaxAltitude = (typeof MAX_ALTITUDE_OPTIONS)[number]['value'];
 
 export interface SkewTLevelData {
   pressure: number;

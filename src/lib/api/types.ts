@@ -16,7 +16,12 @@ export type WeatherModel =
   | 'ecmwf_ifs025'
   | 'ecmwf_aifs025_single';
 
-export type CellSelection = 'land' | 'nearest';
+export const CELL_SELECTION_OPTIONS = [
+  { value: 'land', label: 'Terrain-aware' },
+  { value: 'nearest', label: 'Nearest' },
+] as const;
+
+export type CellSelection = (typeof CELL_SELECTION_OPTIONS)[number]['value'];
 
 export type VerticalProfileKey = `_${number}hPa`;
 export type VerticalProfile = Partial<Record<VerticalProfileKey, Float32Array>>;

@@ -40,8 +40,6 @@ export function getChartHeight(windHeight: number = 440) {
   return WIND_TOP + windHeight + 42;
 }
 
-export const TOTAL_HEIGHT = getChartHeight(440);
-
 // ─── Pre-computed pressure-level band boundaries ─────────────────────────────
 // For each pressure level at index i, the band it paints spans from the
 // midpoint between level[i-1] and level[i] (or the chart floor for the first)

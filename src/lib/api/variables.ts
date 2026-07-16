@@ -36,9 +36,5 @@ export function getVariablesForModel(
     makeProfileVar('windDirectionProfile', 'wind_direction', model, maxAltitude),
   ];
 
-  const modelSpecificVars: (ProfileVariables | FlatVariable)[] = (() => {
-    return [];
-  })();
-
-  return [...flatVars, ...profileVars, ...modelSpecificVars];
+  return [...flatVars, ...profileVars];
 }
