@@ -96,9 +96,10 @@ function buildInterpolatedLevels(nativeLevels: PressureLevel[]): TaggedPressureL
  */
 export function getAllTaggedLevelsForModel(model: WeatherModel, maxAltitude: number): TaggedPressureLevel[] {
   // Display set — strictly within bounds, tagged as model source
-  const nativeForDisplay = getNativeLevelsForModel(model, maxAltitude).map(
-    (l): TaggedPressureLevel => ({ ...l, source: 'model' })
-  );
+  const nativeForDisplay = getNativeLevelsForModel(model, maxAltitude).map((l): TaggedPressureLevel => ({
+    ...l,
+    source: 'model',
+  }));
   // Bracket set — includes the one level above maxAltitude so that
   // buildInterpolatedLevels can fill the gap right up to the ceiling
   const nativeForBracket = getNativeLevelsForFetch(model, maxAltitude);
