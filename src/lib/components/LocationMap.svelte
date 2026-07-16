@@ -146,14 +146,32 @@
     }
   }
 
-  function updateGridCellConnector() {
+  function updateGridCellDistanceVisibility() {
+    if (!map || !selectedGridCell || !distanceMarker) {
+      return;
+    }
+
+    const selectedLocationPixel = map.project([longitude, latitude]);
+    const gridCellPixel = map.project([selectedGridCell.longitude, selectedGridCell.latitude]);
+    const lineLengthPixels = Math.hypot(
+      gridCellPixel.x - selectedLocationPixel.x,
+      gridCellPixel.y - selectedLocationPixel.y
+    );
+    const display = lineLengthPixels < 72 ? 'none' : '';
+    const element = distanceMarker.getElement();
+
+    if (element.style.display !== display) {
+      element.style.display = display;
+    }
+  }
+
+  function updateGridCellConnectorGeometry() {
     if (!map || !map.getSource(gridCellConnectorSourceId)) {
       return;
     }
 
-    const source = map.getSource(gridCellConnectorSourceId) as maplibregl.GeoJSONSource;
-
     if (!selectedGridCell) {
+      const source = map.getSource(gridCellConnectorSourceId) as maplibregl.GeoJSONSource;
       source.setData({
         type: 'FeatureCollection',
         features: [],
@@ -165,13 +183,8 @@
 
     const gridCellLongitude = selectedGridCell.longitude;
     const gridCellLatitude = selectedGridCell.latitude;
-    const selectedLocationPixel = map.project([longitude, latitude]);
-    const gridCellPixel = map.project([gridCellLongitude, gridCellLatitude]);
-    const lineLengthPixels = Math.hypot(
-      gridCellPixel.x - selectedLocationPixel.x,
-      gridCellPixel.y - selectedLocationPixel.y
-    );
 
+    const source = map.getSource(gridCellConnectorSourceId) as maplibregl.GeoJSONSource;
     source.setData({
       type: 'FeatureCollection',
       features: [
@@ -189,12 +202,6 @@
       ],
     });
 
-    if (lineLengthPixels < 72) {
-      distanceMarker?.remove();
-      distanceMarker = null;
-      return;
-    }
-
     const midpoint: LngLatLike = [(longitude + gridCellLongitude) / 2, (latitude + gridCellLatitude) / 2];
     const distanceLabel = formatDistance(
       haversineDistance(latitude, longitude, selectedGridCell.latitude, selectedGridCell.longitude)
@@ -209,6 +216,7 @@
     }
 
     distanceMarker.getElement().textContent = distanceLabel;
+    updateGridCellDistanceVisibility();
   }
 
   function updateSelectedGridCellMarker() {
@@ -219,7 +227,6 @@
     if (!selectedGridCell) {
       selectedGridCellMarker?.remove();
       selectedGridCellMarker = null;
-      updateGridCellConnector();
       return;
     }
 
@@ -246,8 +253,6 @@
       const badgeEl = selectedGridCellMarker.getElement().querySelector('.selected-grid-cell-marker__badge');
       if (badgeEl) badgeEl.textContent = badgeText;
     }
-
-    updateGridCellConnector();
   }
 
   function setTerrainVisibility(enabled: boolean) {
@@ -288,10 +293,14 @@
 
   $effect(() => {
     void selectedGridCell;
-    void latitude;
-    void longitude;
     void modelGridElevation;
     if (map) updateSelectedGridCellMarker();
+  });
+  $effect(() => {
+    void selectedGridCell;
+    void latitude;
+    void longitude;
+    if (map) updateGridCellConnectorGeometry();
   });
   $effect(() => {
     void gridCellElevation;
@@ -299,8 +308,8 @@
     updateElevationBadge();
   });
 
-  function handleMapViewChange() {
-    updateGridCellConnector();
+  function handleMapMove() {
+    updateGridCellDistanceVisibility();
   }
 
   onMount(async () => {
@@ -365,8 +374,7 @@
     });
     mapContainer.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('click', closeContextMenu);
-    map.on('zoom', handleMapViewChange);
-    map.on('move', handleMapViewChange);
+    map.on('move', handleMapMove);
 
     unsubscribe = locationStore.subscribe((state: LocationState) => {
       locationControlManager.updateState(state);
@@ -439,6 +447,7 @@
       setTerrainVisibility(isTerrainEnabled);
       terrainControl.setEnabled(isTerrainEnabled);
       updateSelectedGridCellMarker();
+      updateGridCellConnectorGeometry();
     });
   });
 
@@ -455,8 +464,7 @@
       distanceMarker.remove();
     }
     if (map) {
-      map.off('zoom', handleMapViewChange);
-      map.off('move', handleMapViewChange);
+      map.off('move', handleMapMove);
       map.remove();
     }
   });
