@@ -1,8 +1,11 @@
 /// <reference lib="webworker" />
-import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
-import { registerRoute } from 'workbox-routing';
+import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
+import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { clientsClaim } from 'workbox-core';
-import { CacheExpiration } from 'workbox-expiration';
+import { CacheExpiration, ExpirationPlugin } from 'workbox-expiration';
+import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { classifyMapCacheResource, MAP_CACHE_NAMES, MAP_CACHE_POLICIES } from '$lib/services/mapCache';
 import {
   cleanupLegacyWeatherCaches,
   handleWeatherRequest,
@@ -18,8 +21,49 @@ declare const self: ServiceWorkerGlobalScope;
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
-self.skipWaiting();
 clientsClaim();
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    void self.skipWaiting();
+  }
+});
+
+registerRoute(new NavigationRoute(createHandlerBoundToURL('/')));
+
+const cacheableMapResponse = () => new CacheableResponsePlugin({ statuses: [0, 200] });
+const expireMapCache = (policy: { maxEntries: number; maxAgeSeconds: number }) =>
+  new ExpirationPlugin({
+    ...policy,
+    purgeOnQuotaError: true,
+  });
+
+const mapStrategies = {
+  openFreeMapMetadata: new StaleWhileRevalidate({
+    cacheName: MAP_CACHE_NAMES.openFreeMapMetadata,
+    plugins: [cacheableMapResponse(), expireMapCache(MAP_CACHE_POLICIES.openFreeMapMetadata)],
+  }),
+  openFreeMapTiles: new CacheFirst({
+    cacheName: MAP_CACHE_NAMES.openFreeMapTiles,
+    plugins: [cacheableMapResponse(), expireMapCache(MAP_CACHE_POLICIES.openFreeMapTiles)],
+  }),
+  mapterhornMetadata: new StaleWhileRevalidate({
+    cacheName: MAP_CACHE_NAMES.mapterhornMetadata,
+    plugins: [cacheableMapResponse(), expireMapCache(MAP_CACHE_POLICIES.mapterhornMetadata)],
+  }),
+  mapterhornTiles: new CacheFirst({
+    cacheName: MAP_CACHE_NAMES.mapterhornTiles,
+    plugins: [cacheableMapResponse(), expireMapCache(MAP_CACHE_POLICIES.mapterhornTiles)],
+  }),
+};
+
+for (const resource of Object.keys(mapStrategies) as Array<keyof typeof mapStrategies>) {
+  registerRoute(
+    ({ request, url }) => request.method === 'GET' && classifyMapCacheResource(url) === resource,
+    mapStrategies[resource],
+    'GET'
+  );
+}
 
 const expiration = new CacheExpiration(WEATHER_CACHE_NAME, {
   maxAgeSeconds: MAX_CACHE_AGE_SECONDS,
