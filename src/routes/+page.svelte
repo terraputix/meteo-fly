@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { saveLastVisitedURL } from '$lib/services/storage';
+  import { buildVisitedURL, saveLastVisitedURL } from '$lib/services/storage';
   import { page } from '$app/stores';
   import { afterNavigate, replaceState } from '$app/navigation';
   import { isMobile } from '$lib/stores/media';
@@ -84,12 +84,21 @@
     if (daylightOnly) params.set('daylight', '1');
     return `?${params.toString()}`;
   });
+
+  function saveCurrentURL() {
+    saveLastVisitedURL(buildVisitedURL(window.location));
+  }
+
   function syncURL() {
     const search = urlSearch;
     const currentSearch = window.location.search;
-    if (currentSearch === search) return;
-    const newURL = `${window.location.pathname}${search}`;
+    const newURL = buildVisitedURL({
+      pathname: window.location.pathname,
+      search,
+      hash: window.location.hash,
+    });
     saveLastVisitedURL(newURL);
+    if (currentSearch === search) return;
     // eslint-disable-next-line svelte/no-navigation-without-resolve
     replaceState(newURL, window.history.state);
   }
@@ -435,6 +444,7 @@
           modelGridElevation={windChartData?.modelGridElevation}
           onToggleChart={toggleChartPanel}
           onLocationChange={updateLocation}
+          onMapViewChange={saveCurrentURL}
         />
       </div>
     </ResizablePane>

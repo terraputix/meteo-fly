@@ -42,6 +42,7 @@
     daylightOnly = $bindable(false),
     onLocationChange = undefined as ((location: Location) => void) | undefined,
     onToggleChart = undefined as (() => void) | undefined,
+    onMapViewChange = undefined as (() => void) | undefined,
   }: {
     latitude?: number;
     longitude?: number;
@@ -55,6 +56,7 @@
     daylightOnly?: boolean;
     onLocationChange?: ((location: Location) => void) | undefined;
     onToggleChart?: (() => void) | undefined;
+    onMapViewChange?: (() => void) | undefined;
   } = $props();
 
   const terrainSourceId = 'terrainSource';
@@ -81,6 +83,7 @@
   let activeTouch: { x: number; y: number } | undefined;
   let lastTouchEndTimestamp: number | undefined;
   let ignoreMapClicksUntil = 0;
+  let mapViewChangeTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Hike & fly state
   let hikeFlyActive = $state(false);
@@ -332,6 +335,14 @@
     updateGridCellDistanceVisibility();
   }
 
+  function handleMapMoveEnd() {
+    clearTimeout(mapViewChangeTimer);
+    mapViewChangeTimer = setTimeout(() => {
+      mapViewChangeTimer = undefined;
+      onMapViewChange?.();
+    }, 350);
+  }
+
   function zoomAt(lngLat: LngLatLike, direction = 1) {
     const zoomSnap = map.getZoomSnap();
     const nextZoom = map.getZoom() + direction;
@@ -431,6 +442,7 @@
       style: 'https://tiles.openfreemap.org/styles/positron',
       center: [longitude, latitude],
       zoom: 8,
+      hash: true,
       doubleClickZoom: false,
     });
 
@@ -489,6 +501,7 @@
     mapContainer.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('click', closeContextMenu);
     map.on('move', handleMapMove);
+    map.on('moveend', handleMapMoveEnd);
 
     unsubscribe = locationStore.subscribe((state: LocationState) => {
       locationControlManager.updateState(state);
@@ -567,6 +580,7 @@
 
   onDestroy(() => {
     deferredLocationSelection.destroy();
+    clearTimeout(mapViewChangeTimer);
     if (unsubscribe) {
       unsubscribe();
     }
@@ -585,6 +599,7 @@
       map.off('touchend', handleMapTouchEnd);
       map.off('touchcancel', handleMapTouchCancel);
       map.off('move', handleMapMove);
+      map.off('moveend', handleMapMoveEnd);
       map.remove();
     }
   });
