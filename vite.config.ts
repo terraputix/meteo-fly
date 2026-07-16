@@ -11,7 +11,7 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'service-worker.ts',
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifest: {
         name: 'Meteo-Fly',
         short_name: 'Meteo-Fly',
@@ -51,6 +51,30 @@ export default defineConfig({
       },
     }),
   ],
+  environments: {
+    client: {
+      build: {
+        rolldownOptions: {
+          output: {
+            codeSplitting: {
+              groups: [
+                {
+                  name: 'maplibre-vendor',
+                  test: /node_modules[\\/]maplibre-gl[\\/]/,
+                  priority: 20,
+                },
+                {
+                  name: 'echarts-vendor',
+                  test: /node_modules[\\/](?:echarts|zrender)[\\/]/,
+                  priority: 20,
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  },
   test: {
     include: ['src/**/*.{test,spec}.{js,ts}'],
   },
