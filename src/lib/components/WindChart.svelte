@@ -6,6 +6,7 @@
   import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
   import type { WeatherModel } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
+  import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
 
   let {
     windChartData = null,
@@ -201,10 +202,7 @@
 </script>
 
 <div class="chart-container" style="min-height: {totalHeight}px;">
-  <div class="loading-state" class:loading-state--visible={isBusy} aria-hidden={!isBusy}>
-    <div class="loading-spinner"></div>
-    <p>Loading weather data…</p>
-  </div>
+  <ChartLoadingOverlay visible={isBusy} message="Loading weather data…" />
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
   <div
@@ -230,43 +228,6 @@
   .chart-content {
     width: 100%;
     transition: opacity 0.3s ease;
-  }
-
-  .loading-state {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    z-index: 10;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-
-  .loading-state--visible {
-    opacity: 1;
-  }
-
-  .loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #4f46e5;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    0% {
-      transform: rotate(0deg);
-    }
-    100% {
-      transform: rotate(360deg);
-    }
   }
 
   @media (max-width: 768px) {

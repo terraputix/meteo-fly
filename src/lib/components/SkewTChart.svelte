@@ -3,6 +3,7 @@
   import { renderSkewT, renderHoverOverlay, type HitTestResult, type PlotLayout } from '$lib/charts/skewTRenderer';
   import { CHART_COLORS } from '$lib/charts/chartColors';
   import type { SkewTData } from '$lib/meteo/types';
+  import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
 
   export let skewTData: SkewTData | null = null;
   export let hour = 0; // index into traces array
@@ -109,10 +110,7 @@
 </script>
 
 <div bind:this={container} class="skewt-chart-container" style="min-height: {totalHeight}px;">
-  <div class="loading-state" class:loading-state--visible={isLoading} aria-hidden={!isLoading}>
-    <div class="loading-spinner"></div>
-    <p>Loading sounding data…</p>
-  </div>
+  <ChartLoadingOverlay visible={isLoading} message="Loading sounding data…" />
 
   <div class="chart-wrapper" style="position: relative;">
     <canvas bind:this={canvas} on:mousemove={handleMouseMove} on:mouseleave={handleMouseLeave} class="chart-canvas"
@@ -160,43 +158,6 @@
     top: 0;
     left: 0;
     pointer-events: none;
-  }
-
-  .loading-state {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    z-index: 10;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-
-  .loading-state--visible {
-    opacity: 1;
-  }
-
-  .loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #4f46e5;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    0% {
-      transform: rotate(0deg);
-    }
-    100% {
-      transform: rotate(360deg);
-    }
   }
 
   .skewt-legend {
