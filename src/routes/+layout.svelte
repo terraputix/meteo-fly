@@ -11,8 +11,10 @@
   let offlineReady = $state(false);
   let isOffline = $state(false);
   let isUpdating = $state(false);
+  let updateError = $state<string | null>(null);
   let updateServiceWorker: (() => Promise<void>) | undefined;
   let offlineReadyTimer: ReturnType<typeof setTimeout> | undefined;
+  const UPDATE_TIMEOUT_MS = 15_000;
 
   function showOfflineReady() {
     offlineReady = true;
@@ -22,13 +24,41 @@
     }, 6000);
   }
 
+  function activateWaitingServiceWorker() {
+    return new Promise<void>((resolve, reject) => {
+      const handleControllerChange = () => {
+        cleanup();
+        resolve();
+      };
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('Timed out waiting for the updated service worker to take control'));
+      }, UPDATE_TIMEOUT_MS);
+      const cleanup = () => {
+        clearTimeout(timeout);
+        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      };
+
+      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+      void updateServiceWorker!().catch((error) => {
+        cleanup();
+        reject(error);
+      });
+    });
+  }
+
   async function applyUpdate() {
     if (!updateServiceWorker || isUpdating) return;
     isUpdating = true;
+    updateError = null;
+
     try {
-      await updateServiceWorker();
+      await activateWaitingServiceWorker();
+      needRefresh = false;
+      window.location.reload();
     } catch (error) {
       console.error('Service worker update error', error);
+      updateError = 'The update could not be applied. Please try again.';
       isUpdating = false;
     }
   }
@@ -51,6 +81,7 @@
           immediate: false,
           onNeedRefresh() {
             needRefresh = true;
+            updateError = null;
           },
           onOfflineReady() {
             showOfflineReady();
@@ -99,7 +130,9 @@
         class="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 text-sm text-slate-700 shadow-xl backdrop-blur-md"
         role="status"
       >
-        <span class="min-w-0 flex-1">A new version is ready.</span>
+        <span class="min-w-0 flex-1" class:text-red-700={updateError}>
+          {updateError ?? 'A new version is ready.'}
+        </span>
         <button
           type="button"
           class="rounded-lg px-3 py-1.5 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
