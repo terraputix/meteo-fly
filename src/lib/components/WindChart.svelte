@@ -1,12 +1,17 @@
 <script lang="ts">
-  import * as echarts from 'echarts';
+  import { init, use, type EChartsType } from 'echarts/core';
+  import { CustomChart, LineChart } from 'echarts/charts';
+  import { GridComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
+  import { CanvasRenderer } from 'echarts/renderers';
   import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
   import { buildWindChartOption, getChartHeight } from '$lib/charts/buildWindChartOption';
   import type { WindChartData } from '$lib/api/types';
-  import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
+  import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
   import type { WeatherModel } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
+
+  use([LineChart, CustomChart, GridComponent, TooltipComponent, MarkAreaComponent, MarkLineComponent, CanvasRenderer]);
 
   let {
     windChartData = null,
@@ -29,25 +34,6 @@
   let windHeight = $derived(Math.ceil(maxAltitude / 10));
   let totalHeight = $derived(getChartHeight(windHeight));
 
-  // ─── Worker helper ────────────────────────────────────────────────────────
-
-  function runChartWorker(input: ChartWorkerInput, signal?: { cancelled: boolean }): Promise<ChartWorkerOutput> {
-    return new Promise((resolve, reject) => {
-      const worker = new Worker(new URL('$lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
-      worker.onmessage = (e: MessageEvent<ChartWorkerOutput>) => {
-        worker.terminate();
-        if (signal?.cancelled) return;
-        resolve(e.data);
-      };
-      worker.onerror = (err) => {
-        worker.terminate();
-        if (signal?.cancelled) return;
-        reject(err);
-      };
-      worker.postMessage(input);
-    });
-  }
-
   // ─── Svelte action ────────────────────────────────────────────────────────
 
   type RenderChartParams = {
@@ -59,33 +45,75 @@
   };
 
   function renderChart(node: HTMLElement, params: RenderChartParams) {
-    let chart: echarts.ECharts | null = null;
-    let resizeObserver: ResizeObserver | null = null;
-    let cancellation: { cancelled: boolean } | null = null;
+    let chart: EChartsType | null = init(node);
+    let worker: Worker | null = null;
+    let workerBusy = false;
+    let requestId = 0;
+    let destroyed = false;
+    let pendingRender: { requestId: number; params: RenderChartParams } | null = null;
     let prevData = params.data;
     let prevDaylightOnly = params.daylightOnly;
+    const activeState: ActiveState = createActiveState();
 
-    function destroyChart() {
-      resizeObserver?.disconnect();
-      resizeObserver = null;
-      chart?.dispose();
-      chart = null;
-      node.innerHTML = '';
+    function handleAxisPointer(event: unknown) {
+      const e = event as { axesInfo?: Array<{ axisDim: string; axisIndex: number; value: number }> };
+      const axes = e?.axesInfo;
+      if (!axes?.length) {
+        activeState.gridIndex = -1;
+        activeState.hoveredWindY = null;
+        return;
+      }
+      const yInfo = axes.find((axis) => axis.axisDim === 'y');
+      if (!yInfo) {
+        activeState.gridIndex = -1;
+        activeState.hoveredWindY = null;
+        return;
+      }
+      if (yInfo.axisIndex <= 1) {
+        activeState.gridIndex = 0;
+        activeState.hoveredWindY = null;
+      } else if (yInfo.axisIndex === 2) {
+        activeState.gridIndex = 1;
+        activeState.hoveredWindY = null;
+      } else {
+        activeState.gridIndex = 2;
+        activeState.hoveredWindY = yInfo.value;
+      }
     }
 
-    async function draw(currentData: WindChartData) {
-      isRendering = true;
-      destroyChart();
+    chart.on('updateaxispointer', handleAxisPointer);
 
-      // Cancel any previous in-flight worker
-      if (cancellation) cancellation.cancelled = true;
-      const signal = { cancelled: false };
-      cancellation = signal;
+    const resizeObserver = new ResizeObserver(() => chart?.resize());
+    resizeObserver.observe(node);
+
+    function terminateWorker(target: Worker) {
+      target.onmessage = null;
+      target.onerror = null;
+      target.onmessageerror = null;
+      target.terminate();
+      if (worker === target) {
+        worker = null;
+        workerBusy = false;
+      }
+    }
+
+    function terminateCurrentWorker() {
+      if (!worker) return;
+      terminateWorker(worker);
+    }
+
+    function handleWorkerMessage(source: Worker, event: MessageEvent<ChartWorkerOutput>) {
+      if (worker !== source) return;
+      workerBusy = false;
+
+      const response = event.data;
+      const render = pendingRender;
+      if (destroyed || response.requestId !== requestId || render?.requestId !== response.requestId || !chart) {
+        return;
+      }
+      pendingRender = null;
 
       try {
-        const response = await runChartWorker({ windChartData: currentData, maxAltitude, model, daylightOnly }, signal);
-        if (signal.cancelled) return;
-
         if (!response.success) {
           console.error('Chart worker error:', response.error);
           return;
@@ -103,15 +131,10 @@
           xDomain,
         } = response.data;
 
-        const canvas = document.createElement('div');
-        canvas.style.cssText = `width:100%;height:${totalHeight}px;`;
-        node.appendChild(canvas);
-
-        chart = echarts.init(canvas);
+        activeState.gridIndex = -1;
+        activeState.hoveredWindY = null;
 
         const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
-        const activeState: ActiveState = createActiveState();
-
         chart.setOption(
           buildWindChartOption(
             temperatureChartData,
@@ -124,78 +147,95 @@
             xDomain,
             store,
             activeState,
-            windHeight,
-            maxAltitude,
-            model,
+            render.params.windHeight,
+            render.params.maxAltitude,
+            render.params.model,
             modelGridElevation
-          )
+          ),
+          { notMerge: true }
         );
-
-        // Track which grid the cursor is in and the hovered y-value for the
-        // wind grid.  ECharts fires `updateaxispointer` on every mouse-move
-        // with an `axesInfo` array describing each active axis.
-        //
-        // Y-axis → grid mapping:
-        //   axisIndex 0 or 1  →  grid 0 (temperature)
-        //   axisIndex 2       →  grid 1 (rain / cloud)
-        //   axisIndex 3 or 4  →  grid 2 (wind field)
-        chart.on('updateaxispointer', (event: unknown) => {
-          const e = event as { axesInfo?: Array<{ axisDim: string; axisIndex: number; value: number }> };
-          const axes = e?.axesInfo;
-          if (!axes?.length) {
-            activeState.gridIndex = -1;
-            activeState.hoveredWindY = null;
-            return;
-          }
-          const yInfo = axes.find((a) => a.axisDim === 'y');
-          if (!yInfo) {
-            activeState.gridIndex = -1;
-            activeState.hoveredWindY = null;
-            return;
-          }
-          if (yInfo.axisIndex <= 1) {
-            activeState.gridIndex = 0;
-            activeState.hoveredWindY = null;
-          } else if (yInfo.axisIndex === 2) {
-            activeState.gridIndex = 1;
-            activeState.hoveredWindY = null;
-          } else {
-            // axisIndex 3 (wind height left) or 4 (pressure right) → grid 2
-            activeState.gridIndex = 2;
-            activeState.hoveredWindY = yInfo.value;
-          }
-        });
-
-        resizeObserver = new ResizeObserver(() => chart?.resize());
-        resizeObserver.observe(node);
       } catch (err) {
-        if (!signal.cancelled) console.error('Error creating EChart:', err);
+        console.error('Error updating EChart:', err);
       } finally {
-        if (!signal.cancelled) isRendering = false;
+        if (!destroyed && response.requestId === requestId) isRendering = false;
       }
     }
 
-    if (params.data) draw(params.data);
+    function handleWorkerError(source: Worker, error: unknown) {
+      if (worker !== source) return;
+      terminateWorker(source);
+      pendingRender = null;
+      if (!destroyed) {
+        console.error('Chart worker error:', error);
+        isRendering = false;
+      }
+    }
+
+    function createWorker() {
+      const nextWorker = new Worker(new URL('$lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
+      nextWorker.onmessage = (event: MessageEvent<ChartWorkerOutput>) => handleWorkerMessage(nextWorker, event);
+      nextWorker.onerror = (error) => handleWorkerError(nextWorker, error);
+      nextWorker.onmessageerror = (error) => handleWorkerError(nextWorker, error);
+      return nextWorker;
+    }
+
+    function draw(currentParams: RenderChartParams) {
+      if (!currentParams.data) return;
+
+      const currentRequestId = ++requestId;
+      if (workerBusy) terminateCurrentWorker();
+      worker ??= createWorker();
+      workerBusy = true;
+      pendingRender = { requestId: currentRequestId, params: currentParams };
+      isRendering = true;
+
+      const request: ChartWorkerRequest = {
+        requestId: currentRequestId,
+        input: {
+          windChartData: currentParams.data,
+          maxAltitude: currentParams.maxAltitude,
+          model: currentParams.model,
+          daylightOnly: currentParams.daylightOnly,
+        },
+      };
+
+      try {
+        worker.postMessage(request);
+      } catch (err) {
+        handleWorkerError(worker, err);
+      }
+    }
+
+    if (params.data) draw({ ...params });
 
     return {
       update(newParams: RenderChartParams) {
-        model = newParams.model;
-        maxAltitude = newParams.maxAltitude;
         if (newParams.data !== prevData || newParams.daylightOnly !== prevDaylightOnly) {
           prevData = newParams.data;
           prevDaylightOnly = newParams.daylightOnly;
           if (newParams.data) {
-            draw(newParams.data);
+            draw({ ...newParams });
           } else {
-            if (cancellation) cancellation.cancelled = true;
-            destroyChart();
+            requestId++;
+            terminateCurrentWorker();
+            pendingRender = null;
+            activeState.gridIndex = -1;
+            activeState.hoveredWindY = null;
+            chart?.clear();
             isRendering = false;
           }
         }
       },
       destroy() {
-        if (cancellation) cancellation.cancelled = true;
-        destroyChart();
+        destroyed = true;
+        requestId++;
+        terminateCurrentWorker();
+        pendingRender = null;
+        resizeObserver.disconnect();
+        chart?.off('updateaxispointer', handleAxisPointer);
+        chart?.dispose();
+        chart = null;
+        isRendering = false;
       },
     };
   }
