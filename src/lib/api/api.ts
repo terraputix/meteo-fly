@@ -100,7 +100,8 @@ export function createQueryParams(
 export async function fetchModelGridElevation(
   location: Location,
   model: WeatherModel,
-  cellSelection: CellSelection
+  cellSelection: CellSelection,
+  signal?: AbortSignal
 ): Promise<number> {
   const params = {
     latitude: location.latitude,
@@ -112,7 +113,14 @@ export async function fetchModelGridElevation(
     elevation: 'nan',
   };
 
-  const responses = await fetchWeatherApi(url, params);
+  const responses = await fetchWeatherApi(
+    url,
+    params,
+    undefined,
+    undefined,
+    undefined,
+    signal ? { signal } : undefined
+  );
   const response = responses[0];
   return response.elevation();
 }
@@ -123,13 +131,21 @@ export async function fetchWindChartData(
   start: Date,
   numberOfDays: number = 1,
   maxAltitude: MaxAltitude = 4000,
-  cellSelection: CellSelection = 'nearest'
+  cellSelection: CellSelection = 'nearest',
+  signal?: AbortSignal
 ): Promise<WindChartData> {
   const modelVariables = getVariablesForModel(model, maxAltitude);
   const hourlyParams = createHourlyParams(modelVariables);
   const params = createQueryParams(location, hourlyParams, model, cellSelection, start, numberOfDays);
 
-  const responses = await fetchWeatherApi(url, params);
+  const responses = await fetchWeatherApi(
+    url,
+    params,
+    undefined,
+    undefined,
+    undefined,
+    signal ? { signal } : undefined
+  );
   const response = responses[0];
 
   const timezone = response.timezoneAbbreviation() ?? 'UTC';
@@ -184,7 +200,8 @@ export async function fetchSkewTData(
   model: WeatherModel = 'icon_d2',
   start: Date,
   maxAltitude: MaxAltitude = 4000,
-  cellSelection: CellSelection = 'nearest'
+  cellSelection: CellSelection = 'nearest',
+  signal?: AbortSignal
 ): Promise<SkewTWeatherData> {
   const variables = getSkewTVariablesForModel(model, maxAltitude);
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -200,7 +217,14 @@ export async function fetchSkewTData(
     timezone: localTimezone,
   };
 
-  const responses = await fetchWeatherApi(url, params);
+  const responses = await fetchWeatherApi(
+    url,
+    params,
+    undefined,
+    undefined,
+    undefined,
+    signal ? { signal } : undefined
+  );
   const response = responses[0];
 
   const timezone = response.timezoneAbbreviation() ?? 'UTC';
