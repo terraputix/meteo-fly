@@ -73,18 +73,19 @@ export function getNativeLevelsForFetch(model: WeatherModel, maxAltitude: number
 }
 
 function buildInterpolatedLevels(nativeLevels: PressureLevel[]): TaggedPressureLevel[] {
-  return ALL_PRESSURE_LEVELS.flatMap((levelHPa): TaggedPressureLevel[] => {
-    const lower = [...nativeLevels].reverse().find((l) => l.hPa <= levelHPa);
-    const upper = nativeLevels.find((l) => l.hPa > levelHPa);
-    if (!lower || !upper) return [];
-    return [
-      {
-        hPa: levelHPa,
-        heightMeters: hPaToMeters(levelHPa),
-        source: 'interpolated',
-      },
-    ];
-  });
+  if (nativeLevels.length < 2) return [];
+
+  const nativeHPa = new Set(nativeLevels.map((level) => level.hPa));
+  const minHPa = Math.min(...nativeHPa);
+  const maxHPa = Math.max(...nativeHPa);
+
+  return ALL_PRESSURE_LEVELS.filter(
+    (levelHPa) => !nativeHPa.has(levelHPa) && levelHPa > minHPa && levelHPa < maxHPa
+  ).map((levelHPa) => ({
+    hPa: levelHPa,
+    heightMeters: hPaToMeters(levelHPa),
+    source: 'interpolated',
+  }));
 }
 
 // ─── Combined level set ───────────────────────────────────────────────────────

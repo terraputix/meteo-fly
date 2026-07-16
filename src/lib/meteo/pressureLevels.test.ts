@@ -1,0 +1,32 @@
+import { describe, expect, it } from 'vitest';
+import { MODEL_OPTIONS } from '$lib/api/models';
+import { MAX_ALTITUDE_OPTIONS } from './types';
+import { getAllTaggedLevelsForModel, getNativeLevelsForModel } from './pressureLevels';
+
+const cases = MODEL_OPTIONS.flatMap(({ id: model }) =>
+  MAX_ALTITUDE_OPTIONS.map(({ value: maxAltitude }) => ({ model, maxAltitude }))
+);
+
+describe.each(cases)('pressure levels for $model at $maxAltitude m', ({ model, maxAltitude }) => {
+  it('returns one sorted entry per pressure with native levels preferred', () => {
+    const levels = getAllTaggedLevelsForModel(model, maxAltitude);
+    const nativeLevels = getNativeLevelsForModel(model, maxAltitude);
+
+    expect(new Set(levels.map((level) => level.hPa)).size).toBe(levels.length);
+    expect(levels.map((level) => level.heightMeters)).toEqual(
+      [...levels].sort((a, b) => a.heightMeters - b.heightMeters).map((level) => level.heightMeters)
+    );
+
+    for (const nativeLevel of nativeLevels) {
+      expect(levels.find((level) => level.hPa === nativeLevel.hPa)?.source).toBe('model');
+    }
+  });
+});
+
+describe('GFS pressure levels', () => {
+  it.each(MAX_ALTITUDE_OPTIONS)('uses only native entries at $value m', ({ value: maxAltitude }) => {
+    const levels = getAllTaggedLevelsForModel('gfs_seamless', maxAltitude);
+
+    expect(levels.every((level) => level.source === 'model')).toBe(true);
+  });
+});
