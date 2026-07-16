@@ -1,8 +1,23 @@
 import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest';
+import { fetchWeatherApi } from 'openmeteo';
 import { getVariablesForModel } from './variables';
-import { createHourlyParams, createQueryParams } from '$lib/api/api';
+import {
+  createHourlyParams,
+  createQueryParams,
+  fetchModelGridElevation,
+  fetchSkewTData,
+  fetchWindChartData,
+} from '$lib/api/api';
+
+vi.mock('openmeteo', () => ({
+  fetchWeatherApi: vi.fn(),
+}));
 
 describe('API Configuration', () => {
+  beforeEach(() => {
+    vi.mocked(fetchWeatherApi).mockReset();
+  });
+
   it('should generate correct parameters for ICON-D2 model', () => {
     const variables = getVariablesForModel('icon_d2');
     const params = createHourlyParams(variables);
@@ -48,6 +63,48 @@ describe('API Configuration', () => {
       expect(params.end_date).toBe(expectedEndDate);
       expect(params.cell_selection).toBe('land');
       expect(params.timezone).toBe('Europe/Berlin'); // Verify the mocked local timezone is passed
+    });
+  });
+
+  describe('request cancellation', () => {
+    it.each([
+      [
+        'model grid elevation',
+        (signal: AbortSignal) =>
+          fetchModelGridElevation({ latitude: 46.8, longitude: 8.2 }, 'icon_d2', 'nearest', signal),
+      ],
+      [
+        'wind chart',
+        (signal: AbortSignal) =>
+          fetchWindChartData(
+            { latitude: 46.8, longitude: 8.2 },
+            'icon_d2',
+            new Date('2026-07-16T00:00:00Z'),
+            1,
+            4000,
+            'nearest',
+            signal
+          ),
+      ],
+      [
+        'Skew-T',
+        (signal: AbortSignal) =>
+          fetchSkewTData(
+            { latitude: 46.8, longitude: 8.2 },
+            'icon_d2',
+            new Date('2026-07-16T00:00:00Z'),
+            4000,
+            'nearest',
+            signal
+          ),
+      ],
+    ])('forwards the AbortSignal for %s requests', async (_name, request) => {
+      const abortError = new DOMException('Aborted', 'AbortError');
+      vi.mocked(fetchWeatherApi).mockRejectedValueOnce(abortError);
+      const controller = new AbortController();
+
+      await expect(request(controller.signal)).rejects.toBe(abortError);
+      expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[5]).toEqual({ signal: controller.signal });
     });
   });
 });

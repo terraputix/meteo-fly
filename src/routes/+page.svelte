@@ -12,6 +12,8 @@
   import type { Location, WindChartData, SkewTWeatherData } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
+  import { onDestroy } from 'svelte';
+  import { createLatestRequest, isAbortError, type RequestHandle } from '$lib/services/latestRequest';
 
   let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
   let showChart = $state(false);
@@ -24,6 +26,16 @@
   let error: string | null = $state(null);
 
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
+  const windRequest = createLatestRequest();
+  const skewTRequest = createLatestRequest();
+
+  type WeatherRequestParameters = {
+    location: Location;
+    model: PageParameters['selectedModel'];
+    startDate: Date;
+    maxAltitude: PageParameters['maxAltitude'];
+    cellSelection: PageParameters['cellSelection'];
+  };
 
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
 
@@ -63,8 +75,25 @@
     }
   });
 
+  function closeChartPanel() {
+    showChart = false;
+    clearTimeout(updateTimer ?? undefined);
+    updateTimer = null;
+    windRequest.cancel();
+    skewTRequest.cancel();
+    isWindChartLoading = false;
+    isSkewTLoading = false;
+  }
+
   function toggleChartPanel() {
-    showChart = !showChart;
+    if (showChart) {
+      closeChartPanel();
+    } else {
+      showChart = true;
+      if (!windChartData && !isWindChartLoading) {
+        scheduleWindChartUpdate(getWeatherRequestParameters());
+      }
+    }
   }
 
   function updateLocation(location: Location) {
@@ -78,80 +107,115 @@
     }
   }
 
-  $effect(() => {
-    void parameters.location.latitude;
-    void parameters.location.longitude;
-    void parameters.selectedDay;
-    void parameters.selectedModel;
-    void parameters.maxAltitude;
-    void parameters.cellSelection;
+  function getWeatherRequestParameters(): WeatherRequestParameters {
+    return {
+      location: {
+        latitude: parameters.location.latitude,
+        longitude: parameters.location.longitude,
+      },
+      model: parameters.selectedModel,
+      startDate: new Date(startDate),
+      maxAltitude: parameters.maxAltitude,
+      cellSelection: parameters.cellSelection,
+    };
+  }
 
+  function scheduleWindChartUpdate(requestParameters: WeatherRequestParameters) {
     clearTimeout(updateTimer ?? undefined);
-    updateTimer = setTimeout(updateWindChart, 5);
+    const request = windRequest.start();
+    isWindChartLoading = true;
+    error = null;
+    updateTimer = setTimeout(() => {
+      updateTimer = null;
+      void updateWindChart(requestParameters, request);
+    }, 5);
+  }
+
+  $effect(() => {
+    scheduleWindChartUpdate(getWeatherRequestParameters());
   });
 
   $effect(() => {
-    if (!showChart || chartView !== 'skewt') return;
+    if (!showChart || chartView !== 'skewt') {
+      skewTRequest.cancel();
+      isSkewTLoading = false;
+      return;
+    }
 
-    void parameters.location.latitude;
-    void parameters.location.longitude;
-    void parameters.selectedModel;
-    void parameters.maxAltitude;
-    void parameters.cellSelection;
-    void startDate;
-
-    updateSkewTData();
+    const requestParameters = getWeatherRequestParameters();
+    const request = skewTRequest.start();
+    isSkewTLoading = true;
+    void updateSkewTData(requestParameters, request);
   });
 
-  async function updateWindChart() {
-    isWindChartLoading = true;
-
+  async function updateWindChart(requestParameters: WeatherRequestParameters, request: RequestHandle) {
     try {
-      error = null;
       const result = await fetchWindChartData(
-        parameters.location,
-        parameters.selectedModel,
-        startDate,
+        requestParameters.location,
+        requestParameters.model,
+        requestParameters.startDate,
         1,
-        parameters.maxAltitude,
-        parameters.cellSelection
+        requestParameters.maxAltitude,
+        requestParameters.cellSelection,
+        request.signal
       );
+      if (!windRequest.isCurrent(request)) return;
+
       const modelGridElevation = result.selectedGridCell
         ? await fetchModelGridElevation(
             result.selectedGridCell,
-            parameters.selectedModel,
-            parameters.cellSelection
-          ).catch(() => undefined)
+            requestParameters.model,
+            requestParameters.cellSelection,
+            request.signal
+          ).catch((err: unknown) => {
+            if (isAbortError(err)) throw err;
+            return undefined;
+          })
         : undefined;
+      if (!windRequest.isCurrent(request)) return;
+
       windChartData = { ...result, modelGridElevation };
       showChart = true;
     } catch (err) {
+      if (!windRequest.isCurrent(request) || isAbortError(err)) return;
       console.error(err);
       error = 'Failed to fetch weather data. Please try again.';
     } finally {
-      isWindChartLoading = false;
+      if (windRequest.isCurrent(request)) {
+        isWindChartLoading = false;
+        windRequest.finish(request);
+      }
     }
   }
 
-  async function updateSkewTData() {
-    if (!showChart) return;
-
-    isSkewTLoading = true;
-
+  async function updateSkewTData(requestParameters: WeatherRequestParameters, request: RequestHandle) {
     try {
-      skewTWeatherData = await fetchSkewTData(
-        parameters.location,
-        parameters.selectedModel,
-        startDate,
-        parameters.maxAltitude,
-        parameters.cellSelection
+      const result = await fetchSkewTData(
+        requestParameters.location,
+        requestParameters.model,
+        requestParameters.startDate,
+        requestParameters.maxAltitude,
+        requestParameters.cellSelection,
+        request.signal
       );
+      if (!skewTRequest.isCurrent(request)) return;
+      skewTWeatherData = result;
     } catch (err) {
+      if (!skewTRequest.isCurrent(request) || isAbortError(err)) return;
       console.error(err);
     } finally {
-      isSkewTLoading = false;
+      if (skewTRequest.isCurrent(request)) {
+        isSkewTLoading = false;
+        skewTRequest.finish(request);
+      }
     }
   }
+
+  onDestroy(() => {
+    clearTimeout(updateTimer ?? undefined);
+    windRequest.cancel();
+    skewTRequest.cancel();
+  });
 </script>
 
 <svelte:head>
@@ -211,7 +275,7 @@
             bind:chartView
             bind:hour={selectedHour}
             bind:daylightOnly={parameters.daylightOnly}
-            onClose={() => (showChart = false)}
+            onClose={closeChartPanel}
           />
         </div>
       </ResizablePane>
