@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { CustomSeriesOption, CustomSeriesRenderItemAPI, CustomSeriesRenderItemParams } from 'echarts';
 import { buildTooltipStore, createActiveState } from './tooltipFormatter';
 import { buildWindChartOption } from './buildWindChartOption';
 
@@ -23,7 +24,15 @@ describe('wind chart option', () => {
       sunset: times[1],
     };
     const rainCloudData = {
-      cloudRects: [],
+      cloudRects: [
+        {
+          x1: new Date(times[0].getTime() - 1_800_000),
+          x2: new Date(times[0].getTime() + 1_800_000),
+          y1: 0,
+          y2: 1 / 3,
+          cloudCover: NaN,
+        },
+      ],
       rainDots: [{ time: times[1], rain: 1 }],
     };
     const lcl = [
@@ -36,7 +45,7 @@ describe('wind chart option', () => {
       temperatureData,
       rainCloudData,
       [],
-      [],
+      [{ time: times[0], height: 0, value: NaN }],
       lcl,
       500,
       'UTC',
@@ -52,6 +61,18 @@ describe('wind chart option', () => {
         [times[1].getTime(), 1200],
       ],
     });
+
+    for (const seriesName of ['_cloudRects', '_windCloud']) {
+      const cloudSeries = series.find((item) => item.name === seriesName) as NamedSeries & {
+        renderItem: NonNullable<CustomSeriesOption['renderItem']>;
+      };
+      const renderedMissingCloud = cloudSeries.renderItem(
+        { dataIndex: 0 } as CustomSeriesRenderItemParams,
+        {} as CustomSeriesRenderItemAPI
+      );
+
+      expect(renderedMissingCloud).toEqual({ type: 'group', children: [] });
+    }
 
     const fullRainCloudData = {
       cloudRects: [],
@@ -78,5 +99,21 @@ describe('wind chart option', () => {
 
     expect(filteredRain).toEqual([{ id: times[1].getTime().toString(), value: [times[1].getTime(), 1] }]);
     expect(fullRain[1].id).toBe(filteredRain[0].id);
+
+    const rainSeries = series.find((item) => item.name === 'Rain') as NamedSeries & {
+      renderItem: NonNullable<CustomSeriesOption['renderItem']>;
+    };
+    const renderedMissingRain = rainSeries.renderItem(
+      {} as CustomSeriesRenderItemParams,
+      {
+        value: (dimension: number | string) => (dimension === 0 ? times[0].getTime() : NaN),
+      } as unknown as CustomSeriesRenderItemAPI
+    );
+
+    expect(renderedMissingRain).toMatchObject({
+      type: 'group',
+      $mergeChildren: false,
+      children: [],
+    });
   });
 });

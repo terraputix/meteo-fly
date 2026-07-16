@@ -13,7 +13,7 @@ function createData(): WindChartData {
       time: [new Date('2026-07-16T10:00:00Z'), new Date('2026-07-16T11:00:00Z')],
       temperature_2m: new Float32Array([20, 21]),
       dewpoint_2m: new Float32Array([NaN, 15]),
-      precipitation: new Float32Array([0, 1]),
+      precipitation: new Float32Array([NaN, 1]),
       relativeHumidity_2m: new Float32Array([60, 65]),
       cloudCoverLow: new Float32Array([NaN, 40]),
       cloudCoverMid: new Float32Array([20, 30]),
@@ -35,7 +35,10 @@ describe('chart worker preparation', () => {
 
     expect(result.lcl[0].value).toBeNull();
     expect(result.temperatureChartData.temperatureData).toHaveLength(2);
-    expect(result.rainCloudChartData.rainDots).toEqual([{ time: new Date('2026-07-16T11:00:00Z'), rain: 1 }]);
+    expect(result.rainCloudChartData.rainDots).toEqual([
+      { time: new Date('2026-07-16T10:00:00Z'), rain: NaN },
+      { time: new Date('2026-07-16T11:00:00Z'), rain: 1 },
+    ]);
     expect(result.rainCloudChartData.cloudRects).toHaveLength(6);
     expect(result.rainCloudChartData.cloudRects[0].cloudCover).toBeNaN();
     expect(result.windData).toEqual([]);

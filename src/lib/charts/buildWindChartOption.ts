@@ -318,6 +318,7 @@ export function buildWindChartOption(
     silent: true,
     renderItem(params, api) {
       const item = cloudItems[params.dataIndex];
+      if (!Number.isFinite(item.cloudCover)) return { type: 'group', children: [] };
       const p1 = api.coord([item.x1, item.y2 * 3]);
       const p2 = api.coord([item.x2, item.y1 * 3]);
       const w = Math.max(0, p2[0] - p1[0]);
@@ -338,6 +339,7 @@ export function buildWindChartOption(
   };
 
   function rainDropCount(rain: number): number {
+    if (!Number.isFinite(rain) || rain <= 0) return 0;
     if (rain > 5) return 3;
     if (rain > 1) return 2;
     return 1;
@@ -410,7 +412,7 @@ export function buildWindChartOption(
     silent: true,
     renderItem(params, api) {
       const item = cloudItems2[params.dataIndex];
-      if (item.value <= 0) return { type: 'group', children: [] };
+      if (!Number.isFinite(item.value) || item.value <= 0) return { type: 'group', children: [] };
 
       const band = bandByHeight.get(item.height);
       if (!band) return { type: 'group', children: [] };

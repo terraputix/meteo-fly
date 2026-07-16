@@ -208,7 +208,7 @@ export function createTooltipFormatter(
         html += `</table>`;
       }
       const rain = store.rainByTime.get(snap);
-      if (rain != null && rain > 0) {
+      if (rain != null && rain !== 0) {
         html += `<div style="margin-bottom:3px">💧 Rain:&nbsp;<b>${rain.toFixed(1)}&nbsp;mm/h</b></div>`;
       }
     }

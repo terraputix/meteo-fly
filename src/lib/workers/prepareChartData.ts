@@ -90,12 +90,10 @@ function prepareRainAndCloudData(data: WindChartData): RainCloudChartData {
 
   return {
     cloudRects,
-    rainDots: data.hourly.time
-      .map((time, i) => ({
-        time,
-        rain: data.hourly.precipitation[i],
-      }))
-      .filter((d) => d.rain > 0),
+    rainDots: data.hourly.time.map((time, i) => ({
+      time,
+      rain: data.hourly.precipitation[i],
+    })),
   };
 }
 
