@@ -1,7 +1,13 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import maplibregl, { NavigationControl, type Map, type Marker } from 'maplibre-gl';
+  import maplibregl, {
+    NavigationControl,
+    type Map,
+    type MapMouseEvent,
+    type MapTouchEvent,
+    type Marker,
+  } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { LngLatLike } from 'maplibre-gl';
   import { base } from '$app/paths';
@@ -16,6 +22,12 @@
   import type { WeatherModel, CellSelection } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
   import { haversineDistance } from '$lib/meteo/hikeAndFly';
+  import {
+    createDeferredMapLocationSelection,
+    createMapDoubleActivationRecognizer,
+    MAP_DOUBLE_ACTIVATION_INTERVAL_MS,
+    MAP_DOUBLE_ACTIVATION_MAX_DISTANCE_PX,
+  } from './mapLocationSelection';
 
   let {
     latitude = $bindable(46.41526),
@@ -61,6 +73,14 @@
   let unsubscribe: () => void;
   let isTerrainEnabled = true;
   let lastTerrainElevation: number | undefined;
+  const deferredLocationSelection = createDeferredMapLocationSelection(({ latitude, longitude }) => {
+    updatePosition(latitude, longitude);
+  });
+  const mouseDoubleActivation = createMapDoubleActivationRecognizer();
+  const touchDoubleActivation = createMapDoubleActivationRecognizer();
+  let activeTouch: { x: number; y: number } | undefined;
+  let lastTouchEndTimestamp: number | undefined;
+  let ignoreMapClicksUntil = 0;
 
   // Hike & fly state
   let hikeFlyActive = $state(false);
@@ -312,12 +332,106 @@
     updateGridCellDistanceVisibility();
   }
 
+  function zoomAt(lngLat: LngLatLike, direction = 1) {
+    const zoomSnap = map.getZoomSnap();
+    const nextZoom = map.getZoom() + direction;
+    const zoom = zoomSnap > 0 ? Math.round(nextZoom / zoomSnap) * zoomSnap : nextZoom;
+    map.easeTo({ around: lngLat, duration: 300, zoom });
+  }
+
+  function handleMapClick(e: MapMouseEvent) {
+    if ($isMobile && hikeFlyActive) return;
+
+    const timestamp = e.originalEvent.timeStamp;
+    if (timestamp <= ignoreMapClicksUntil) return;
+
+    const followsTouch =
+      lastTouchEndTimestamp !== undefined &&
+      timestamp >= lastTouchEndTimestamp &&
+      timestamp - lastTouchEndTimestamp < MAP_DOUBLE_ACTIVATION_INTERVAL_MS;
+    lastTouchEndTimestamp = undefined;
+
+    if (
+      !followsTouch &&
+      mouseDoubleActivation.register({
+        timestamp,
+        x: e.point.x,
+        y: e.point.y,
+      })
+    ) {
+      deferredLocationSelection.cancel();
+      zoomAt(e.lngLat, e.originalEvent.shiftKey ? -1 : 1);
+      return;
+    }
+
+    deferredLocationSelection.schedule({
+      latitude: e.lngLat.lat,
+      longitude: e.lngLat.lng,
+    });
+  }
+
+  function handleMapTouchStart(e: MapTouchEvent) {
+    if (e.points.length !== 1) {
+      activeTouch = undefined;
+      touchDoubleActivation.reset();
+      return;
+    }
+
+    activeTouch = {
+      x: e.point.x,
+      y: e.point.y,
+    };
+  }
+
+  function handleMapTouchMove(e: MapTouchEvent) {
+    if (
+      activeTouch &&
+      (e.points.length !== 1 ||
+        Math.hypot(e.point.x - activeTouch.x, e.point.y - activeTouch.y) >= MAP_DOUBLE_ACTIVATION_MAX_DISTANCE_PX)
+    ) {
+      activeTouch = undefined;
+      touchDoubleActivation.reset();
+    }
+  }
+
+  function handleMapTouchEnd(e: MapTouchEvent) {
+    const touch = activeTouch;
+    activeTouch = undefined;
+    if (!touch) return;
+
+    const timestamp = e.originalEvent.timeStamp;
+    if (Math.hypot(e.point.x - touch.x, e.point.y - touch.y) >= MAP_DOUBLE_ACTIVATION_MAX_DISTANCE_PX) {
+      touchDoubleActivation.reset();
+      return;
+    }
+
+    lastTouchEndTimestamp = timestamp;
+    if (
+      touchDoubleActivation.register({
+        timestamp,
+        x: e.point.x,
+        y: e.point.y,
+      })
+    ) {
+      lastTouchEndTimestamp = undefined;
+      ignoreMapClicksUntil = timestamp + MAP_DOUBLE_ACTIVATION_INTERVAL_MS;
+      deferredLocationSelection.cancel();
+      zoomAt(e.lngLat);
+    }
+  }
+
+  function handleMapTouchCancel() {
+    activeTouch = undefined;
+    touchDoubleActivation.reset();
+  }
+
   onMount(async () => {
     map = new maplibregl.Map({
       container: mapContainer,
       style: 'https://tiles.openfreemap.org/styles/positron',
       center: [longitude, latitude],
       zoom: 8,
+      doubleClickZoom: false,
     });
 
     map.addControl(
@@ -367,11 +481,11 @@
     });
     updateSelectedGridCellMarker();
 
-    map.on('click', (e: maplibregl.MapMouseEvent) => {
-      if ($isMobile && hikeFlyActive) return;
-      const { lat, lng } = e.lngLat;
-      updatePosition(lat, lng);
-    });
+    map.on('click', handleMapClick);
+    map.on('touchstart', handleMapTouchStart);
+    map.on('touchmove', handleMapTouchMove);
+    map.on('touchend', handleMapTouchEnd);
+    map.on('touchcancel', handleMapTouchCancel);
     mapContainer.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('click', closeContextMenu);
     map.on('move', handleMapMove);
@@ -452,6 +566,7 @@
   });
 
   onDestroy(() => {
+    deferredLocationSelection.destroy();
     if (unsubscribe) {
       unsubscribe();
     }
@@ -464,6 +579,11 @@
       distanceMarker.remove();
     }
     if (map) {
+      map.off('click', handleMapClick);
+      map.off('touchstart', handleMapTouchStart);
+      map.off('touchmove', handleMapTouchMove);
+      map.off('touchend', handleMapTouchEnd);
+      map.off('touchcancel', handleMapTouchCancel);
       map.off('move', handleMapMove);
       map.remove();
     }
