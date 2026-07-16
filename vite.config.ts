@@ -12,6 +12,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'service-worker.ts',
       registerType: 'prompt',
+      injectRegister: false,
       manifest: {
         name: 'Meteo-Fly',
         short_name: 'Meteo-Fly',
