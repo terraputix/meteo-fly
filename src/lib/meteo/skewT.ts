@@ -31,19 +31,6 @@ function interpolateScalar(
   return lowerValue + (upperValue - lowerValue) * ratio;
 }
 
-export function dedupeLevels(levels: TaggedPressureLevel[]): TaggedPressureLevel[] {
-  const byHpa = new Map<number, TaggedPressureLevel>();
-
-  levels.forEach((level) => {
-    const existing = byHpa.get(level.hPa);
-    if (!existing || (existing.source === 'interpolated' && level.source === 'model')) {
-      byHpa.set(level.hPa, level);
-    }
-  });
-
-  return [...byHpa.values()].sort((a, b) => a.heightMeters - b.heightMeters);
-}
-
 function buildLevelDataAtHour({
   weatherData,
   hourIndex,
@@ -191,7 +178,7 @@ export function buildSkewTData(
 ): SkewTData {
   const traces: SkewTTrace[] = [];
   const nativeLevels = getNativeLevelsForFetch(model, maxAltitude);
-  const allLevels = dedupeLevels(getAllTaggedLevelsForModel(model, maxAltitude));
+  const allLevels = getAllTaggedLevelsForModel(model, maxAltitude);
 
   weatherData.hourly.time.forEach((time, i) => {
     const surfaceTemp = weatherData.hourly.temperature_2m?.[i] ?? NaN;
