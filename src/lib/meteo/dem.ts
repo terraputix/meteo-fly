@@ -7,13 +7,42 @@ export interface DemTile {
 }
 
 const TILE_EXTENT = 256;
+const EARTH_CIRCUMFERENCE = 40_075_017;
+export const WEB_MERCATOR_MAX_LATITUDE = 85.05112878;
+
+export interface GeographicBounds {
+  minLatitude: number;
+  maxLatitude: number;
+  minLongitude: number;
+  maxLongitude: number;
+}
+
+export function boundsForRadius(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  padding = 1
+): GeographicBounds {
+  const latitudeMargin = (Math.max(0, radiusMeters) * padding * 360) / EARTH_CIRCUMFERENCE;
+  const cosineLatitude = Math.abs(Math.cos((latitude * Math.PI) / 180));
+  const longitudeMargin = cosineLatitude < 0.01 ? 180 : Math.min(180, latitudeMargin / cosineLatitude);
+  const normalizedLongitude = normalizeLongitude(longitude);
+
+  return {
+    minLatitude: clampWebMercatorLatitude(latitude - latitudeMargin),
+    maxLatitude: clampWebMercatorLatitude(latitude + latitudeMargin),
+    minLongitude: normalizedLongitude - longitudeMargin,
+    maxLongitude: normalizedLongitude + longitudeMargin,
+  };
+}
 
 function mercatorY(lat: number): number {
   return Math.log(Math.tan((lat * Math.PI) / 360 + Math.PI / 4));
 }
 
 function lonToTileX(lon: number, zoom: number): number {
-  return Math.floor(((lon + 180) / 360) * (1 << zoom));
+  const tileCount = 1 << zoom;
+  return Math.max(0, Math.min(tileCount - 1, Math.floor(((normalizeLongitude(lon) + 180) / 360) * tileCount)));
 }
 
 function latToTileY(lat: number, zoom: number): number {
@@ -28,17 +57,39 @@ export function tilesForBbox(
   maxLon: number,
   zoom: number
 ): Array<{ z: number; x: number; y: number }> {
-  const xMin = lonToTileX(minLon, zoom);
-  const xMax = lonToTileX(maxLon, zoom);
+  const tileCount = 1 << zoom;
   const yMin = latToTileY(maxLat, zoom);
   const yMax = latToTileY(minLat, zoom);
+  const longitudeSpan = maxLon - minLon;
+  const normalizedMinLongitude = normalizeLongitude(minLon);
+  const normalizedMaxLongitude = normalizeLongitude(maxLon);
+  const crossesAntimeridian = minLon > maxLon || normalizedMinLongitude > normalizedMaxLongitude;
+  const xRanges: Array<[number, number]> =
+    longitudeSpan >= 360
+      ? [[0, tileCount - 1]]
+      : crossesAntimeridian
+        ? [
+            [lonToTileX(normalizedMinLongitude, zoom), tileCount - 1],
+            [0, lonToTileX(normalizedMaxLongitude, zoom)],
+          ]
+        : [[lonToTileX(normalizedMinLongitude, zoom), lonToTileX(normalizedMaxLongitude, zoom)]];
   const tiles: Array<{ z: number; x: number; y: number }> = [];
-  for (let x = xMin; x <= xMax; x++) {
-    for (let y = yMin; y <= yMax; y++) {
-      tiles.push({ z: zoom, x, y });
+  for (const [xMin, xMax] of xRanges) {
+    for (let x = xMin; x <= xMax; x++) {
+      for (let y = yMin; y <= yMax; y++) {
+        tiles.push({ z: zoom, x, y });
+      }
     }
   }
   return tiles;
+}
+
+function normalizeLongitude(longitude: number): number {
+  return ((((longitude + 180) % 360) + 360) % 360) - 180;
+}
+
+function clampWebMercatorLatitude(latitude: number): number {
+  return Math.max(-WEB_MERCATOR_MAX_LATITUDE, Math.min(WEB_MERCATOR_MAX_LATITUDE, latitude));
 }
 
 function decodeValue(r: number, g: number, b: number, encoding: DemEncoding): number {
@@ -114,7 +165,7 @@ export function pixelPositionInTile(
 ): { px: number; py: number } {
   const tileCount = 1 << zoom;
   const mercY = mercatorY(lat);
-  const px = (((lon + 180) / 360) * tileCount - tileX) * TILE_EXTENT;
+  const px = (((normalizeLongitude(lon) + 180) / 360) * tileCount - tileX) * TILE_EXTENT;
   const py = (((1 - mercY / Math.PI) / 2) * tileCount - tileY) * TILE_EXTENT;
   return { px, py };
 }
