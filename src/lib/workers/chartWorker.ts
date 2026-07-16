@@ -4,7 +4,7 @@ import { calculateLclWeather } from '$lib/meteo/lcl';
 
 import type { WindChartData, VerticalProfile } from '$lib/api/types';
 import type {
-  ChartWorkerInput,
+  ChartWorkerRequest,
   ChartWorkerSuccessOutput,
   ChartWorkerErrorOutput,
   TemperatureChartData,
@@ -124,8 +124,9 @@ function calculateDomains(
   return [xMin, xMax];
 }
 
-self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
-  const { windChartData, maxAltitude, model, daylightOnly } = e.data;
+self.onmessage = function (e: MessageEvent<ChartWorkerRequest>) {
+  const { requestId, input } = e.data;
+  const { windChartData, maxAltitude, model, daylightOnly } = input;
 
   try {
     const data = daylightOnly ? filterDaylightHours(windChartData) : windChartData;
@@ -140,6 +141,7 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
     const rainCloudChartData = prepareRainAndCloudData(data);
 
     const successResponse: ChartWorkerSuccessOutput = {
+      requestId,
       success: true,
       data: {
         cloudData,
@@ -157,6 +159,7 @@ self.onmessage = function (e: MessageEvent<ChartWorkerInput>) {
     self.postMessage(successResponse);
   } catch (error) {
     const errorResponse: ChartWorkerErrorOutput = {
+      requestId,
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
     };

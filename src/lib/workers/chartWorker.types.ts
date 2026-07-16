@@ -10,6 +10,11 @@ export interface ChartWorkerInput {
   daylightOnly?: boolean;
 }
 
+export interface ChartWorkerRequest {
+  requestId: number;
+  input: ChartWorkerInput;
+}
+
 export interface TemperatureChartData {
   temperatureData: Array<{ time: Date; value: number }>;
   dewpointData: Array<{ time: Date; value: number }>;
@@ -33,6 +38,7 @@ export interface RainCloudChartData {
 }
 
 export interface ChartWorkerSuccessOutput {
+  requestId: number;
   success: true;
   data: {
     cloudData: CloudCoverData[];
@@ -48,6 +54,7 @@ export interface ChartWorkerSuccessOutput {
 }
 
 export interface ChartWorkerErrorOutput {
+  requestId: number;
   success: false;
   error: string;
 }

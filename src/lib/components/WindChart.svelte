@@ -6,7 +6,7 @@
   import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
   import { buildWindChartOption, getChartHeight } from '$lib/charts/buildWindChartOption';
   import type { WindChartData } from '$lib/api/types';
-  import type { ChartWorkerInput, ChartWorkerOutput } from '$lib/workers/chartWorker.types';
+  import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
   import type { WeatherModel } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
@@ -46,9 +46,11 @@
 
   function renderChart(node: HTMLElement, params: RenderChartParams) {
     let chart: EChartsType | null = init(node);
-    let activeWorker: Worker | null = null;
+    let worker: Worker | null = null;
+    let workerBusy = false;
     let requestId = 0;
     let destroyed = false;
+    let pendingRender: { requestId: number; params: RenderChartParams } | null = null;
     let prevData = params.data;
     let prevDaylightOnly = params.daylightOnly;
     const activeState: ActiveState = createActiveState();
@@ -84,103 +86,123 @@
     const resizeObserver = new ResizeObserver(() => chart?.resize());
     resizeObserver.observe(node);
 
-    function releaseWorker(worker: Worker) {
-      worker.onmessage = null;
-      worker.onerror = null;
-      worker.onmessageerror = null;
-      worker.terminate();
-      if (activeWorker === worker) activeWorker = null;
+    function terminateWorker(target: Worker) {
+      target.onmessage = null;
+      target.onerror = null;
+      target.onmessageerror = null;
+      target.terminate();
+      if (worker === target) {
+        worker = null;
+        workerBusy = false;
+      }
     }
 
-    function cancelActiveWorker() {
-      if (!activeWorker) return;
-      releaseWorker(activeWorker);
+    function terminateCurrentWorker() {
+      if (!worker) return;
+      terminateWorker(worker);
+    }
+
+    function handleWorkerMessage(source: Worker, event: MessageEvent<ChartWorkerOutput>) {
+      if (worker !== source) return;
+      workerBusy = false;
+
+      const response = event.data;
+      const render = pendingRender;
+      if (destroyed || response.requestId !== requestId || render?.requestId !== response.requestId || !chart) {
+        return;
+      }
+      pendingRender = null;
+
+      try {
+        if (!response.success) {
+          console.error('Chart worker error:', response.error);
+          return;
+        }
+
+        const {
+          cloudData,
+          windData,
+          lcl,
+          elevation,
+          modelGridElevation,
+          timezoneAbbr,
+          temperatureChartData,
+          rainCloudChartData,
+          xDomain,
+        } = response.data;
+
+        activeState.gridIndex = -1;
+        activeState.hoveredWindY = null;
+
+        const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
+        chart.setOption(
+          buildWindChartOption(
+            temperatureChartData,
+            rainCloudChartData,
+            windData,
+            cloudData,
+            lcl,
+            elevation,
+            timezoneAbbr,
+            xDomain,
+            store,
+            activeState,
+            render.params.windHeight,
+            render.params.maxAltitude,
+            render.params.model,
+            modelGridElevation
+          ),
+          { notMerge: true }
+        );
+      } catch (err) {
+        console.error('Error updating EChart:', err);
+      } finally {
+        if (!destroyed && response.requestId === requestId) isRendering = false;
+      }
+    }
+
+    function handleWorkerError(source: Worker, error: unknown) {
+      if (worker !== source) return;
+      terminateWorker(source);
+      pendingRender = null;
+      if (!destroyed) {
+        console.error('Chart worker error:', error);
+        isRendering = false;
+      }
+    }
+
+    function createWorker() {
+      const nextWorker = new Worker(new URL('$lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
+      nextWorker.onmessage = (event: MessageEvent<ChartWorkerOutput>) => handleWorkerMessage(nextWorker, event);
+      nextWorker.onerror = (error) => handleWorkerError(nextWorker, error);
+      nextWorker.onmessageerror = (error) => handleWorkerError(nextWorker, error);
+      return nextWorker;
     }
 
     function draw(currentParams: RenderChartParams) {
       if (!currentParams.data) return;
 
       const currentRequestId = ++requestId;
-      cancelActiveWorker();
+      if (workerBusy) terminateCurrentWorker();
+      worker ??= createWorker();
+      workerBusy = true;
+      pendingRender = { requestId: currentRequestId, params: currentParams };
       isRendering = true;
 
-      const worker = new Worker(new URL('$lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
-      activeWorker = worker;
-
-      worker.onmessage = (event: MessageEvent<ChartWorkerOutput>) => {
-        releaseWorker(worker);
-        if (destroyed || currentRequestId !== requestId || !chart) return;
-
-        try {
-          const response = event.data;
-          if (!response.success) {
-            console.error('Chart worker error:', response.error);
-            return;
-          }
-
-          const {
-            cloudData,
-            windData,
-            lcl,
-            elevation,
-            modelGridElevation,
-            timezoneAbbr,
-            temperatureChartData,
-            rainCloudChartData,
-            xDomain,
-          } = response.data;
-
-          activeState.gridIndex = -1;
-          activeState.hoveredWindY = null;
-
-          const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
-          chart.setOption(
-            buildWindChartOption(
-              temperatureChartData,
-              rainCloudChartData,
-              windData,
-              cloudData,
-              lcl,
-              elevation,
-              timezoneAbbr,
-              xDomain,
-              store,
-              activeState,
-              currentParams.windHeight,
-              currentParams.maxAltitude,
-              currentParams.model,
-              modelGridElevation
-            ),
-            { notMerge: true }
-          );
-        } catch (err) {
-          console.error('Error updating EChart:', err);
-        } finally {
-          if (!destroyed && currentRequestId === requestId) isRendering = false;
-        }
-      };
-
-      const handleWorkerError = (error: unknown) => {
-        releaseWorker(worker);
-        if (destroyed || currentRequestId !== requestId) return;
-        console.error('Chart worker error:', error);
-        isRendering = false;
-      };
-
-      worker.onerror = handleWorkerError;
-      worker.onmessageerror = handleWorkerError;
-
-      const input: ChartWorkerInput = {
-        windChartData: currentParams.data,
-        maxAltitude: currentParams.maxAltitude,
-        model: currentParams.model,
-        daylightOnly: currentParams.daylightOnly,
+      const request: ChartWorkerRequest = {
+        requestId: currentRequestId,
+        input: {
+          windChartData: currentParams.data,
+          maxAltitude: currentParams.maxAltitude,
+          model: currentParams.model,
+          daylightOnly: currentParams.daylightOnly,
+        },
       };
 
       try {
-        worker.postMessage(input);
+        worker.postMessage(request);
       } catch (err) {
-        handleWorkerError(err);
+        handleWorkerError(worker, err);
       }
     }
 
@@ -195,7 +217,8 @@
             draw({ ...newParams });
           } else {
             requestId++;
-            cancelActiveWorker();
+            terminateCurrentWorker();
+            pendingRender = null;
             activeState.gridIndex = -1;
             activeState.hoveredWindY = null;
             chart?.clear();
@@ -206,7 +229,8 @@
       destroy() {
         destroyed = true;
         requestId++;
-        cancelActiveWorker();
+        terminateCurrentWorker();
+        pendingRender = null;
         resizeObserver.disconnect();
         chart?.off('updateaxispointer', handleAxisPointer);
         chart?.dispose();
