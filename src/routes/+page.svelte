@@ -206,8 +206,6 @@
     clearTimeout(updateTimer ?? undefined);
     const request = windRequest.start();
     skewTRequest.cancel();
-    windChartData = null;
-    skewTWeatherData = null;
     isWindChartLoading = true;
     isSkewTLoading = false;
     windFailure = null;
@@ -222,7 +220,6 @@
 
   function scheduleSkewTUpdate(requestParameters: WeatherRequestParameters) {
     const request = skewTRequest.start();
-    skewTWeatherData = null;
     isSkewTLoading = true;
     skewTFailure = null;
     skewTOutdatedCachedAt = null;
@@ -325,6 +322,8 @@
     } catch (err) {
       if (!windRequest.isCurrent(request) || isAbortError(err)) return;
       console.error(err);
+      windChartData = null;
+      skewTWeatherData = null;
       windFailure = {
         message: 'Failed to fetch wind forecast. Check your connection and try again.',
         requestParameters,
@@ -352,6 +351,7 @@
     } catch (err) {
       if (!skewTRequest.isCurrent(request) || isAbortError(err)) return;
       console.error(err);
+      skewTWeatherData = null;
       skewTFailure = {
         message: 'Failed to fetch sounding data. Check your connection and try again.',
         requestParameters,
@@ -485,7 +485,7 @@
     >
       {#if renderChartPanel}
         <div
-          class="h-full overflow-y-auto bg-white p-0 transition-opacity duration-200 motion-reduce:transition-none sm:p-0 {showChart
+          class="flex h-full min-h-0 flex-col overflow-hidden bg-white p-0 transition-opacity duration-200 motion-reduce:transition-none sm:p-0 {showChart
             ? 'opacity-100'
             : 'pointer-events-none opacity-0'}"
           aria-hidden={!showChart}
@@ -509,7 +509,6 @@
               bind:selectedDay={parameters.selectedDay}
               bind:maxAltitude={parameters.maxAltitude}
               bind:model={parameters.selectedModel}
-              bind:cellSelection={parameters.cellSelection}
               bind:chartView
               bind:hour={selectedHour}
               bind:daylightOnly={parameters.daylightOnly}

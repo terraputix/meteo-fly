@@ -1,13 +1,11 @@
 <script lang="ts">
-  import type { CellSelection, WindChartData, WeatherModel, SkewTWeatherData } from '$lib/api/types';
+  import type { WindChartData, WeatherModel, SkewTWeatherData } from '$lib/api/types';
   import { MODEL_FORECAST_DAYS } from '$lib/api/models';
   import WindChart from './WindChart.svelte';
   import SkewTChart from './SkewTChart.svelte';
   import BottomControls from './BottomControls.svelte';
   import Footer from './Footer.svelte';
   import { windColors, windMaxSpeed } from '$lib/charts/scales';
-  import { browser } from '$app/environment';
-  import { tick } from 'svelte';
   import { buildSkewTData } from '$lib/meteo/skewT';
   import type { MaxAltitude } from '$lib/meteo/types';
   import type { ChartView } from '$lib/services/types';
@@ -22,7 +20,6 @@
     selectedDay = $bindable(),
     maxAltitude = $bindable(4000),
     model = $bindable<WeatherModel>('icon_d2'),
-    cellSelection = $bindable<CellSelection>('nearest'),
     chartView = $bindable<ChartView>('wind'),
     hour = $bindable(0),
     daylightOnly = $bindable(false),
@@ -38,7 +35,6 @@
     selectedDay: number;
     maxAltitude?: MaxAltitude;
     model?: WeatherModel;
-    cellSelection?: CellSelection;
     chartView?: ChartView;
     hour?: number;
     daylightOnly?: boolean;
@@ -73,33 +69,17 @@
     })
     .join(', ')})`;
 
-  let scrollContainer: HTMLDivElement | undefined;
-
   $effect(() => {
     if (hour >= traceHours.length && traceHours.length > 0) {
       hour = 0;
     }
   });
-
-  $effect(() => {
-    void windChartData;
-    void selectedDay;
-    void maxAltitude;
-    void model;
-    void cellSelection;
-    if (scrollContainer && browser && window.innerWidth < 640) {
-      tick().then(() => {
-        scrollContainer!.scrollTop = scrollContainer!.scrollHeight;
-      });
-    }
-  });
 </script>
 
 <div
-  bind:this={scrollContainer}
-  class="relative mx-auto flex h-full max-w-3xl flex-col overflow-y-auto rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
+  class="relative mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
 >
-  <div class="bg-white px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
+  <div class="min-h-0 flex-1 overflow-y-auto bg-white px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
     <div class="mb-2 flex items-center justify-center">
       <div class="inline-flex rounded-xl bg-slate-100 p-1">
         <button
@@ -209,7 +189,7 @@
     {/if}
   </div>
 
-  <div class="mt-auto border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:px-5">
+  <div class="shrink-0 border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:px-5">
     <BottomControls
       bind:selectedDay
       {startDate}
