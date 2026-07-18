@@ -86,7 +86,7 @@
       view: chartView,
     });
     params.set('hour', selectedHour.toString());
-    if (daylightOnly) params.set('daylight', '1');
+    params.set('daylight', daylightOnly ? '1' : '0');
     return `?${params.toString()}`;
   });
 

@@ -32,7 +32,7 @@ export function readURLParams(params: URLSearchParams): PageParameters | null {
     cellSelection === 'nearest' || cellSelection === 'land' ? cellSelection : defaultCellSelection;
   const chartView: ChartView | undefined = view === 'wind' || view === 'skewt' ? view : undefined;
   const hour = hourStr ? Number(hourStr) : undefined;
-  const daylightOnly = daylightStr === '1';
+  const daylightOnly = daylightStr !== '0';
 
   return {
     location,
