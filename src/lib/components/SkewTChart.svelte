@@ -12,6 +12,7 @@
   export let isLoading = false;
 
   const totalHeight = 520;
+  const touchMoveThreshold = 8;
 
   let canvas: HTMLCanvasElement | undefined;
   let overlayCanvas: HTMLCanvasElement | undefined;
@@ -21,6 +22,7 @@
   let currentTrace: SkewTData['traces'][number] | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let activePointerId: number | null = null;
+  let touchStart: { pointerId: number; x: number; y: number } | null = null;
   let selectedLevelIndex = 0;
   let selectedResult: HitTestResult | null = null;
   let selectionVisible = false;
@@ -136,20 +138,47 @@
   }
 
   function handlePointerDown(e: PointerEvent) {
+    if (e.pointerType === 'touch') {
+      touchStart = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+      return;
+    }
     activePointerId = e.pointerId;
     canvas?.setPointerCapture(e.pointerId);
     selectPointerPosition(e);
   }
 
   function handlePointerMove(e: PointerEvent) {
+    if (e.pointerType === 'touch') {
+      if (touchStart?.pointerId !== e.pointerId) return;
+      if (Math.hypot(e.clientX - touchStart.x, e.clientY - touchStart.y) > touchMoveThreshold) {
+        touchStart = null;
+      }
+      return;
+    }
     if (e.pointerType !== 'mouse' && activePointerId !== e.pointerId) return;
     selectPointerPosition(e);
   }
 
   function handlePointerUp(e: PointerEvent) {
+    if (e.pointerType === 'touch') {
+      const start = touchStart?.pointerId === e.pointerId ? touchStart : null;
+      touchStart = null;
+      if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) <= touchMoveThreshold) {
+        selectPointerPosition(e);
+      }
+      return;
+    }
     if (activePointerId !== e.pointerId) return;
     if (canvas?.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
     activePointerId = null;
+  }
+
+  function handlePointerCancel(e: PointerEvent) {
+    if (e.pointerType === 'touch') {
+      if (touchStart?.pointerId === e.pointerId) touchStart = null;
+      return;
+    }
+    handlePointerUp(e);
   }
 
   function handlePointerLeave(e: PointerEvent) {
@@ -222,6 +251,7 @@
     selectionVisible = false;
     selectionPinned = false;
     selectedResult = null;
+    touchStart = null;
     clearOverlay();
   }
 </script>
@@ -241,7 +271,7 @@
       onpointerdown={handlePointerDown}
       onpointermove={handlePointerMove}
       onpointerup={handlePointerUp}
-      onpointercancel={handlePointerUp}
+      onpointercancel={handlePointerCancel}
       onpointerleave={handlePointerLeave}
       class="chart-canvas"
       aria-hidden="true"
@@ -294,7 +324,7 @@
     display: block;
     width: 100%;
     cursor: crosshair;
-    touch-action: none;
+    touch-action: pan-y pinch-zoom;
   }
 
   .overlay-canvas {
