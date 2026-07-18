@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { renderSkewT, renderHoverOverlay, type HitTestResult, type PlotLayout } from '$lib/charts/skewTRenderer';
   import { CHART_COLORS } from '$lib/charts/chartColors';
+  import { clampIndex, createSkewTLevelSelection, findNearestIndex } from '$lib/charts/chartAccessibility';
   import type { SkewTData } from '$lib/meteo/types';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
 
@@ -18,6 +19,10 @@
   let lastLayout: PlotLayout | null = null;
   let currentTrace: SkewTData['traces'][number] | null = null;
   let resizeObserver: ResizeObserver | null = null;
+  let activePointerId: number | null = null;
+  let selectedLevelIndex = 0;
+  let selectedResult: HitTestResult | null = null;
+  let selectionVisible = false;
 
   function canvasSize() {
     const dpr = window.devicePixelRatio || 1;
@@ -59,6 +64,13 @@
       overlayCtx.scale(dpr, dpr);
       overlayCtx.clearRect(0, 0, width, totalHeight);
     }
+
+    const levels = orderedLevels();
+    if (levels.length > 0) {
+      selectedLevelIndex = clampIndex(selectedLevelIndex, levels.length);
+      selectedResult = createSkewTLevelSelection(levels[selectedLevelIndex]);
+      if (selectionVisible) renderSelection(selectedResult);
+    }
   }
 
   $: if (canvas && skewTData && (hour, true)) render();
@@ -73,7 +85,23 @@
     resizeObserver?.disconnect();
   });
 
-  function handleMouseMove(e: MouseEvent) {
+  function orderedLevels() {
+    return currentTrace ? [...currentTrace.levels].sort((a, b) => a.heightMeters - b.heightMeters) : [];
+  }
+
+  function renderSelection(result: HitTestResult) {
+    if (!overlayCanvas || !currentTrace || !lastLayout || !skewTData) return;
+    const overlayCtx = overlayCanvas.getContext('2d');
+    if (!overlayCtx) return;
+    const { dpr, width } = canvasSize();
+    overlayCtx.save();
+    overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    overlayCtx.clearRect(0, 0, width, totalHeight);
+    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width, skewTData.elevation);
+    overlayCtx.restore();
+  }
+
+  function selectPointerPosition(e: PointerEvent) {
     if (!hitTest || !canvas || !overlayCanvas || !currentTrace || !lastLayout) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -83,18 +111,75 @@
       clearOverlay();
       return;
     }
-    const overlayCtx = overlayCanvas.getContext('2d');
-    if (!overlayCtx) return;
-    const { dpr, width } = canvasSize();
-    overlayCtx.save();
-    overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    overlayCtx.clearRect(0, 0, width, totalHeight);
-    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width, skewTData!.elevation);
-    overlayCtx.restore();
+    const levels = orderedLevels();
+    selectedLevelIndex = findNearestIndex(
+      levels.map((level) => level.heightMeters),
+      result.heightMeters
+    );
+    selectedResult = result;
+    selectionVisible = true;
+    renderSelection(result);
   }
 
-  function handleMouseLeave() {
-    clearOverlay();
+  function handlePointerDown(e: PointerEvent) {
+    activePointerId = e.pointerId;
+    canvas?.setPointerCapture(e.pointerId);
+    selectPointerPosition(e);
+  }
+
+  function handlePointerMove(e: PointerEvent) {
+    if (e.pointerType !== 'mouse' && activePointerId !== e.pointerId) return;
+    selectPointerPosition(e);
+  }
+
+  function handlePointerUp(e: PointerEvent) {
+    if (activePointerId !== e.pointerId) return;
+    if (canvas?.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+    activePointerId = null;
+  }
+
+  function handlePointerLeave(e: PointerEvent) {
+    if (e.pointerType === 'mouse' && activePointerId === null) {
+      selectionVisible = false;
+      clearOverlay();
+    }
+  }
+
+  function selectLevel(index: number) {
+    const levels = orderedLevels();
+    if (levels.length === 0) return;
+    selectedLevelIndex = clampIndex(index, levels.length);
+    selectedResult = createSkewTLevelSelection(levels[selectedLevelIndex]);
+    selectionVisible = true;
+    renderSelection(selectedResult);
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (!skewTData || !currentTrace) return;
+
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      const increment = e.key === 'ArrowLeft' ? -1 : 1;
+      hour = clampIndex(hour + increment, skewTData.traces.length);
+      selectionVisible = true;
+      return;
+    }
+
+    const levels = orderedLevels();
+    if (levels.length === 0) return;
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      selectLevel(selectedLevelIndex + 1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      selectLevel(selectedLevelIndex - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      selectLevel(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      selectLevel(levels.length - 1);
+    }
   }
 
   function clearOverlay() {
@@ -112,11 +197,25 @@
 <div bind:this={container} class="skewt-chart-container" style="min-height: {totalHeight}px;">
   <ChartLoadingOverlay visible={isLoading} message="Loading sounding data…" />
 
-  <div class="chart-wrapper" style="position: relative;">
-    <canvas bind:this={canvas} on:mousemove={handleMouseMove} on:mouseleave={handleMouseLeave} class="chart-canvas"
+  <button
+    type="button"
+    class="chart-wrapper block w-full border-0 bg-transparent p-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+    style="position: relative;"
+    aria-label="Skew-T atmospheric sounding chart"
+    onkeydown={handleKeydown}
+  >
+    <canvas
+      bind:this={canvas}
+      onpointerdown={handlePointerDown}
+      onpointermove={handlePointerMove}
+      onpointerup={handlePointerUp}
+      onpointercancel={handlePointerUp}
+      onpointerleave={handlePointerLeave}
+      class="chart-canvas"
+      aria-hidden="true"
     ></canvas>
-    <canvas bind:this={overlayCanvas} class="overlay-canvas"></canvas>
-  </div>
+    <canvas bind:this={overlayCanvas} class="overlay-canvas" aria-hidden="true"></canvas>
+  </button>
 
   <div class="skewt-legend">
     {#each legendItems as item (item.label)}
@@ -151,6 +250,7 @@
     display: block;
     width: 100%;
     cursor: crosshair;
+    touch-action: none;
   }
 
   .overlay-canvas {

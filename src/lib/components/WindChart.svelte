@@ -3,7 +3,18 @@
   import { CustomChart, LineChart } from 'echarts/charts';
   import { GridComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
   import { CanvasRenderer } from 'echarts/renderers';
-  import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
+  import {
+    buildTooltipStore,
+    createActiveState,
+    type ActiveState,
+    type TooltipStore,
+  } from '$lib/charts/tooltipFormatter';
+  import {
+    clampIndex,
+    createWindChartSelection,
+    findNearestIndex,
+    type WindChartSelection,
+  } from '$lib/charts/chartAccessibility';
   import { buildWindChartOption, getChartHeight } from '$lib/charts/buildWindChartOption';
   import type { WindChartData } from '$lib/api/types';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
@@ -28,6 +39,7 @@
   } = $props();
 
   let isRendering = $state(false);
+  let windSelection = $state<WindChartSelection | null>(null);
 
   let isBusy = $derived(isLoading || isRendering);
 
@@ -53,7 +65,52 @@
     let pendingRender: { requestId: number; params: RenderChartParams } | null = null;
     let prevData = params.data;
     let prevDaylightOnly = params.daylightOnly;
+    let tooltipStore: TooltipStore | null = null;
     const activeState: ActiveState = createActiveState();
+
+    function setSelection(timeIndex: number, heightIndex: number) {
+      if (!tooltipStore) return;
+      windSelection = createWindChartSelection(tooltipStore, timeIndex, heightIndex);
+    }
+
+    function setSelectionFromValues(timestamp: number, height: number | null) {
+      if (!tooltipStore) return;
+      const timeIndex = findNearestIndex(tooltipStore.sortedWindTimes, timestamp);
+      const heightIndex =
+        height == null ? (windSelection?.heightIndex ?? 0) : findNearestIndex(tooltipStore.sortedWindHeights, height);
+      setSelection(timeIndex, heightIndex);
+    }
+
+    function showKeyboardSelection() {
+      if (!chart || !windSelection || windSelection.height == null) return;
+      const x = Number(chart.convertToPixel({ xAxisIndex: 2 }, windSelection.timestamp));
+      const y = Number(chart.convertToPixel({ yAxisIndex: 3 }, windSelection.height));
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      chart.dispatchAction({ type: 'updateAxisPointer', x, y });
+    }
+
+    function handleKeydown(event: KeyboardEvent) {
+      if (!tooltipStore || tooltipStore.sortedWindTimes.length === 0) return;
+      const current = windSelection ?? createWindChartSelection(tooltipStore, 0, 0);
+      if (!current) return;
+
+      let timeIndex = current.timeIndex;
+      let heightIndex = current.heightIndex;
+      if (event.key === 'ArrowLeft') timeIndex--;
+      else if (event.key === 'ArrowRight') timeIndex++;
+      else if (event.key === 'ArrowDown') heightIndex--;
+      else if (event.key === 'ArrowUp') heightIndex++;
+      else if (event.key === 'Home') timeIndex = 0;
+      else if (event.key === 'End') timeIndex = tooltipStore.sortedWindTimes.length - 1;
+      else return;
+
+      event.preventDefault();
+      setSelection(
+        clampIndex(timeIndex, tooltipStore.sortedWindTimes.length),
+        clampIndex(heightIndex, tooltipStore.sortedWindHeights.length)
+      );
+      showKeyboardSelection();
+    }
 
     function handleAxisPointer(event: unknown) {
       const e = event as { axesInfo?: Array<{ axisDim: string; axisIndex: number; value: number }> };
@@ -64,6 +121,8 @@
         return;
       }
       const yInfo = axes.find((axis) => axis.axisDim === 'y');
+      const xInfo = axes.find((axis) => axis.axisDim === 'x');
+      if (xInfo) setSelectionFromValues(xInfo.value, yInfo?.axisIndex === 3 ? (yInfo.value ?? null) : null);
       if (!yInfo) {
         activeState.gridIndex = -1;
         activeState.hoveredWindY = null;
@@ -81,7 +140,9 @@
       }
     }
 
+    const keyboardTarget = node.parentElement;
     chart.on('updateaxispointer', handleAxisPointer);
+    keyboardTarget?.addEventListener('keydown', handleKeydown);
 
     const resizeObserver = new ResizeObserver(() => chart?.resize());
     resizeObserver.observe(node);
@@ -135,6 +196,8 @@
         activeState.hoveredWindY = null;
 
         const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
+        tooltipStore = store;
+        setSelection(0, 0);
         chart.setOption(
           buildWindChartOption(
             temperatureChartData,
@@ -222,6 +285,8 @@
             activeState.gridIndex = -1;
             activeState.hoveredWindY = null;
             chart?.clear();
+            tooltipStore = null;
+            windSelection = null;
             isRendering = false;
           }
         }
@@ -232,6 +297,7 @@
         terminateCurrentWorker();
         pendingRender = null;
         resizeObserver.disconnect();
+        keyboardTarget?.removeEventListener('keydown', handleKeydown);
         chart?.off('updateaxispointer', handleAxisPointer);
         chart?.dispose();
         chart = null;
@@ -245,11 +311,19 @@
   <ChartLoadingOverlay visible={isBusy} message="Loading weather data…" />
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
-  <div
-    use:renderChart={{ data: windChartData, windHeight, maxAltitude, model, daylightOnly }}
-    class="chart-content"
+  <button
+    type="button"
+    class="block w-full border-0 bg-transparent p-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
     style="opacity: {isBusy ? 0 : 1}; height: {totalHeight}px;"
-  ></div>
+    aria-label="Wind forecast chart"
+    aria-busy={isBusy}
+  >
+    <div
+      use:renderChart={{ data: windChartData, windHeight, maxAltitude, model, daylightOnly }}
+      class="chart-content"
+      style="height: {totalHeight}px;"
+    ></div>
+  </button>
 </div>
 
 <style>

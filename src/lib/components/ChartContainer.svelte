@@ -200,7 +200,7 @@
         </div>
       </div>
     {:else if skewTData && traceHours.length > 0}
-      <SkewTChart {skewTData} {hour} isLoading={isSkewTLoading} />
+      <SkewTChart {skewTData} bind:hour isLoading={isSkewTLoading} />
       <Footer />
     {:else}
       <div class="flex h-64 items-center justify-center">
