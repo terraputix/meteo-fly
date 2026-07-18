@@ -934,6 +934,8 @@ export function renderSkewT(
   drawAnnotations(ctx, trace, layout, skewTData.elevation);
 
   const hitTest: HitTestFn = (cx, cy) => {
+    if (cx < plotLeft || cx > plotLeft + plotWidth || cy < plotTop || cy > plotTop + plotHeight) return null;
+
     const yn = canvasToYNorm(cy, plotTop, plotHeight);
     const pressure = yNormToPressure(yn, layout.minP, layout.maxP);
 
