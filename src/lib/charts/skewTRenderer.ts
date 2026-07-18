@@ -9,7 +9,6 @@ import {
 } from '$lib/meteo/thermo';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
-import type { SkewTChartSelection } from '$lib/charts/chartAccessibility';
 import { type SkewTData, type SkewTLevelData, type SkewTTrace } from '$lib/meteo/types';
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
@@ -891,7 +890,15 @@ export function renderHoverOverlay(
 
   ctx.restore(); // initial save
 }
-export type HitTestResult = SkewTChartSelection;
+export interface HitTestResult {
+  pressure: number;
+  heightMeters: number;
+  temperature: number;
+  dewpoint: number;
+  windSpeed: number;
+  windDirection: number;
+  isInterpolated: boolean;
+}
 
 export type HitTestFn = (canvasX: number, canvasY: number) => HitTestResult | null;
 
@@ -950,11 +957,9 @@ export function renderSkewT(
       pressure: Math.round(pressure),
       heightMeters: levelData.heightMeters,
       temperature: temp,
-      traceTemperature: levelData.temperature,
       dewpoint: levelData.dewpoint,
       windSpeed: levelData.windSpeed,
       windDirection: levelData.windDirection,
-      cloudCover: levelData.cloudCover,
       isInterpolated: levelData.isInterpolated,
     };
   };

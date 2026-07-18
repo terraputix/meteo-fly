@@ -3,25 +3,13 @@
   import { CustomChart, LineChart } from 'echarts/charts';
   import { GridComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
   import { CanvasRenderer } from 'echarts/renderers';
-  import {
-    buildTooltipStore,
-    createActiveState,
-    type ActiveState,
-    type TooltipStore,
-  } from '$lib/charts/tooltipFormatter';
-  import {
-    clampIndex,
-    createWindChartSelection,
-    findNearestIndex,
-    type WindChartSelection,
-  } from '$lib/charts/chartAccessibility';
+  import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
   import { buildWindChartOption, getChartHeight } from '$lib/charts/buildWindChartOption';
   import type { WindChartData } from '$lib/api/types';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
   import type { WeatherModel } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
-  import XIcon from '@lucide/svelte/icons/x';
 
   use([LineChart, CustomChart, GridComponent, TooltipComponent, MarkAreaComponent, MarkLineComponent, CanvasRenderer]);
 
@@ -40,9 +28,6 @@
   } = $props();
 
   let isRendering = $state(false);
-  let windSelection = $state<WindChartSelection | null>(null);
-  let selectionPinned = $state(false);
-  let dismissChartSelection = $state<(() => void) | null>(null);
 
   let isBusy = $derived(isLoading || isRendering);
 
@@ -68,69 +53,7 @@
     let pendingRender: { requestId: number; params: RenderChartParams } | null = null;
     let prevData = params.data;
     let prevDaylightOnly = params.daylightOnly;
-    let tooltipStore: TooltipStore | null = null;
     const activeState: ActiveState = createActiveState();
-
-    function setSelection(timeIndex: number, heightIndex: number) {
-      if (!tooltipStore) return;
-      windSelection = createWindChartSelection(tooltipStore, timeIndex, heightIndex);
-    }
-
-    function setSelectionFromValues(timestamp: number, height: number | null) {
-      if (!tooltipStore) return;
-      const timeIndex = findNearestIndex(tooltipStore.sortedWindTimes, timestamp);
-      const heightIndex =
-        height == null ? (windSelection?.heightIndex ?? 0) : findNearestIndex(tooltipStore.sortedWindHeights, height);
-      setSelection(timeIndex, heightIndex);
-    }
-
-    function showKeyboardSelection() {
-      if (!chart || !windSelection || windSelection.height == null) return;
-      const x = Number(chart.convertToPixel({ xAxisIndex: 2 }, windSelection.timestamp));
-      const y = Number(chart.convertToPixel({ yAxisIndex: 3 }, windSelection.height));
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-      chart.dispatchAction({ type: 'updateAxisPointer', x, y });
-    }
-
-    function dismissSelection() {
-      if (chart) {
-        chart.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' });
-        chart.dispatchAction({ type: 'hideTip' });
-      }
-      activeState.gridIndex = -1;
-      activeState.hoveredWindY = null;
-      windSelection = null;
-      selectionPinned = false;
-    }
-
-    function handleKeydown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        dismissSelection();
-        return;
-      }
-      if (!tooltipStore || tooltipStore.sortedWindTimes.length === 0) return;
-      const current = windSelection ?? createWindChartSelection(tooltipStore, 0, 0);
-      if (!current) return;
-
-      let timeIndex = current.timeIndex;
-      let heightIndex = current.heightIndex;
-      if (event.key === 'ArrowLeft') timeIndex--;
-      else if (event.key === 'ArrowRight') timeIndex++;
-      else if (event.key === 'ArrowDown') heightIndex--;
-      else if (event.key === 'ArrowUp') heightIndex++;
-      else if (event.key === 'Home') timeIndex = 0;
-      else if (event.key === 'End') timeIndex = tooltipStore.sortedWindTimes.length - 1;
-      else return;
-
-      event.preventDefault();
-      selectionPinned = true;
-      setSelection(
-        clampIndex(timeIndex, tooltipStore.sortedWindTimes.length),
-        clampIndex(heightIndex, tooltipStore.sortedWindHeights.length)
-      );
-      showKeyboardSelection();
-    }
 
     function handleAxisPointer(event: unknown) {
       const e = event as { axesInfo?: Array<{ axisDim: string; axisIndex: number; value: number }> };
@@ -141,8 +64,6 @@
         return;
       }
       const yInfo = axes.find((axis) => axis.axisDim === 'y');
-      const xInfo = axes.find((axis) => axis.axisDim === 'x');
-      if (xInfo) setSelectionFromValues(xInfo.value, yInfo?.axisIndex === 3 ? (yInfo.value ?? null) : null);
       if (!yInfo) {
         activeState.gridIndex = -1;
         activeState.hoveredWindY = null;
@@ -160,28 +81,7 @@
       }
     }
 
-    function handlePointerDown(event: PointerEvent) {
-      selectionPinned = event.pointerType !== 'mouse';
-    }
-
-    function handlePointerMove(event: PointerEvent) {
-      if (event.pointerType === 'mouse') selectionPinned = false;
-    }
-
-    function handleDocumentPointerDown(event: PointerEvent) {
-      const chartContainer = keyboardTarget?.parentElement;
-      if (selectionPinned && event.target instanceof Node && !chartContainer?.contains(event.target)) {
-        dismissSelection();
-      }
-    }
-
-    const keyboardTarget = node.parentElement;
-    dismissChartSelection = dismissSelection;
     chart.on('updateaxispointer', handleAxisPointer);
-    keyboardTarget?.addEventListener('keydown', handleKeydown);
-    keyboardTarget?.addEventListener('pointerdown', handlePointerDown);
-    keyboardTarget?.addEventListener('pointermove', handlePointerMove);
-    document.addEventListener('pointerdown', handleDocumentPointerDown);
 
     const resizeObserver = new ResizeObserver(() => chart?.resize());
     resizeObserver.observe(node);
@@ -235,8 +135,6 @@
         activeState.hoveredWindY = null;
 
         const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
-        tooltipStore = store;
-        setSelection(0, 0);
         chart.setOption(
           buildWindChartOption(
             temperatureChartData,
@@ -284,7 +182,6 @@
     function draw(currentParams: RenderChartParams) {
       if (!currentParams.data) return;
 
-      dismissSelection();
       const currentRequestId = ++requestId;
       if (workerBusy) terminateCurrentWorker();
       worker ??= createWorker();
@@ -325,8 +222,6 @@
             activeState.gridIndex = -1;
             activeState.hoveredWindY = null;
             chart?.clear();
-            tooltipStore = null;
-            windSelection = null;
             isRendering = false;
           }
         }
@@ -337,15 +232,9 @@
         terminateCurrentWorker();
         pendingRender = null;
         resizeObserver.disconnect();
-        keyboardTarget?.removeEventListener('keydown', handleKeydown);
-        keyboardTarget?.removeEventListener('pointerdown', handlePointerDown);
-        keyboardTarget?.removeEventListener('pointermove', handlePointerMove);
-        document.removeEventListener('pointerdown', handleDocumentPointerDown);
         chart?.off('updateaxispointer', handleAxisPointer);
         chart?.dispose();
         chart = null;
-        dismissChartSelection = null;
-        selectionPinned = false;
         isRendering = false;
       },
     };
@@ -356,31 +245,11 @@
   <ChartLoadingOverlay visible={isBusy} message="Loading weather data…" />
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
-  <button
-    type="button"
-    class="block w-full border-0 bg-transparent p-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+  <div
+    use:renderChart={{ data: windChartData, windHeight, maxAltitude, model, daylightOnly }}
+    class="chart-content"
     style="opacity: {isBusy ? 0 : 1}; height: {totalHeight}px;"
-    aria-label="Wind forecast chart"
-    aria-busy={isBusy}
-  >
-    <div
-      use:renderChart={{ data: windChartData, windHeight, maxAltitude, model, daylightOnly }}
-      class="chart-content"
-      style="height: {totalHeight}px;"
-    ></div>
-  </button>
-
-  {#if windSelection && selectionPinned}
-    <button
-      type="button"
-      class="absolute top-2 right-2 z-10 flex size-11 items-center justify-center rounded-md border border-slate-200 bg-white/95 text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-      aria-label="Hide chart details"
-      title="Hide chart details"
-      onclick={() => dismissChartSelection?.()}
-    >
-      <XIcon class="size-4" aria-hidden="true" />
-    </button>
-  {/if}
+  ></div>
 </div>
 
 <style>
