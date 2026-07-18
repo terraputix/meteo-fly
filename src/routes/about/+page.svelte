@@ -18,7 +18,7 @@
 </svelte:head>
 
 <div class="bg-slate-50 text-slate-900">
-  <div class="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 pt-10 pb-16 sm:px-6 lg:px-8">
+  <div class="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pt-10 pb-16 sm:px-6 lg:px-8">
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div class="max-w-2xl">
         <p class="text-xs font-semibold tracking-[0.2em] text-slate-500 uppercase">About</p>
@@ -32,14 +32,14 @@
       <!-- eslint-disable svelte/no-navigation-without-resolve -->
       <a
         href={returnUrl}
-        class="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold tracking-widest text-slate-600 uppercase transition hover:border-slate-300 hover:text-slate-900"
+        class="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold tracking-widest text-slate-600 uppercase transition hover:border-slate-300 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
       >
         Back to forecast
       </a>
       <!-- eslint-enable svelte/no-navigation-without-resolve -->
     </div>
 
-    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section class="border-y border-slate-200 py-6 sm:py-8">
       <h2 class="text-xl font-semibold text-slate-900">Why was Meteo-Fly created</h2>
       <p class="mt-3 text-sm text-slate-600 sm:text-base">
         I wanted a single chart that brings together all the information needed to assess a flight day: wind, cloud,
@@ -54,8 +54,8 @@
       </p>
     </section>
 
-    <section class="space-y-6">
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section class="divide-y divide-slate-200 border-y border-slate-200">
+      <div class="py-6 sm:py-8">
         <h2 class="text-xl font-semibold text-slate-900">The meteogram panel</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           The meteogram panel shows a stack of charts covering wind, cloud cover, precipitation, humidity, and the
@@ -63,7 +63,7 @@
         </p>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="py-6 sm:py-8">
         <h2 class="text-xl font-semibold text-slate-900">Wind arrows</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           In the wind chart, solid arrows correspond to wind data that comes directly from the model's native pressure
@@ -72,7 +72,7 @@
         </p>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="py-6 sm:py-8">
         <h2 class="text-xl font-semibold text-slate-900">Lifted Condensation Level (LCL)</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           The LCL line is calculated from surface temperature and dewpoint using Espy's approximation: <strong
@@ -89,7 +89,7 @@
         </div>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="py-6 sm:py-8">
         <h2 class="text-xl font-semibold text-slate-900">Grid cell selection</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           Weather models provide data on a grid. Meteo-Fly lets you decide whether to always select the closest grid
@@ -110,7 +110,7 @@
         </ul>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="py-6 sm:py-8">
         <h2 class="text-xl font-semibold text-slate-900">Multi-model comparison</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           Each model has its own grid resolution, vertical levels, and physics. Use the model selector to compare trends
@@ -119,7 +119,7 @@
         </p>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="py-6 sm:py-8">
         <h2 class="text-xl font-semibold text-slate-900">Map tiles</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           Map tiles are served by two awesome projects: the base map uses
@@ -130,7 +130,7 @@
         </p>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="py-6 sm:py-8">
         <h2 class="text-xl font-semibold text-slate-900">Data source</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           Meteo-Fly uses meteorological data from
@@ -140,18 +140,20 @@
         </p>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 class="text-xl font-semibold text-slate-900">Limitations</h2>
-        <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600 sm:text-base">
-          <li>Mountain meteorology, valley circulations, and rotor effects are not resolved by global models.</li>
-          <li>
-            For some models, cloud cover is derived from model humidity profiles; thin orographic cloud can be missed.
-          </li>
-          <li>All forecasts are guidance only. Always combine with live observations and local knowledge.</li>
-        </ul>
+      <div class="py-6 sm:py-8">
+        <div class="rounded-md border border-amber-200 bg-amber-50 p-5 sm:p-6">
+          <h2 class="text-xl font-semibold text-slate-900">Limitations</h2>
+          <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700 sm:text-base">
+            <li>Mountain meteorology, valley circulations, and rotor effects are not resolved by global models.</li>
+            <li>
+              For some models, cloud cover is derived from model humidity profiles; thin orographic cloud can be missed.
+            </li>
+            <li>All forecasts are guidance only. Always combine with live observations and local knowledge.</li>
+          </ul>
+        </div>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="py-6 sm:py-8">
         <h2 class="text-xl font-semibold text-slate-900">Open source</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">
           Meteo-Fly is open source software. The source code is available on
