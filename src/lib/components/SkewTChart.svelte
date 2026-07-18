@@ -5,6 +5,7 @@
   import { clampIndex, createSkewTLevelSelection, findNearestIndex } from '$lib/charts/chartAccessibility';
   import type { SkewTData } from '$lib/meteo/types';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
+  import XIcon from '@lucide/svelte/icons/x';
 
   export let skewTData: SkewTData | null = null;
   export let hour = 0; // index into traces array
@@ -23,6 +24,10 @@
   let selectedLevelIndex = 0;
   let selectedResult: HitTestResult | null = null;
   let selectionVisible = false;
+  let selectionPinned = false;
+  let renderedData: SkewTData | null = null;
+  let renderedHour = -1;
+  let preserveSelectionOnNextRender = false;
 
   function canvasSize() {
     const dpr = window.devicePixelRatio || 1;
@@ -40,6 +45,12 @@
 
   function render() {
     if (!canvas || !overlayCanvas || !skewTData) return;
+    const contextChanged = renderedData !== null && (renderedData !== skewTData || renderedHour !== hour);
+    if (contextChanged && !preserveSelectionOnNextRender) dismissSelection();
+    preserveSelectionOnNextRender = false;
+    renderedData = skewTData;
+    renderedHour = hour;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const { dpr, width } = canvasSize();
@@ -79,10 +90,12 @@
     if (!container) return;
     resizeObserver = new ResizeObserver(() => render());
     resizeObserver.observe(container);
+    document.addEventListener('pointerdown', handleDocumentPointerDown);
   });
 
   onDestroy(() => {
     resizeObserver?.disconnect();
+    document.removeEventListener('pointerdown', handleDocumentPointerDown);
   });
 
   function orderedLevels() {
@@ -108,7 +121,7 @@
     const y = e.clientY - rect.top;
     const result = hitTest(x, y);
     if (!result) {
-      clearOverlay();
+      dismissSelection();
       return;
     }
     const levels = orderedLevels();
@@ -118,6 +131,7 @@
     );
     selectedResult = result;
     selectionVisible = true;
+    selectionPinned = e.pointerType !== 'mouse';
     renderSelection(result);
   }
 
@@ -140,9 +154,12 @@
 
   function handlePointerLeave(e: PointerEvent) {
     if (e.pointerType === 'mouse' && activePointerId === null) {
-      selectionVisible = false;
-      clearOverlay();
+      dismissSelection();
     }
+  }
+
+  function handleDocumentPointerDown(e: PointerEvent) {
+    if (selectionPinned && e.target instanceof Node && !container?.contains(e.target)) dismissSelection();
   }
 
   function selectLevel(index: number) {
@@ -151,17 +168,25 @@
     selectedLevelIndex = clampIndex(index, levels.length);
     selectedResult = createSkewTLevelSelection(levels[selectedLevelIndex]);
     selectionVisible = true;
+    selectionPinned = true;
     renderSelection(selectedResult);
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      dismissSelection();
+      return;
+    }
     if (!skewTData || !currentTrace) return;
 
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault();
       const increment = e.key === 'ArrowLeft' ? -1 : 1;
+      preserveSelectionOnNextRender = true;
       hour = clampIndex(hour + increment, skewTData.traces.length);
       selectionVisible = true;
+      selectionPinned = true;
       return;
     }
 
@@ -192,6 +217,13 @@
     overlayCtx.clearRect(0, 0, width, totalHeight);
     overlayCtx.restore();
   }
+
+  function dismissSelection() {
+    selectionVisible = false;
+    selectionPinned = false;
+    selectedResult = null;
+    clearOverlay();
+  }
 </script>
 
 <div bind:this={container} class="skewt-chart-container" style="min-height: {totalHeight}px;">
@@ -216,6 +248,18 @@
     ></canvas>
     <canvas bind:this={overlayCanvas} class="overlay-canvas" aria-hidden="true"></canvas>
   </button>
+
+  {#if selectionVisible && selectionPinned}
+    <button
+      type="button"
+      class="absolute top-2 right-2 z-10 flex size-11 items-center justify-center rounded-md border border-slate-200 bg-white/95 text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+      aria-label="Hide chart details"
+      title="Hide chart details"
+      onclick={dismissSelection}
+    >
+      <XIcon class="size-4" aria-hidden="true" />
+    </button>
+  {/if}
 
   <div class="skewt-legend">
     {#each legendItems as item (item.label)}

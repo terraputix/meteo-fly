@@ -21,6 +21,7 @@
   import type { WeatherModel } from '$lib/api/types';
   import type { MaxAltitude } from '$lib/meteo/types';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
+  import XIcon from '@lucide/svelte/icons/x';
 
   use([LineChart, CustomChart, GridComponent, TooltipComponent, MarkAreaComponent, MarkLineComponent, CanvasRenderer]);
 
@@ -40,6 +41,8 @@
 
   let isRendering = $state(false);
   let windSelection = $state<WindChartSelection | null>(null);
+  let selectionPinned = $state(false);
+  let dismissChartSelection = $state<(() => void) | null>(null);
 
   let isBusy = $derived(isLoading || isRendering);
 
@@ -89,7 +92,23 @@
       chart.dispatchAction({ type: 'updateAxisPointer', x, y });
     }
 
+    function dismissSelection() {
+      if (chart) {
+        chart.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' });
+        chart.dispatchAction({ type: 'hideTip' });
+      }
+      activeState.gridIndex = -1;
+      activeState.hoveredWindY = null;
+      windSelection = null;
+      selectionPinned = false;
+    }
+
     function handleKeydown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        dismissSelection();
+        return;
+      }
       if (!tooltipStore || tooltipStore.sortedWindTimes.length === 0) return;
       const current = windSelection ?? createWindChartSelection(tooltipStore, 0, 0);
       if (!current) return;
@@ -105,6 +124,7 @@
       else return;
 
       event.preventDefault();
+      selectionPinned = true;
       setSelection(
         clampIndex(timeIndex, tooltipStore.sortedWindTimes.length),
         clampIndex(heightIndex, tooltipStore.sortedWindHeights.length)
@@ -140,9 +160,28 @@
       }
     }
 
+    function handlePointerDown(event: PointerEvent) {
+      selectionPinned = event.pointerType !== 'mouse';
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      if (event.pointerType === 'mouse') selectionPinned = false;
+    }
+
+    function handleDocumentPointerDown(event: PointerEvent) {
+      const chartContainer = keyboardTarget?.parentElement;
+      if (selectionPinned && event.target instanceof Node && !chartContainer?.contains(event.target)) {
+        dismissSelection();
+      }
+    }
+
     const keyboardTarget = node.parentElement;
+    dismissChartSelection = dismissSelection;
     chart.on('updateaxispointer', handleAxisPointer);
     keyboardTarget?.addEventListener('keydown', handleKeydown);
+    keyboardTarget?.addEventListener('pointerdown', handlePointerDown);
+    keyboardTarget?.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerdown', handleDocumentPointerDown);
 
     const resizeObserver = new ResizeObserver(() => chart?.resize());
     resizeObserver.observe(node);
@@ -245,6 +284,7 @@
     function draw(currentParams: RenderChartParams) {
       if (!currentParams.data) return;
 
+      dismissSelection();
       const currentRequestId = ++requestId;
       if (workerBusy) terminateCurrentWorker();
       worker ??= createWorker();
@@ -298,9 +338,14 @@
         pendingRender = null;
         resizeObserver.disconnect();
         keyboardTarget?.removeEventListener('keydown', handleKeydown);
+        keyboardTarget?.removeEventListener('pointerdown', handlePointerDown);
+        keyboardTarget?.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerdown', handleDocumentPointerDown);
         chart?.off('updateaxispointer', handleAxisPointer);
         chart?.dispose();
         chart = null;
+        dismissChartSelection = null;
+        selectionPinned = false;
         isRendering = false;
       },
     };
@@ -324,6 +369,18 @@
       style="height: {totalHeight}px;"
     ></div>
   </button>
+
+  {#if windSelection && selectionPinned}
+    <button
+      type="button"
+      class="absolute top-2 right-2 z-10 flex size-11 items-center justify-center rounded-md border border-slate-200 bg-white/95 text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+      aria-label="Hide chart details"
+      title="Hide chart details"
+      onclick={() => dismissChartSelection?.()}
+    >
+      <XIcon class="size-4" aria-hidden="true" />
+    </button>
+  {/if}
 </div>
 
 <style>
