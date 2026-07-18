@@ -67,34 +67,51 @@
     if (!container) return;
     resizeObserver = new ResizeObserver(() => render());
     resizeObserver.observe(container);
+    document.addEventListener('pointerdown', handleDocumentPointerDown);
   });
 
   onDestroy(() => {
     resizeObserver?.disconnect();
+    document.removeEventListener('pointerdown', handleDocumentPointerDown);
   });
 
-  function handleMouseMove(e: MouseEvent) {
-    if (!hitTest || !canvas || !overlayCanvas || !currentTrace || !lastLayout) return;
+  function showSelection(e: MouseEvent) {
+    if (!hitTest || !canvas || !overlayCanvas || !currentTrace || !lastLayout || !skewTData) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const result = hitTest(x, y);
+    const result = hitTest(e.clientX - rect.left, e.clientY - rect.top);
     if (!result) {
       clearOverlay();
       return;
     }
+
     const overlayCtx = overlayCanvas.getContext('2d');
     if (!overlayCtx) return;
     const { dpr, width } = canvasSize();
     overlayCtx.save();
     overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     overlayCtx.clearRect(0, 0, width, totalHeight);
-    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width, skewTData!.elevation);
+    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width, skewTData.elevation);
     overlayCtx.restore();
   }
 
-  function handleMouseLeave() {
-    clearOverlay();
+  function handlePointerMove(e: PointerEvent) {
+    if (e.pointerType !== 'touch') showSelection(e);
+  }
+
+  function handleClick(e: MouseEvent) {
+    if ((e as PointerEvent).pointerType === 'touch') showSelection(e);
+  }
+
+  function handlePointerCancel(e: PointerEvent) {
+    if (e.pointerType === 'touch') clearOverlay();
+  }
+
+  function handlePointerLeave(e: PointerEvent) {
+    if (e.pointerType === 'mouse') clearOverlay();
+  }
+
+  function handleDocumentPointerDown(e: PointerEvent) {
+    if (e.target instanceof Node && !container?.contains(e.target)) clearOverlay();
   }
 
   function clearOverlay() {
@@ -113,7 +130,13 @@
   <ChartLoadingOverlay visible={isLoading} message="Loading sounding data…" />
 
   <div class="chart-wrapper" style="position: relative;">
-    <canvas bind:this={canvas} on:mousemove={handleMouseMove} on:mouseleave={handleMouseLeave} class="chart-canvas"
+    <canvas
+      bind:this={canvas}
+      onpointermove={handlePointerMove}
+      onclick={handleClick}
+      onpointercancel={handlePointerCancel}
+      onpointerleave={handlePointerLeave}
+      class="chart-canvas"
     ></canvas>
     <canvas bind:this={overlayCanvas} class="overlay-canvas"></canvas>
   </div>
@@ -151,6 +174,7 @@
     display: block;
     width: 100%;
     cursor: crosshair;
+    touch-action: pan-y pinch-zoom;
   }
 
   .overlay-canvas {
