@@ -59,6 +59,11 @@
 
   const paneDirection = $derived<'horizontal' | 'vertical'>($isMobile ? 'vertical' : 'horizontal');
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
+  const showMapLoadingStatus = $derived(!showChart && isWindChartLoading && !windChartData);
+  const showMapErrorStatus = $derived(!showChart && windFailure !== null);
+  const mapControlsTopOffset = $derived(
+    $isMobile ? (showMapErrorStatus ? '7.5rem' : showMapLoadingStatus ? '3.75rem' : '0.75rem') : '0.75rem'
+  );
   const outdatedCachedAt = $derived(chartView === 'wind' ? windOutdatedCachedAt : skewTOutdatedCachedAt);
   const outdatedCachedAtLabel = $derived(
     outdatedCachedAt === null
@@ -399,15 +404,23 @@
   />
 </svelte:head>
 
-<div class="relative h-screen w-full overflow-hidden bg-slate-100">
-  {#if !showChart && isWindChartLoading && !windChartData}
-    <div class="pointer-events-none absolute inset-x-3 top-3 z-50 flex justify-center" role="status">
+<div
+  class="relative h-screen w-full overflow-hidden bg-slate-100"
+  style="--map-controls-top-offset: {mapControlsTopOffset};"
+>
+  {#if showMapLoadingStatus}
+    <div
+      class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
+      role="status"
+    >
       <div class="rounded-md bg-white/95 px-4 py-2 text-sm text-slate-600 shadow-md ring-1 ring-slate-200">
         Loading weather data…
       </div>
     </div>
-  {:else if !showChart && windFailure}
-    <div class="pointer-events-none absolute inset-x-3 top-3 z-50 flex justify-center">
+  {:else if showMapErrorStatus && windFailure}
+    <div
+      class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
+    >
       <div
         class="pointer-events-auto flex max-w-lg items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 shadow-md ring-1 ring-red-200"
         role="alert"

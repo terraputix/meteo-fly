@@ -710,7 +710,7 @@
 
 <style>
   :global(.maplibregl-ctrl-top-left) {
-    top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+    top: calc(env(safe-area-inset-top, 0px) + var(--map-controls-top-offset, 0.75rem));
     left: calc(env(safe-area-inset-left, 0px) + 0.75rem);
     display: flex;
     flex-direction: column;
@@ -919,7 +919,7 @@
   }
 
   .controls-stack {
-    top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+    top: calc(env(safe-area-inset-top, 0px) + var(--map-controls-top-offset, 0.75rem));
   }
 
   button.chart-open {
