@@ -512,6 +512,7 @@
               bind:chartView
               bind:hour={selectedHour}
               bind:daylightOnly={parameters.daylightOnly}
+              keyboardNavigationEnabled={showChart}
               onClose={closeChartPanel}
             />
           {:else if isWindChartLoading}

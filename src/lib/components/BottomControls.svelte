@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { MIN_FORECAST_DAY, stepTimestep, type TimestepDirection } from '$lib/components/timestepNavigation';
+  import type { ChartView } from '$lib/services/types';
+
   let {
     selectedDay = $bindable(),
     startDate,
@@ -6,6 +9,8 @@
     traceHours = [],
     timezoneAbbr = '',
     maxForecastDays = 8,
+    chartView = 'wind',
+    keyboardNavigationEnabled = false,
     onclose = undefined,
   }: {
     selectedDay: number;
@@ -14,8 +19,22 @@
     traceHours?: Date[];
     timezoneAbbr?: string;
     maxForecastDays?: number;
+    chartView?: ChartView;
+    keyboardNavigationEnabled?: boolean;
     onclose?: () => void;
   } = $props();
+
+  const keyboardNavigationExclusionSelector = [
+    'a[href]',
+    'input',
+    'select',
+    'textarea',
+    'summary',
+    '[contenteditable]:not([contenteditable="false"])',
+    '[tabindex]:not([tabindex="-1"])',
+    '[role="dialog"]',
+    '.maplibregl-map',
+  ].join(',');
 
   function getDayLabel(day: number) {
     if (day === 1) return 'Today';
@@ -24,14 +43,33 @@
     return day > 1 ? `+${day - 1} days` : `${day - 1} days`;
   }
 
+  function formatForecastDate(date: Date): string {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+
+  function applyTimestep(direction: TimestepDirection, activeView = chartView) {
+    ({ selectedDay, hour } = stepTimestep({
+      chartView: activeView,
+      direction,
+      selectedDay,
+      hour,
+      traceCount: traceHours.length,
+      maxForecastDays,
+    }));
+  }
+
   function handleNextDay(e: MouseEvent) {
     e.preventDefault();
-    if (selectedDay < maxForecastDays) selectedDay += 1;
+    applyTimestep(1, 'wind');
   }
 
   function handlePrevDay(e: MouseEvent) {
     e.preventDefault();
-    if (selectedDay > -13) selectedDay -= 1;
+    applyTimestep(-1, 'wind');
   }
 
   function formatDayHour(date: Date): string {
@@ -44,37 +82,68 @@
   }
 
   function prevTrace() {
-    if (hour > 0) {
-      hour--;
-    } else if (selectedDay > -13) {
-      selectedDay--;
-      hour = 23;
-    }
+    applyTimestep(-1, 'skewt');
   }
 
   function nextTrace() {
-    if (hour < traceHours.length - 1) {
-      hour++;
-    } else if (selectedDay < maxForecastDays) {
-      selectedDay++;
-      hour = 0;
-    }
+    applyTimestep(1, 'skewt');
   }
 
   function handleSliderInput(e: Event) {
     const target = e.target as HTMLInputElement;
     hour = parseInt(target.value);
   }
+
+  function hasInteractiveKeyboardTarget(event: KeyboardEvent): boolean {
+    return event
+      .composedPath()
+      .some((target) => target instanceof Element && target.matches(keyboardNavigationExclusionSelector));
+  }
+
+  function handleTimestepKeydown(event: KeyboardEvent) {
+    if (
+      !keyboardNavigationEnabled ||
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') ||
+      hasInteractiveKeyboardTarget(event)
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    applyTimestep(event.key === 'ArrowLeft' ? -1 : 1);
+  }
+
+  let timestepAnnouncement = $derived.by(() => {
+    if (chartView === 'skewt' && traceHours.length > 0) {
+      return `Forecast time ${formatDayHour(traceHours[hour] ?? new Date())} ${timezoneAbbr}`.trim();
+    }
+    return `Forecast ${getDayLabel(selectedDay)}, ${formatForecastDate(startDate)}`;
+  });
 </script>
 
-<div class="flex flex-col gap-1">
+<svelte:window onkeydown={handleTimestepKeydown} />
+
+<div
+  class="flex flex-col gap-1"
+  role="group"
+  aria-label="Forecast timestep controls"
+  aria-keyshortcuts="ArrowLeft ArrowRight"
+>
+  <span class="sr-only" aria-live="polite" aria-atomic="true">{timestepAnnouncement}</span>
   {#if traceHours.length > 0}
     <div class="flex items-center gap-2 px-1">
       <span class="text-xs font-medium text-slate-500">Time</span>
       <button
+        type="button"
         onclick={prevTrace}
-        disabled={hour <= 0 && selectedDay <= -13}
-        class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={hour <= 0 && selectedDay <= MIN_FORECAST_DAY}
+        class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Previous hour"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -87,12 +156,15 @@
         max={traceHours.length - 1}
         value={hour}
         oninput={handleSliderInput}
-        class="h-2 flex-1 cursor-pointer rounded-lg bg-slate-200 accent-indigo-600"
+        aria-label="Forecast time"
+        aria-valuetext={`${formatDayHour(traceHours[hour] ?? new Date())} ${timezoneAbbr}`.trim()}
+        class="h-2 flex-1 cursor-pointer rounded-lg bg-slate-200 accent-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600"
       />
       <button
+        type="button"
         onclick={nextTrace}
         disabled={hour >= traceHours.length - 1 && selectedDay >= maxForecastDays}
-        class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Next hour"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -110,9 +182,10 @@
     class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 shadow-inner shadow-slate-100 sm:gap-3 sm:p-2.5"
   >
     <button
+      type="button"
       onclick={handlePrevDay}
-      disabled={selectedDay <= -13}
-      class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10"
+      disabled={selectedDay <= MIN_FORECAST_DAY}
+      class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10"
       aria-label="Previous day"
     >
       <svg
@@ -134,19 +207,16 @@
         <span class="truncate">{getDayLabel(selectedDay)}</span>
         <span class="text-slate-300">•</span>
         <span class="truncate text-slate-600">
-          {startDate.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-          })}
+          {formatForecastDate(startDate)}
         </span>
       </div>
     </div>
 
     <button
+      type="button"
       onclick={handleNextDay}
       disabled={selectedDay >= maxForecastDays}
-      class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10"
+      class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:bg-slate-300 sm:h-10 sm:w-10"
       aria-label="Next day"
     >
       <svg
@@ -161,8 +231,9 @@
     </button>
 
     <button
+      type="button"
       onclick={() => onclose?.()}
-      class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm transition hover:bg-white hover:text-slate-800 sm:h-10 sm:w-10"
+      class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm transition hover:bg-white hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 sm:h-10 sm:w-10"
       aria-label="Close chart panel"
     >
       <svg
