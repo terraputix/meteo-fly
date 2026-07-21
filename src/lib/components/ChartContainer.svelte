@@ -23,6 +23,7 @@
     chartView = $bindable<ChartView>('wind'),
     hour = $bindable(0),
     daylightOnly = $bindable(false),
+    keyboardNavigationEnabled = false,
     onRetrySkewT,
     onClose,
   }: {
@@ -38,6 +39,7 @@
     chartView?: ChartView;
     hour?: number;
     daylightOnly?: boolean;
+    keyboardNavigationEnabled?: boolean;
     onRetrySkewT?: () => void;
     onClose?: () => void;
   } = $props();
@@ -197,6 +199,8 @@
       {traceHours}
       timezoneAbbr={skewTData?.timezoneAbbr ?? ''}
       {maxForecastDays}
+      {chartView}
+      {keyboardNavigationEnabled}
       onclose={onClose}
     />
   </div>
