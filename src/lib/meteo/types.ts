@@ -15,6 +15,7 @@ export const MAX_ALTITUDE_OPTIONS = [
   { value: 6000, label: '6000m (475hPa)' },
   { value: 7000, label: '7000m (400hPa)' },
   { value: 8000, label: '8000m (350hPa)' },
+  { value: 10000, label: '10000m (250hPa)' },
 ] as const;
 
 export type MaxAltitude = (typeof MAX_ALTITUDE_OPTIONS)[number]['value'];

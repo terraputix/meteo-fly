@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MODEL_OPTIONS } from '$lib/api/models';
 import { MAX_ALTITUDE_OPTIONS } from './types';
-import { getAllTaggedLevelsForModel, getNativeLevelsForModel } from './pressureLevels';
+import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, getNativeLevelsForModel } from './pressureLevels';
 
 const cases = MODEL_OPTIONS.flatMap(({ id: model }) =>
   MAX_ALTITUDE_OPTIONS.map(({ value: maxAltitude }) => ({ model, maxAltitude }))
@@ -28,5 +28,13 @@ describe('GFS pressure levels', () => {
     const levels = getAllTaggedLevelsForModel('gfs_seamless', maxAltitude);
 
     expect(levels.every((level) => level.source === 'model')).toBe(true);
+  });
+});
+
+describe('10 km pressure levels', () => {
+  it.each(MODEL_OPTIONS)('fetches $name through 200 hPa', ({ id: model }) => {
+    const levels = getNativeLevelsForFetch(model, 10000);
+
+    expect(levels[levels.length - 1]?.hPa).toBe(200);
   });
 });
