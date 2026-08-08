@@ -23,22 +23,26 @@ export function metersToHPa(heightMeters: number): number {
 
 const ALL_PRESSURE_LEVELS = [
   1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 675, 650, 625, 600, 575, 550, 525, 500, 475, 450,
-  425, 400, 375, 350, 325, 300,
+  425, 400, 375, 350, 325, 300, 275, 250, 225, 200,
 ];
+const HIGH_ALTITUDE_FETCH_THRESHOLD_METERS = 10000;
+const HIGH_ALTITUDE_FETCH_TOP_HPA = 200;
 
 function pickLevels(hPaValues: number[]): PressureLevel[] {
   return hPaValues.map((hPa) => ({ hPa, heightMeters: hPaToMeters(hPa) }));
 }
 
 // ─── Per-model native level sets ──────────────────────────────────────────────
-const ICON_HEIGHT_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300];
+const ICON_HEIGHT_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
 const UKMO_HEIGHT_LEVELS = [
-  1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 375, 350, 325, 300,
+  1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 375, 350, 325, 300, 275, 250, 225, 200,
 ];
-const ECMWF_HEIGHT_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300];
-const CMA_HEIGHT_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300];
+const ECMWF_HEIGHT_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200];
+const CMA_HEIGHT_LEVELS = [
+  1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200,
+];
 const GEM_HEIGHT_LEVELS = [
-  1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300,
+  1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200,
 ];
 export const MODEL_NATIVE_LEVELS: Record<WeatherModel, PressureLevel[]> = {
   icon_seamless: pickLevels(ICON_HEIGHT_LEVELS),
@@ -60,12 +64,16 @@ export function getNativeLevelsForModel(model: WeatherModel, maxAltitude: number
 }
 
 /**
- * Like getNativeLevelsForModel, but also includes the first native level above
- * maxAltitude. This ensures callers always have an upper bracket available for
- * interpolation up to the ceiling.
+ * Like getNativeLevelsForModel, but includes enough data above maxAltitude for
+ * interpolation: the first native level normally, or levels through 200 hPa for
+ * the 10 km ceiling.
  */
 export function getNativeLevelsForFetch(model: WeatherModel, maxAltitude: number): PressureLevel[] {
   const levels = MODEL_NATIVE_LEVELS[model];
+  if (maxAltitude >= HIGH_ALTITUDE_FETCH_THRESHOLD_METERS) {
+    return levels.filter((l) => l.hPa >= HIGH_ALTITUDE_FETCH_TOP_HPA);
+  }
+
   const withinBounds = levels.filter((l) => l.heightMeters <= maxAltitude);
   const firstAbove = levels.find((l) => l.heightMeters > maxAltitude);
   if (firstAbove) withinBounds.push(firstAbove);
