@@ -204,7 +204,7 @@ export async function fetchModelGridElevation(
 
 export async function fetchWindChartData(
   location: Location,
-  model: WeatherModel = 'icon_d2',
+  model: WeatherModel = 'icon_seamless',
   start: Date,
   numberOfDays: number = 1,
   maxAltitude: MaxAltitude = 4000,
@@ -277,7 +277,7 @@ function getSkewTVariablesForModel(model: WeatherModel, maxAltitude: MaxAltitude
 
 export async function fetchSkewTData(
   location: Location,
-  model: WeatherModel = 'icon_d2',
+  model: WeatherModel = 'icon_seamless',
   start: Date,
   maxAltitude: MaxAltitude = 4000,
   cellSelection: CellSelection = 'nearest',

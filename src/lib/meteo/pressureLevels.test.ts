@@ -5,6 +5,7 @@ import {
   getAllTaggedLevelsForModel,
   getNativeLevelsForFetch,
   getNativeLevelsForModel,
+  getTopPressureForModel,
   hPaToMeters,
   metersToHPaExact,
 } from './pressureLevels';
@@ -51,5 +52,13 @@ describe('continuous pressure conversion', () => {
 
     expect(pressure).toBeCloseTo(616.4, 1);
     expect(hPaToMeters(pressure)).toBe(4000);
+  });
+});
+
+describe('top pressure mapping', () => {
+  it('returns the highest plotted level for an altitude and model', () => {
+    expect(getTopPressureForModel('icon_d2', 4000)).toBe(625);
+    expect(getTopPressureForModel('icon_d2', 7000)).toBe(425);
+    expect(getTopPressureForModel('gfs_seamless', 10000)).toBe(275);
   });
 });

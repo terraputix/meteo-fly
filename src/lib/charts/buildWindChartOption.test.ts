@@ -79,6 +79,15 @@ describe('wind chart option', () => {
     expect(windAxes[3].max).toBeCloseTo(metersToHPaExact(0));
     expect(getWindChartHeight(10000)).toBe(749);
 
+    const altitudeGridData = series.find((item) => item.name === '_altitudeGrid')?.markLine?.data as Array<{
+      yAxis: number;
+      label: { show: boolean; formatter: string };
+    }>;
+    expect(altitudeGridData.at(-1)).toMatchObject({
+      yAxis: metersToHPaExact(4000),
+      label: { show: false, formatter: '4000m' },
+    });
+
     for (const seriesName of ['_cloudRects', '_windCloud']) {
       const cloudSeries = series.find((item) => item.name === seriesName) as NamedSeries & {
         renderItem: NonNullable<CustomSeriesOption['renderItem']>;

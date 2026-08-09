@@ -119,3 +119,7 @@ export function getAllTaggedLevelsForModel(model: WeatherModel, maxAltitude: num
   const interpolated = buildInterpolatedLevels(nativeForBracket).filter((l) => l.heightMeters <= maxAltitude);
   return [...nativeForDisplay, ...interpolated].sort((a, b) => a.heightMeters - b.heightMeters);
 }
+
+export function getTopPressureForModel(model: WeatherModel, maxAltitude: number): number | undefined {
+  return getAllTaggedLevelsForModel(model, maxAltitude).at(-1)?.hPa;
+}

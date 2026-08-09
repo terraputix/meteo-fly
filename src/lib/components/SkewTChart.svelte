@@ -1,15 +1,31 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { renderSkewT, renderHoverOverlay, type HitTestResult, type PlotLayout } from '$lib/charts/skewTRenderer';
+  import {
+    renderSkewT,
+    renderHoverOverlay,
+    SKEWT_PLOT_TOP,
+    type HitTestResult,
+    type PlotLayout,
+  } from '$lib/charts/skewTRenderer';
   import { CHART_COLORS } from '$lib/charts/chartColors';
-  import type { SkewTData } from '$lib/meteo/types';
+  import { MAX_ALTITUDE_OPTIONS, type MaxAltitude, type SkewTData } from '$lib/meteo/types';
+  import type { WeatherModel } from '$lib/api/types';
+  import { getTopPressureForModel } from '$lib/meteo/pressureLevels';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
+  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
   export let skewTData: SkewTData | null = null;
   export let hour = 0; // index into traces array
+  export let maxAltitude: MaxAltitude = 4000;
+  export let model: WeatherModel = 'icon_seamless';
   export let isLoading = false;
 
   const totalHeight = 520;
+
+  $: topPressureOptions = MAX_ALTITUDE_OPTIONS.map((option) => ({
+    ...option,
+    pressure: getTopPressureForModel(model, option.value),
+  }));
 
   let canvas: HTMLCanvasElement | undefined;
   let overlayCanvas: HTMLCanvasElement | undefined;
@@ -130,6 +146,26 @@
   <ChartLoadingOverlay visible={isLoading} message="Loading sounding data…" />
 
   <div class="chart-wrapper" style="position: relative;">
+    <label
+      class="group absolute left-0 z-[5] flex h-5 w-[58px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
+      style="top: {SKEWT_PLOT_TOP - 10}px;"
+    >
+      <select
+        bind:value={maxAltitude}
+        aria-label="Skew-T top height"
+        title="Skew-T top height: {maxAltitude}m"
+        class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-3 pl-0 text-right font-medium text-slate-600 outline-none"
+      >
+        {#each topPressureOptions as option (option.value)}
+          <option value={option.value}>{option.pressure}hPa</option>
+        {/each}
+      </select>
+      <ChevronDownIcon
+        class="pointer-events-none absolute right-0.5 h-3 w-3 text-slate-300 transition group-hover:text-slate-500"
+        aria-hidden="true"
+      />
+    </label>
+
     <canvas
       bind:this={canvas}
       onpointermove={handlePointerMove}

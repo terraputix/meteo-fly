@@ -105,7 +105,7 @@ export function buildWindChartOption(
   activeState: ActiveState,
   windHeight: number = getWindChartHeight(),
   maxAltitude: MaxAltitude = 4000,
-  model: WeatherModel = 'icon_d2',
+  model: WeatherModel = 'icon_seamless',
   modelGridElevation: number | undefined = undefined
 ): EChartsOption {
   // ── Model-specific level data ──────────────────────────────────────────────
@@ -426,7 +426,7 @@ export function buildWindChartOption(
       },
       data: altitudeTicks.map((altitude) => ({
         yAxis: metersToHPaExact(altitude),
-        label: { formatter: `${altitude}m` },
+        label: { show: altitude !== maxAltitude, formatter: `${altitude}m` },
       })),
     },
     z: 0,
