@@ -4,18 +4,19 @@
   import { GridComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
   import { CanvasRenderer } from 'echarts/renderers';
   import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
-  import { buildWindChartOption, getChartHeight } from '$lib/charts/buildWindChartOption';
+  import { buildWindChartOption, getChartHeight, getWindChartHeight, WIND_TOP } from '$lib/charts/buildWindChartOption';
   import type { WindChartData } from '$lib/api/types';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
   import type { WeatherModel } from '$lib/api/types';
-  import type { MaxAltitude } from '$lib/meteo/types';
+  import { MAX_ALTITUDE_OPTIONS, type MaxAltitude } from '$lib/meteo/types';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
+  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
   use([LineChart, CustomChart, GridComponent, TooltipComponent, MarkAreaComponent, MarkLineComponent, CanvasRenderer]);
 
   let {
     windChartData = null,
-    maxAltitude = 4000,
+    maxAltitude = $bindable<MaxAltitude>(4000),
     model = 'icon_seamless',
     isLoading = false,
     daylightOnly = false,
@@ -31,7 +32,7 @@
 
   let isBusy = $derived(isLoading || isRendering);
 
-  let windHeight = $derived(Math.ceil(maxAltitude / 10));
+  let windHeight = $derived(getWindChartHeight(maxAltitude));
   let totalHeight = $derived(getChartHeight(windHeight));
 
   // ─── Svelte action ────────────────────────────────────────────────────────
@@ -60,24 +61,24 @@
       const axes = e?.axesInfo;
       if (!axes?.length) {
         activeState.gridIndex = -1;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
         return;
       }
       const yInfo = axes.find((axis) => axis.axisDim === 'y');
       if (!yInfo) {
         activeState.gridIndex = -1;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
         return;
       }
       if (yInfo.axisIndex <= 1) {
         activeState.gridIndex = 0;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
       } else if (yInfo.axisIndex === 2) {
         activeState.gridIndex = 1;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
       } else {
         activeState.gridIndex = 2;
-        activeState.hoveredWindY = yInfo.value;
+        activeState.hoveredWindPressure = yInfo.value;
       }
     }
 
@@ -132,7 +133,7 @@
         } = response.data;
 
         activeState.gridIndex = -1;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
 
         const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
         chart.setOption(
@@ -220,7 +221,7 @@
             terminateCurrentWorker();
             pendingRender = null;
             activeState.gridIndex = -1;
-            activeState.hoveredWindY = null;
+            activeState.hoveredWindPressure = null;
             chart?.clear();
             isRendering = false;
           }
@@ -243,6 +244,26 @@
 
 <div class="chart-container" style="min-height: {totalHeight}px;">
   <ChartLoadingOverlay visible={isBusy} message="Loading weather data…" />
+
+  <label
+    class="group absolute left-0 z-[5] flex h-5 w-[54px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
+    style="top: {WIND_TOP - 10}px;"
+  >
+    <select
+      bind:value={maxAltitude}
+      aria-label="Wind chart top height"
+      title="Wind chart top height"
+      class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-3 pl-0 text-right font-medium text-slate-600 outline-none"
+    >
+      {#each MAX_ALTITUDE_OPTIONS as option (option.value)}
+        <option value={option.value}>{option.value}m</option>
+      {/each}
+    </select>
+    <ChevronDownIcon
+      class="pointer-events-none absolute right-0.5 h-3 w-3 text-slate-300 transition group-hover:text-slate-500"
+      aria-hidden="true"
+    />
+  </label>
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
   <div

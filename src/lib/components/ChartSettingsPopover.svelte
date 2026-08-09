@@ -1,15 +1,12 @@
 <script lang="ts">
   import { CELL_SELECTION_OPTIONS, type CellSelection } from '$lib/api/types';
-  import { MAX_ALTITUDE_OPTIONS, type MaxAltitude } from '$lib/meteo/types';
   import * as Popover from '$lib/components/ui/popover/index.js';
   import SettingsIcon from '@lucide/svelte/icons/settings';
 
   let {
-    maxAltitude = $bindable<MaxAltitude>(4000),
     cellSelection = $bindable<CellSelection>('nearest'),
     daylightOnly = $bindable(false),
   }: {
-    maxAltitude?: MaxAltitude;
     cellSelection?: CellSelection;
     daylightOnly?: boolean;
   } = $props();
@@ -30,19 +27,6 @@
 
   <Popover.Content side="bottom" align="end" class="w-64 p-3" sideOffset={6}>
     <div class="flex flex-col gap-3">
-      <label class="flex flex-col gap-1.5">
-        <span class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Top height</span>
-        <select
-          bind:value={maxAltitude}
-          onchange={() => (open = false)}
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-        >
-          {#each MAX_ALTITUDE_OPTIONS as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
-      </label>
-
       <div class="flex flex-col gap-1.5">
         <div class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Grid cell selection</div>
         <div class="grid grid-cols-2 gap-1 rounded-xl bg-slate-50/70 p-1">

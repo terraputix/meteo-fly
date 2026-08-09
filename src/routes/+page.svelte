@@ -449,7 +449,6 @@
           longitude={parameters.location.longitude}
           bind:chartOpen={showChart}
           bind:model={parameters.selectedModel}
-          bind:maxAltitude={parameters.maxAltitude}
           bind:cellSelection={parameters.cellSelection}
           bind:daylightOnly={parameters.daylightOnly}
           selectedGridCell={windChartData?.selectedGridCell ?? null}

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomSeriesOption, CustomSeriesRenderItemAPI, CustomSeriesRenderItemParams } from 'echarts';
 import { buildTooltipStore, createActiveState } from './tooltipFormatter';
-import { buildWindChartOption } from './buildWindChartOption';
+import { buildWindChartOption, getWindChartHeight } from './buildWindChartOption';
+import { metersToHPaExact } from '$lib/meteo/pressureLevels';
 
 interface NamedSeries {
   name?: string;
@@ -12,6 +13,12 @@ interface NamedSeries {
 interface RainSeriesItem {
   id: string;
   value: [number, number];
+}
+
+interface ValueAxis {
+  min?: number;
+  max?: number;
+  inverse?: boolean;
 }
 
 describe('wind chart option', () => {
@@ -46,7 +53,7 @@ describe('wind chart option', () => {
       temperatureData,
       rainCloudData,
       [],
-      [{ time: times[0], height: 0, value: NaN }],
+      [{ time: times[0], pressure: 1000, value: NaN }],
       lcl,
       500,
       'UTC',
@@ -61,11 +68,24 @@ describe('wind chart option', () => {
       [{ coord: [times[0].getTime(), 2] }, { coord: [times[1].getTime(), 2] }],
       [{ coord: [times[0].getTime(), 3] }, { coord: [times[1].getTime(), 3] }],
     ]);
-    expect(series.find((item) => item.name === 'LCL')).toMatchObject({
-      data: [
-        [times[0].getTime(), null],
-        [times[1].getTime(), 1200],
-      ],
+    const lclData = series.find((item) => item.name === 'LCL')?.data as [number, number | null][];
+    expect(lclData[0]).toEqual([times[0].getTime(), null]);
+    expect(lclData[1][0]).toBe(times[1].getTime());
+    expect(lclData[1][1]).toBeCloseTo(metersToHPaExact(1200));
+
+    const windAxes = option.yAxis as ValueAxis[];
+    expect(windAxes[3]).toMatchObject({ inverse: true });
+    expect(windAxes[3].min).toBeCloseTo(metersToHPaExact(4000));
+    expect(windAxes[3].max).toBeCloseTo(metersToHPaExact(0));
+    expect(getWindChartHeight(10000)).toBe(749);
+
+    const altitudeGridData = series.find((item) => item.name === '_altitudeGrid')?.markLine?.data as Array<{
+      yAxis: number;
+      label: { show: boolean; formatter: string };
+    }>;
+    expect(altitudeGridData.at(-1)).toMatchObject({
+      yAxis: metersToHPaExact(4000),
+      label: { show: false, formatter: '4000m' },
     });
 
     for (const seriesName of ['_cloudRects', '_windCloud']) {

@@ -7,6 +7,7 @@ import type { MaxAltitude } from '$lib/meteo/types';
 export interface WindFieldLevel {
   time: Date;
   height: number;
+  pressure: number;
   speed: number;
   direction: number;
   source: LevelSource;
@@ -62,6 +63,7 @@ export function getWindFieldAllLevels(
         data.push({
           time,
           height: level.heightMeters,
+          pressure: level.hPa,
           speed: Math.round(speed * 100) / 100,
           direction: Math.round(direction),
           source: level.source,

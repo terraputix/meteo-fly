@@ -17,8 +17,12 @@ export function hPaToMeters(hPa: number): number {
 }
 
 export function metersToHPa(heightMeters: number): number {
+  return Math.round(metersToHPaExact(heightMeters));
+}
+
+export function metersToHPaExact(heightMeters: number): number {
   const pascals = ISA_P0_PA * Math.pow(1 - heightMeters / ISA_T0_OVER_L, 1 / ISA_EXPONENT);
-  return Math.round(pascals / 100);
+  return pascals / 100;
 }
 
 const ALL_PRESSURE_LEVELS = [
@@ -114,4 +118,8 @@ export function getAllTaggedLevelsForModel(model: WeatherModel, maxAltitude: num
   const nativeForBracket = getNativeLevelsForFetch(model, maxAltitude);
   const interpolated = buildInterpolatedLevels(nativeForBracket).filter((l) => l.heightMeters <= maxAltitude);
   return [...nativeForDisplay, ...interpolated].sort((a, b) => a.heightMeters - b.heightMeters);
+}
+
+export function getTopPressureForModel(model: WeatherModel, maxAltitude: number): number | undefined {
+  return getAllTaggedLevelsForModel(model, maxAltitude).at(-1)?.hPa;
 }

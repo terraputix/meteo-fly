@@ -20,7 +20,6 @@
   import ChartSettingsPopover from './ChartSettingsPopover.svelte';
   import HikeFlyLayer from './HikeFlyLayer.svelte';
   import type { WeatherModel, CellSelection } from '$lib/api/types';
-  import type { MaxAltitude } from '$lib/meteo/types';
   import { haversineDistance } from '$lib/meteo/hikeAndFly';
   import {
     createDeferredMapLocationSelection,
@@ -36,8 +35,7 @@
     selectedGridCell = $bindable(null as Location | null),
     gridCellElevation = $bindable(undefined as number | undefined),
     modelGridElevation = $bindable(undefined as number | undefined),
-    model = $bindable<WeatherModel>('icon_d2'),
-    maxAltitude = $bindable<MaxAltitude>(4000),
+    model = $bindable<WeatherModel>('icon_seamless'),
     cellSelection = $bindable<CellSelection>('nearest'),
     daylightOnly = $bindable(false),
     onLocationChange = undefined as ((location: Location) => void) | undefined,
@@ -51,7 +49,6 @@
     gridCellElevation?: number | undefined;
     modelGridElevation?: number | undefined;
     model?: WeatherModel;
-    maxAltitude?: MaxAltitude;
     cellSelection?: CellSelection;
     daylightOnly?: boolean;
     onLocationChange?: ((location: Location) => void) | undefined;
@@ -640,7 +637,7 @@
     </button>
 
     <div class="pointer-events-auto">
-      <ChartSettingsPopover bind:maxAltitude bind:cellSelection bind:daylightOnly />
+      <ChartSettingsPopover bind:cellSelection bind:daylightOnly />
     </div>
 
     <button

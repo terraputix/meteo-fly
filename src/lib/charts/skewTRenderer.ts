@@ -16,6 +16,7 @@ import { type SkewTData, type SkewTLevelData, type SkewTTrace } from '$lib/meteo
 const SKEW_OFFSET = 40;
 const PRESSURE_SAMPLE_COUNT = 84;
 const TEMP_PADDING = 12;
+export const SKEWT_PLOT_TOP = 30;
 
 const ADIABAT_OPACITY = 0.7;
 const ADIABAT_WIDTH = 0.85;
@@ -360,6 +361,7 @@ function drawAxis(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
 
   // Pressure labels (left side)
   for (const p of layout.pressureLevels) {
+    if (p === layout.minP) continue;
     const y = pressureToCanvasY(layout, p);
     drawText(ctx, `${p}`, plotLeft - 8, y, '#666', 'right', 'middle');
   }
@@ -914,7 +916,7 @@ export function renderSkewT(
   width: number,
   height: number
 ): SkewTRenderResult | null {
-  const margin = { top: 30, right: 70, bottom: 50, left: 60 };
+  const margin = { top: SKEWT_PLOT_TOP, right: 70, bottom: 50, left: 60 };
   const plotLeft = margin.left;
   const plotTop = margin.top;
   const plotWidth = Math.max(width - margin.left - margin.right, 100);

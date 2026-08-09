@@ -4,7 +4,7 @@ import { getNativeLevelsForModel } from '$lib/meteo/pressureLevels';
 
 export interface CloudCoverData {
   time: Date;
-  height: number;
+  pressure: number;
   value: number;
 }
 
@@ -25,7 +25,7 @@ export function getCloudCoverData(
       if (!Number.isFinite(value)) return;
       data.push({
         time,
-        height: level.heightMeters,
+        pressure: level.hPa,
         value,
       });
     });

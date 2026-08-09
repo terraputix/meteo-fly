@@ -15,9 +15,8 @@ export interface TooltipStore {
   cloudMidByTime: Map<number, number>;
   cloudHighByTime: Map<number, number>;
   lclByTime: Map<number, number>;
-  windByTimeHeight: Map<string, { speed: number; direction: number }>;
-  sortedWindTimes: number[];
-  sortedWindHeights: number[];
+  windByTimePressure: Map<string, { height: number; speed: number; direction: number }>;
+  sortedWindPressures: number[];
 }
 
 export function buildTooltipStore(
@@ -53,14 +52,16 @@ export function buildTooltipStore(
     if (d.value != null && Number.isFinite(d.value)) lclByTime.set(d.time.getTime(), d.value);
   });
 
-  const windByTimeHeight = new Map<string, { speed: number; direction: number }>();
-  const windTimesSet = new Set<number>();
-  const windHeightsSet = new Set<number>();
+  const windByTimePressure = new Map<string, { height: number; speed: number; direction: number }>();
+  const windPressuresSet = new Set<number>();
   windData.forEach((w) => {
     const t = w.time.getTime();
-    windByTimeHeight.set(`${t}_${w.height}`, { speed: w.speed, direction: w.direction });
-    windTimesSet.add(t);
-    windHeightsSet.add(w.height);
+    windByTimePressure.set(`${t}_${w.pressure}`, {
+      height: w.height,
+      speed: w.speed,
+      direction: w.direction,
+    });
+    windPressuresSet.add(w.pressure);
   });
 
   return {
@@ -70,9 +71,8 @@ export function buildTooltipStore(
     cloudMidByTime,
     cloudHighByTime,
     lclByTime,
-    windByTimeHeight,
-    sortedWindTimes: Array.from(windTimesSet).sort((a, b) => a - b),
-    sortedWindHeights: Array.from(windHeightsSet).sort((a, b) => a - b),
+    windByTimePressure,
+    sortedWindPressures: Array.from(windPressuresSet).sort((a, b) => a - b),
   };
 }
 
@@ -89,11 +89,11 @@ export function buildTooltipStore(
 
 export interface ActiveState {
   gridIndex: number; // 0 | 1 | 2 | -1
-  hoveredWindY: number | null; // raw y-axis value in grid 2, null when not in grid 2
+  hoveredWindPressure: number | null;
 }
 
 export function createActiveState(): ActiveState {
-  return { gridIndex: -1, hoveredWindY: null };
+  return { gridIndex: -1, hoveredWindPressure: null };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ export function createTooltipFormatter(
     const snap = Math.round(hoveredTime / 3_600_000) * 3_600_000;
     const timeStr = fmtTime(new Date(snap));
 
-    const { gridIndex, hoveredWindY } = active;
+    const { gridIndex, hoveredWindPressure } = active;
 
     let html =
       `<div style="font-weight:600;margin-bottom:4px;padding-bottom:3px;` +
@@ -224,18 +224,17 @@ export function createTooltipFormatter(
           `LCL:&nbsp;<b>${Math.round(cb)}&nbsp;m</b></div>`;
       }
 
-      if (gridIndex === 2 && hoveredWindY != null) {
-        // Single-level: snap hover Y to the nearest available height.
-        const nearestHeight = snapToNearest(store.sortedWindHeights, hoveredWindY);
-        if (nearestHeight != null) {
-          const w = store.windByTimeHeight.get(`${snap}_${nearestHeight}`);
+      if (gridIndex === 2 && hoveredWindPressure != null) {
+        const nearestPressure = snapToNearest(store.sortedWindPressures, hoveredWindPressure);
+        if (nearestPressure != null) {
+          const w = store.windByTimePressure.get(`${snap}_${nearestPressure}`);
           if (w) {
             const col = windColorScale(w.speed);
             html += `<div style="margin-top:4px;padding-top:3px;border-top:1px solid #eee">`;
             html += `<table style="border-collapse:collapse;width:100%">`;
             html +=
               `<tr>` +
-              `<td style="padding:0 4px 0 0;color:#666">${nearestHeight}&nbsp;m</td>` +
+              `<td style="padding:0 4px 0 0;color:#666">${w.height}&nbsp;m</td>` +
               `<td style="color:${col};font-weight:600;text-align:right">${w.speed}&nbsp;km/h</td>` +
               `<td style="color:#555;text-align:right;padding-left:6px">${w.direction}°</td>` +
               `</tr>`;
@@ -245,9 +244,9 @@ export function createTooltipFormatter(
       } else {
         // Fallback (unknown grid): show all levels in a compact table.
         const entries: { height: number; speed: number; direction: number }[] = [];
-        for (const h of store.sortedWindHeights) {
-          const w = store.windByTimeHeight.get(`${snap}_${h}`);
-          if (w) entries.push({ height: h, speed: w.speed, direction: w.direction });
+        for (const pressure of [...store.sortedWindPressures].reverse()) {
+          const w = store.windByTimePressure.get(`${snap}_${pressure}`);
+          if (w) entries.push(w);
         }
         if (entries.length) {
           html += `<div style="margin-top:4px;padding-top:3px;border-top:1px solid #eee;font-size:11px">`;

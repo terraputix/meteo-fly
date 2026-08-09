@@ -19,7 +19,7 @@
     skewTError = null,
     selectedDay = $bindable(),
     maxAltitude = $bindable(4000),
-    model = $bindable<WeatherModel>('icon_d2'),
+    model = $bindable<WeatherModel>('icon_seamless'),
     chartView = $bindable<ChartView>('wind'),
     hour = $bindable(0),
     daylightOnly = $bindable(false),
@@ -116,7 +116,7 @@
     </div>
 
     {#if chartView === 'wind'}
-      <WindChart {windChartData} {maxAltitude} {model} {daylightOnly} isLoading={isWindChartLoading} />
+      <WindChart {windChartData} bind:maxAltitude {model} {daylightOnly} isLoading={isWindChartLoading} />
       <Footer>
         {#snippet heading()}
           <button
@@ -182,7 +182,7 @@
         </div>
       </div>
     {:else if skewTData && traceHours.length > 0}
-      <SkewTChart {skewTData} {hour} isLoading={isSkewTLoading} />
+      <SkewTChart {skewTData} {hour} bind:maxAltitude {model} isLoading={isSkewTLoading} />
       <Footer />
     {:else}
       <div class="flex h-64 items-center justify-center">
