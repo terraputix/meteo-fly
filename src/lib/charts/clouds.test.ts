@@ -30,8 +30,6 @@ describe('cloud chart data', () => {
       },
     };
 
-    expect(getCloudCoverData(data, 'icon_d2', 4000)).toEqual([
-      { time: times[1], height: level.heightMeters, value: 42.25 },
-    ]);
+    expect(getCloudCoverData(data, 'icon_d2', 4000)).toEqual([{ time: times[1], pressure: level.hPa, value: 42.25 }]);
   });
 });

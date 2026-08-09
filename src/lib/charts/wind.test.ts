@@ -33,6 +33,7 @@ describe('wind chart data', () => {
     expect(result).toContainEqual({
       time: times[1],
       height: level?.heightMeters,
+      pressure: 1000,
       speed: 10.13,
       direction: 181,
       source: 'model',

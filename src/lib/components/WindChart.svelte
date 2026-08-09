@@ -4,7 +4,7 @@
   import { GridComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
   import { CanvasRenderer } from 'echarts/renderers';
   import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
-  import { buildWindChartOption, getChartHeight } from '$lib/charts/buildWindChartOption';
+  import { buildWindChartOption, getChartHeight, getWindChartHeight } from '$lib/charts/buildWindChartOption';
   import type { WindChartData } from '$lib/api/types';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
   import type { WeatherModel } from '$lib/api/types';
@@ -31,7 +31,7 @@
 
   let isBusy = $derived(isLoading || isRendering);
 
-  let windHeight = $derived(Math.ceil(maxAltitude / 10));
+  let windHeight = $derived(getWindChartHeight(maxAltitude));
   let totalHeight = $derived(getChartHeight(windHeight));
 
   // ─── Svelte action ────────────────────────────────────────────────────────
@@ -60,24 +60,24 @@
       const axes = e?.axesInfo;
       if (!axes?.length) {
         activeState.gridIndex = -1;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
         return;
       }
       const yInfo = axes.find((axis) => axis.axisDim === 'y');
       if (!yInfo) {
         activeState.gridIndex = -1;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
         return;
       }
       if (yInfo.axisIndex <= 1) {
         activeState.gridIndex = 0;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
       } else if (yInfo.axisIndex === 2) {
         activeState.gridIndex = 1;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
       } else {
         activeState.gridIndex = 2;
-        activeState.hoveredWindY = yInfo.value;
+        activeState.hoveredWindPressure = yInfo.value;
       }
     }
 
@@ -132,7 +132,7 @@
         } = response.data;
 
         activeState.gridIndex = -1;
-        activeState.hoveredWindY = null;
+        activeState.hoveredWindPressure = null;
 
         const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
         chart.setOption(
@@ -220,7 +220,7 @@
             terminateCurrentWorker();
             pendingRender = null;
             activeState.gridIndex = -1;
-            activeState.hoveredWindY = null;
+            activeState.hoveredWindPressure = null;
             chart?.clear();
             isRendering = false;
           }

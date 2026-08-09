@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { MODEL_OPTIONS } from '$lib/api/models';
 import { MAX_ALTITUDE_OPTIONS } from './types';
-import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, getNativeLevelsForModel } from './pressureLevels';
+import {
+  getAllTaggedLevelsForModel,
+  getNativeLevelsForFetch,
+  getNativeLevelsForModel,
+  hPaToMeters,
+  metersToHPaExact,
+} from './pressureLevels';
 
 const cases = MODEL_OPTIONS.flatMap(({ id: model }) =>
   MAX_ALTITUDE_OPTIONS.map(({ value: maxAltitude }) => ({ model, maxAltitude }))
@@ -36,5 +42,14 @@ describe('10 km pressure levels', () => {
     const levels = getNativeLevelsForFetch(model, 10000);
 
     expect(levels[levels.length - 1]?.hPa).toBe(200);
+  });
+});
+
+describe('continuous pressure conversion', () => {
+  it('preserves fractional pressure for chart coordinates', () => {
+    const pressure = metersToHPaExact(4000);
+
+    expect(pressure).toBeCloseTo(616.4, 1);
+    expect(hPaToMeters(pressure)).toBe(4000);
   });
 });
