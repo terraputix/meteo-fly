@@ -253,14 +253,14 @@
       bind:value={maxAltitude}
       aria-label="Wind chart top height"
       title="Wind chart top height"
-      class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-3 pl-0 text-right font-medium text-slate-600 outline-none"
+      class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-4 pl-0 text-right font-semibold text-slate-700 outline-none"
     >
       {#each MAX_ALTITUDE_OPTIONS as option (option.value)}
         <option value={option.value}>{option.value}m</option>
       {/each}
     </select>
     <ChevronDownIcon
-      class="pointer-events-none absolute right-0.5 h-3 w-3 text-slate-300 transition group-hover:text-slate-500"
+      class="pointer-events-none absolute right-0.5 h-3 w-3 text-slate-500 transition group-hover:text-slate-700"
       aria-hidden="true"
     />
   </label>
