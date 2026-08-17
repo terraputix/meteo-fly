@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomSeriesOption, CustomSeriesRenderItemAPI, CustomSeriesRenderItemParams } from 'echarts';
 import { buildTooltipStore, createActiveState } from './tooltipFormatter';
-import { buildWindChartOption, getWindChartHeight } from './buildWindChartOption';
+import { buildWindChartOption, getWindChartHeight, RAIN_SPOT_TOP, RAIN_TOP } from './buildWindChartOption';
 import { metersToHPaExact } from '$lib/meteo/pressureLevels';
 
 interface NamedSeries {
   name?: string;
   data?: unknown;
   markLine?: { data?: unknown };
+  xAxisIndex?: number;
+  yAxisIndex?: number;
 }
 
 interface RainSeriesItem {
@@ -23,6 +25,7 @@ interface ValueAxis {
 
 describe('wind chart option', () => {
   it('renders LCL gaps and keeps rain identities stable', () => {
+    expect(RAIN_SPOT_TOP).toBeLessThan(RAIN_TOP);
     const times: [Date, Date] = [new Date('2026-07-16T10:00:00Z'), new Date('2026-07-16T11:00:00Z')];
     const temperatureData = {
       temperatureData: times.map((time) => ({ time, value: NaN })),
@@ -74,9 +77,9 @@ describe('wind chart option', () => {
     expect(lclData[1][1]).toBeCloseTo(metersToHPaExact(1200));
 
     const windAxes = option.yAxis as ValueAxis[];
-    expect(windAxes[3]).toMatchObject({ inverse: true });
-    expect(windAxes[3].min).toBeCloseTo(metersToHPaExact(4000));
-    expect(windAxes[3].max).toBeCloseTo(metersToHPaExact(0));
+    expect(windAxes[4]).toMatchObject({ inverse: true });
+    expect(windAxes[4].min).toBeCloseTo(metersToHPaExact(4000));
+    expect(windAxes[4].max).toBeCloseTo(metersToHPaExact(0));
     expect(getWindChartHeight(10000)).toBe(749);
 
     const altitudeGridData = series.find((item) => item.name === '_altitudeGrid')?.markLine?.data as Array<{
@@ -141,5 +144,56 @@ describe('wind chart option', () => {
       $mergeChildren: false,
       children: [],
     });
+
+    const rainSpotPrecipitation = new Float32Array(25);
+    rainSpotPrecipitation[12] = 2;
+    const rainSpotData = {
+      gridSize: 5,
+      radiusKm: 20,
+      glyphs: [
+        {
+          time: times[0],
+          x1: new Date(times[0].getTime() - 1_800_000),
+          x2: new Date(times[0].getTime() + 1_800_000),
+          precipitation: rainSpotPrecipitation,
+          maximum: 2,
+          wetCellCount: 1,
+        },
+      ],
+    };
+    const rainSpotOption = buildWindChartOption(
+      temperatureData,
+      fullRainCloudData,
+      [],
+      [],
+      lcl,
+      500,
+      'UTC',
+      times,
+      buildTooltipStore(temperatureData, fullRainCloudData, [], lcl, rainSpotData),
+      createActiveState(),
+      getWindChartHeight(),
+      4000,
+      'icon_d2',
+      undefined,
+      rainSpotData
+    );
+    const rainSpotSeries = (rainSpotOption.series as NamedSeries[]).find(
+      (item) => item.name === 'Nearby rain'
+    ) as NamedSeries & { renderItem: NonNullable<CustomSeriesOption['renderItem']> };
+    const renderedRainSpot = rainSpotSeries.renderItem(
+      { dataIndex: 0 } as CustomSeriesRenderItemParams,
+      {
+        coord: ([time, value]: [number, number]) => [(time - times[0].getTime()) / 60_000, value * 20],
+      } as unknown as CustomSeriesRenderItemAPI
+    );
+
+    expect((renderedRainSpot as { children: unknown[] }).children).toHaveLength(25);
+    expect(rainSpotSeries).toMatchObject({ xAxisIndex: 2, yAxisIndex: 3 });
+    expect((rainSpotOption.series as NamedSeries[]).find((item) => item.name === 'Rain')).toMatchObject({
+      xAxisIndex: 1,
+      yAxisIndex: 2,
+    });
+    expect(rainSpotOption.grid).toHaveLength(4);
   });
 });

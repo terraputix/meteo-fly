@@ -6,7 +6,9 @@ import { getVariablesForModel } from './variables';
 import {
   createHourlyParams,
   createQueryParams,
+  createRainSpotCoordinates,
   fetchModelGridElevation,
+  fetchRainSpotData,
   fetchSkewTData,
   fetchWindChartData,
 } from '$lib/api/api';
@@ -50,14 +52,18 @@ function createDailySection(includeSunrise: boolean = true, includeSunset: boole
 function createResponse({
   hourly = null,
   daily = createDailySection(),
+  latitude = 46.8,
+  longitude = 8.2,
 }: {
   hourly?: VariablesWithTime | null;
   daily?: VariablesWithTime | null;
+  latitude?: number;
+  longitude?: number;
 }): WeatherApiResponse {
   return {
     timezoneAbbreviation: () => 'UTC',
-    latitude: () => 46.8,
-    longitude: () => 8.2,
+    latitude: () => latitude,
+    longitude: () => longitude,
     elevation: () => 500,
     hourly: () => hourly,
     daily: () => daily,
@@ -81,6 +87,54 @@ describe('API Configuration', () => {
     const variables = getVariablesForModel('icon_d2');
     const defaultVarCount = getVariablesForModel('icon_global').length;
     expect(variables.length).toBeGreaterThanOrEqual(defaultVarCount);
+  });
+
+  it('creates a north-to-south 5×5 grid centred on the selected location', () => {
+    const location = { latitude: 47, longitude: 8 };
+    const coordinates = createRainSpotCoordinates(location);
+
+    expect(coordinates).toHaveLength(25);
+    expect(coordinates[12]).toEqual(location);
+    expect(coordinates[0].latitude).toBeGreaterThan(location.latitude);
+    expect(coordinates[0].longitude).toBeLessThan(location.longitude);
+    expect(coordinates[24].latitude).toBeLessThan(location.latitude);
+    expect(coordinates[24].longitude).toBeGreaterThan(location.longitude);
+    expect((coordinates[0].latitude - coordinates[20].latitude) * 111.32).toBeCloseTo(40, 5);
+  });
+
+  it('fetches precipitation for all 25 rain spot coordinates', async () => {
+    vi.mocked(fetchWeatherApi).mockImplementationOnce(async (_url, params) => {
+      const latitudes = params.latitude as number[];
+      const longitudes = params.longitude as number[];
+      expect(latitudes).toHaveLength(25);
+      expect(longitudes).toHaveLength(25);
+      expect(params).toMatchObject({
+        hourly: ['precipitation'],
+        models: 'icon_seamless',
+        cell_selection: 'nearest',
+      });
+      expect(params.elevation).toEqual(Array(25).fill('nan'));
+      return latitudes.map((latitude, index) =>
+        createResponse({
+          latitude,
+          longitude: longitudes[index],
+          daily: null,
+          hourly: createHourlySection(['precipitation'], { precipitation: [index, index + 1, index + 2] }),
+        })
+      );
+    });
+
+    const result = await fetchRainSpotData(
+      { latitude: 47, longitude: 8 },
+      'icon_seamless',
+      new Date('2026-07-16T00:00:00Z')
+    );
+
+    expect(result.gridSize).toBe(5);
+    expect(result.radiusKm).toBe(20);
+    expect(result.cells).toHaveLength(25);
+    expect(result.cells[12]).toMatchObject({ row: 2, column: 2 });
+    expect(result.cells[12].precipitation).toEqual(new Float32Array([12, 13, 14]));
   });
 
   describe('createQueryParams date handling', () => {
@@ -134,6 +188,17 @@ describe('API Configuration', () => {
             1,
             4000,
             'nearest',
+            signal
+          ),
+      ],
+      [
+        'rain spot',
+        (signal: AbortSignal) =>
+          fetchRainSpotData(
+            { latitude: 46.8, longitude: 8.2 },
+            'icon_seamless',
+            new Date('2026-07-16T00:00:00Z'),
+            1,
             signal
           ),
       ],

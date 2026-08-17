@@ -8,7 +8,7 @@
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
   import { getInitialParameters } from '$lib/services/defaults';
   import { type PageParameters } from '$lib/services/types';
-  import { fetchWindChartData, fetchModelGridElevation, fetchSkewTData } from '$lib/api/api';
+  import { fetchWindChartData, fetchModelGridElevation, fetchRainSpotData, fetchSkewTData } from '$lib/api/api';
   import type { Location, WindChartData, SkewTWeatherData } from '$lib/api/types';
   import { addDays } from '$lib/utils/dateExtensions';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
@@ -293,15 +293,28 @@
 
   async function updateWindChart(requestParameters: WeatherRequestParameters, request: RequestHandle) {
     try {
-      const result = await fetchWindChartData(
-        requestParameters.location,
-        requestParameters.model,
-        requestParameters.startDate,
-        1,
-        requestParameters.maxAltitude,
-        requestParameters.cellSelection,
-        request.signal
-      );
+      const [result, rainSpot] = await Promise.all([
+        fetchWindChartData(
+          requestParameters.location,
+          requestParameters.model,
+          requestParameters.startDate,
+          1,
+          requestParameters.maxAltitude,
+          requestParameters.cellSelection,
+          request.signal
+        ),
+        fetchRainSpotData(
+          requestParameters.location,
+          requestParameters.model,
+          requestParameters.startDate,
+          1,
+          request.signal
+        ).catch((err: unknown) => {
+          if (isAbortError(err)) throw err;
+          console.warn('Failed to fetch nearby precipitation:', err);
+          return undefined;
+        }),
+      ]);
       if (!windRequest.isCurrent(request)) return;
 
       const modelGridElevation = result.selectedGridCell
@@ -317,7 +330,7 @@
         : undefined;
       if (!windRequest.isCurrent(request)) return;
 
-      windChartData = { ...result, modelGridElevation };
+      windChartData = { ...result, rainSpot, modelGridElevation };
       await openChartPanel();
     } catch (err) {
       if (!windRequest.isCurrent(request) || isAbortError(err)) return;

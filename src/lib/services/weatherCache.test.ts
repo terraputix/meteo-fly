@@ -15,6 +15,9 @@ import {
 
 const REQUEST = new Request('https://api.open-meteo.com/v1/forecast?latitude=47&daily=sunrise');
 const SKEWT_REQUEST = new Request('https://api.open-meteo.com/v1/forecast?latitude=47&hourly=temperature');
+const RAIN_SPOT_REQUEST = new Request(
+  'https://api.open-meteo.com/v1/forecast?latitude=47,47.1&longitude=8,8.1&hourly=precipitation'
+);
 const NOW = Date.parse('2026-07-16T12:00:00Z');
 
 class MemoryCache {
@@ -183,6 +186,21 @@ describe('weather cache policy', () => {
 
     expect(await response.text()).toBe('cached');
     expect(notifyOutdated).toHaveBeenCalledWith('skewt', cachedAt);
+  });
+
+  it('classifies multi-coordinate precipitation as wind chart data', async () => {
+    const cachedAt = NOW - OUTDATED_WARNING_MS;
+    const cacheStorage = new MemoryCacheStorage();
+    cacheStorage.getWeatherCache().responses.set(RAIN_SPOT_REQUEST.url, createCachedResponse('cached', cachedAt));
+    const notifyOutdated = vi.fn().mockResolvedValue(undefined);
+    const dependencies = createDependencies(cacheStorage, {
+      fetchRequest: vi.fn().mockRejectedValue(new TypeError('offline')),
+      notifyOutdated,
+    });
+
+    await handleWeatherRequest(RAIN_SPOT_REQUEST, dependencies);
+
+    expect(notifyOutdated).toHaveBeenCalledWith('wind', cachedAt);
   });
 
   it('invokes the network fetch without binding the dependency object as its receiver', async () => {

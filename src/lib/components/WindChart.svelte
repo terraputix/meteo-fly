@@ -73,7 +73,7 @@
       if (yInfo.axisIndex <= 1) {
         activeState.gridIndex = 0;
         activeState.hoveredWindPressure = null;
-      } else if (yInfo.axisIndex === 2) {
+      } else if (yInfo.axisIndex === 2 || yInfo.axisIndex === 3) {
         activeState.gridIndex = 1;
         activeState.hoveredWindPressure = null;
       } else {
@@ -129,13 +129,14 @@
           timezoneAbbr,
           temperatureChartData,
           rainCloudChartData,
+          rainSpotChartData,
           xDomain,
         } = response.data;
 
         activeState.gridIndex = -1;
         activeState.hoveredWindPressure = null;
 
-        const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
+        const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl, rainSpotChartData);
         chart.setOption(
           buildWindChartOption(
             temperatureChartData,
@@ -151,7 +152,8 @@
             render.params.windHeight,
             render.params.maxAltitude,
             render.params.model,
-            modelGridElevation
+            modelGridElevation,
+            rainSpotChartData
           ),
           { notMerge: true }
         );

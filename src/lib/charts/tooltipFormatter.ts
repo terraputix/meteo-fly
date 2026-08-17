@@ -1,9 +1,10 @@
-import type { TemperatureChartData, RainCloudChartData } from '$lib/workers/chartWorker.types';
+import type { TemperatureChartData, RainCloudChartData, RainSpotChartData } from '$lib/workers/chartWorker.types';
 import type { WindFieldLevel } from '$lib/charts/wind';
 import { windColorScale } from '$lib/charts/scales';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { fmtTime } from '$lib/helpers';
 import type { LclPoint } from '$lib/meteo/lcl';
+import { RAIN_SPOT_GRID_SIZE, RAIN_SPOT_RADIUS_KM } from '$lib/api/types';
 
 // ─── Tooltip store ──────────────────────────────────────────────────────────
 // Pre-built look-up maps keyed by timestamp so the formatter is O(1).
@@ -11,6 +12,7 @@ import type { LclPoint } from '$lib/meteo/lcl';
 export interface TooltipStore {
   tempByTime: Map<number, { temp: number; dew: number; hum: number }>;
   rainByTime: Map<number, number>;
+  rainSpotByTime: Map<number, { maximum: number; wetCellCount: number; cellCount: number; radiusKm: number }>;
   cloudLowByTime: Map<number, number>;
   cloudMidByTime: Map<number, number>;
   cloudHighByTime: Map<number, number>;
@@ -23,7 +25,12 @@ export function buildTooltipStore(
   tempData: TemperatureChartData,
   rainData: RainCloudChartData,
   windData: WindFieldLevel[],
-  cloudBase: LclPoint[]
+  cloudBase: LclPoint[],
+  rainSpotData: RainSpotChartData = {
+    glyphs: [],
+    gridSize: RAIN_SPOT_GRID_SIZE,
+    radiusKm: RAIN_SPOT_RADIUS_KM,
+  }
 ): TooltipStore {
   const tempByTime = new Map<number, { temp: number; dew: number; hum: number }>();
   tempData.temperatureData.forEach((d, i) => {
@@ -36,6 +43,22 @@ export function buildTooltipStore(
 
   const rainByTime = new Map<number, number>();
   rainData.rainDots.forEach((d) => rainByTime.set(d.time.getTime(), d.rain));
+
+  const rainSpotByTime = new Map<
+    number,
+    { maximum: number; wetCellCount: number; cellCount: number; radiusKm: number }
+  >();
+  rainSpotData.glyphs.forEach((glyph) => {
+    const summary = {
+      maximum: glyph.maximum,
+      wetCellCount: glyph.wetCellCount,
+      cellCount: glyph.precipitation.length,
+      radiusKm: rainSpotData.radiusKm,
+    };
+    for (let time = glyph.x1.getTime() + 1_800_000; time < glyph.x2.getTime(); time += 3_600_000) {
+      rainSpotByTime.set(time, summary);
+    }
+  });
 
   const cloudLowByTime = new Map<number, number>();
   const cloudMidByTime = new Map<number, number>();
@@ -67,6 +90,7 @@ export function buildTooltipStore(
   return {
     tempByTime,
     rainByTime,
+    rainSpotByTime,
     cloudLowByTime,
     cloudMidByTime,
     cloudHighByTime,
@@ -83,8 +107,8 @@ export function buildTooltipStore(
 //
 // gridIndex mapping (matches yAxisIndex grouping):
 //   0 → Temperature grid (y-axes 0 & 1)
-//   1 → Rain / cloud-cover grid (y-axis 2)
-//   2 → Wind field grid (y-axis 3)
+//   1 → Rain / cloud-cover and nearby-rain grids (y-axes 2 & 3)
+//   2 → Wind field grid (y-axis 4)
 //  -1 → Unknown / cursor outside all grids (show everything as fallback)
 
 export interface ActiveState {
@@ -210,6 +234,12 @@ export function createTooltipFormatter(
       const rain = store.rainByTime.get(snap);
       if (rain != null && rain !== 0) {
         html += `<div style="margin-bottom:3px">💧 Rain:&nbsp;<b>${rain.toFixed(1)}&nbsp;mm/h</b></div>`;
+      }
+      const rainSpot = store.rainSpotByTime.get(snap);
+      if (rainSpot && Number.isFinite(rainSpot.maximum)) {
+        html +=
+          `<div style="margin-bottom:3px">Nearby ±${rainSpot.radiusKm}&nbsp;km (1h):&nbsp;` +
+          `<b>max ${rainSpot.maximum.toFixed(1)}&nbsp;mm</b>, ${rainSpot.wetCellCount}/${rainSpot.cellCount} wet</div>`;
       }
     }
 

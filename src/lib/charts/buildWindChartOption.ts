@@ -13,10 +13,10 @@ import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { makeAnchorSeries, makeLineSeries } from '$lib/charts/seriesFactories';
 import { createTooltipFormatter, type TooltipStore, type ActiveState } from '$lib/charts/tooltipFormatter';
-import type { TemperatureChartData, RainCloudChartData } from '$lib/workers/chartWorker.types';
+import type { TemperatureChartData, RainCloudChartData, RainSpotChartData } from '$lib/workers/chartWorker.types';
 import type { WindFieldLevel } from '$lib/charts/wind';
 import type { CloudCoverData } from '$lib/charts/clouds';
-import type { WeatherModel } from '$lib/api/types';
+import { RAIN_SPOT_GRID_SIZE, RAIN_SPOT_RADIUS_KM, type WeatherModel } from '$lib/api/types';
 import { getNativeLevelsForFetch, getNativeLevelsForModel, metersToHPaExact } from '$lib/meteo/pressureLevels';
 import { fmtTime } from '$lib/helpers';
 import type { MaxAltitude } from '$lib/meteo/types';
@@ -28,13 +28,17 @@ export const MARGIN_LEFT = 56;
 export const MARGIN_RIGHT = 25;
 export const TEMP_HEIGHT_PX = 130;
 export const RAIN_HEIGHT_PX = 66;
+export const RAIN_SPOT_HEIGHT_PX = 40;
 
 export const TEMP_TOP = 10;
 const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX;
-const RAIN_GAP = 10;
-export const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
+const RAIN_SPOT_GAP = 10;
+export const RAIN_SPOT_TOP = TEMP_BOTTOM_PX + RAIN_SPOT_GAP;
+const RAIN_SPOT_BOTTOM_PX = RAIN_SPOT_TOP + RAIN_SPOT_HEIGHT_PX;
+const RAIN_GAP = 6;
+export const RAIN_TOP = RAIN_SPOT_BOTTOM_PX + RAIN_GAP;
 const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
-const WIND_GAP = 20;
+const WIND_GAP = 16;
 export const WIND_TOP = RAIN_BOTTOM_PX + WIND_GAP;
 
 const SEA_LEVEL_PRESSURE_HPA = metersToHPaExact(0);
@@ -106,7 +110,12 @@ export function buildWindChartOption(
   windHeight: number = getWindChartHeight(),
   maxAltitude: MaxAltitude = 4000,
   model: WeatherModel = 'icon_seamless',
-  modelGridElevation: number | undefined = undefined
+  modelGridElevation: number | undefined = undefined,
+  rainSpotChartData: RainSpotChartData = {
+    glyphs: [],
+    gridSize: RAIN_SPOT_GRID_SIZE,
+    radiusKm: RAIN_SPOT_RADIUS_KM,
+  }
 ): EChartsOption {
   // ── Model-specific level data ──────────────────────────────────────────────
   // nativeLevels drives cloud-band geometry and pressure labels.
@@ -144,6 +153,7 @@ export function buildWindChartOption(
   const grids: GridComponentOption[] = [
     { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: TEMP_TOP, height: TEMP_HEIGHT_PX },
     { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: RAIN_TOP, height: RAIN_HEIGHT_PX },
+    { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: RAIN_SPOT_TOP, height: RAIN_SPOT_HEIGHT_PX },
     { left: MARGIN_LEFT, right: MARGIN_RIGHT, top: WIND_TOP, height: windHeight },
   ];
 
@@ -151,8 +161,9 @@ export function buildWindChartOption(
   const xAxes: XAXisComponentOption[] = [
     makeXAxis(0, false, xMin, xMax),
     makeXAxis(1, false, xMin, xMax),
+    makeXAxis(2, false, xMin, xMax),
     {
-      ...makeXAxis(2, true, xMin, xMax),
+      ...makeXAxis(3, true, xMin, xMax),
       name: `Time [${timezoneAbbr}]`,
       nameLocation: 'middle',
       nameGap: 28,
@@ -218,10 +229,29 @@ export function buildWindChartOption(
       axisLine: { show: false },
       splitLine: { show: false },
     },
-    // 3 – wind pressure coordinate; altitude labels are rendered by markLines
+    // 3 – nearby precipitation
     {
       type: 'value',
       gridIndex: 2,
+      min: 0,
+      max: 1,
+      interval: 0.5,
+      axisLabel: {
+        show: true,
+        fontSize: 9,
+        lineHeight: 11,
+        color: '#999',
+        margin: 8,
+        formatter: (value: number) => (value === 0.5 ? `Rain 🌧️\n±${rainSpotChartData.radiusKm} km` : ''),
+      },
+      axisTick: { show: false },
+      axisLine: { show: true, lineStyle: { color: CHART_COLORS.axisLine } },
+      splitLine: { show: false },
+    },
+    // 4 – wind pressure coordinate; altitude labels are rendered by markLines
+    {
+      type: 'value',
+      gridIndex: 3,
       min: pressureTop,
       max: pressureBottom,
       inverse: true,
@@ -230,10 +260,10 @@ export function buildWindChartOption(
       axisTick: { show: false },
       splitLine: { show: false },
     },
-    // 4 – wind pressure right (pressure labels via markLine, axis provides right border)
+    // 5 – wind pressure right (pressure labels via markLine, axis provides right border)
     {
       type: 'value',
-      gridIndex: 2,
+      gridIndex: 3,
       position: 'right',
       min: pressureTop,
       max: pressureBottom,
@@ -392,22 +422,97 @@ export function buildWindChartOption(
     }),
   };
 
+  function rainSpotColor(precipitation: number): string {
+    if (precipitation >= 8) return 'rgba(126,34,206,0.92)';
+    if (precipitation >= 3) return 'rgba(67,56,202,0.88)';
+    if (precipitation >= 1) return 'rgba(37,99,235,0.84)';
+    if (precipitation >= 0.2) return 'rgba(14,165,233,0.78)';
+    return 'rgba(125,211,252,0.70)';
+  }
+
+  const rainSpotItems = rainSpotChartData.glyphs.map((glyph) => ({
+    timeMs: glyph.time.getTime(),
+    x1: glyph.x1.getTime(),
+    x2: glyph.x2.getTime(),
+    precipitation: glyph.precipitation,
+    maximum: glyph.maximum,
+  }));
+  const rainSpotAnchorSeries = makeAnchorSeries(
+    '__anchor_rain_spot',
+    2,
+    3,
+    rainSpotItems.map((item) => [item.timeMs, 0.5] as [number, number])
+  );
+
+  const rainSpotSeries: CustomSeriesOption = {
+    name: 'Nearby rain',
+    type: 'custom',
+    xAxisIndex: 2,
+    yAxisIndex: 3,
+    z: 4,
+    tooltip: { show: false },
+    silent: true,
+    renderItem(params, api) {
+      const item = rainSpotItems[params.dataIndex];
+      if (!item) return { type: 'group', children: [] };
+
+      const intervalStart = api.coord([item.x1, 0.5]);
+      const intervalEnd = api.coord([item.x2, 0.5]);
+      const center = api.coord([item.timeMs, 0.5]);
+      const availableWidth = Math.max(0, intervalEnd[0] - intervalStart[0] - 4);
+      const size = Math.min(RAIN_SPOT_HEIGHT_PX - 8, availableWidth);
+      if (size < rainSpotChartData.gridSize) return { type: 'group', children: [] };
+
+      const tileSize = size / rainSpotChartData.gridSize;
+      const left = center[0] - size / 2;
+      const top = center[1] - size / 2;
+      const centerIndex = Math.floor(rainSpotChartData.gridSize / 2);
+      const children = Array.from(item.precipitation, (precipitation, index) => {
+        const row = Math.floor(index / rainSpotChartData.gridSize);
+        const column = index % rainSpotChartData.gridSize;
+        const isCenter = row === centerIndex && column === centerIndex;
+        const isWet = Number.isFinite(precipitation) && precipitation >= 0.1;
+
+        return {
+          type: 'rect' as const,
+          shape: {
+            x: left + column * tileSize,
+            y: top + row * tileSize,
+            width: tileSize,
+            height: tileSize,
+          },
+          style: {
+            fill: isWet ? rainSpotColor(precipitation) : 'rgba(255,255,255,0.08)',
+            stroke: isCenter ? '#0f172a' : 'rgba(100,116,139,0.22)',
+            lineWidth: isCenter ? 1 : 0.25,
+          },
+        };
+      });
+
+      return { type: 'group', $mergeChildren: false, children };
+    },
+    data: rainSpotItems.map((item) => ({
+      id: item.timeMs.toString(),
+      value: [item.timeMs, item.maximum],
+    })),
+  };
+
   // ═══════════════════════════════════════════════════════════════════════════
-  // GRID 2 – Wind field / cloud raster
+  // GRID 3 – Wind field / cloud raster
   // ═══════════════════════════════════════════════════════════════════════════
 
   const windAnchorSeries = makeAnchorSeries(
     '__anchor_wind',
-    2,
     3,
+    4,
     tempChartData.temperatureData.map((d) => [d.time.getTime(), pressureBottom] as [number, number])
   );
 
   const altitudeGridSeries: LineSeriesOption = {
     name: '_altitudeGrid',
     type: 'line',
-    xAxisIndex: 2,
-    yAxisIndex: 3,
+    xAxisIndex: 3,
+    yAxisIndex: 4,
     silent: true,
     symbol: 'none',
     lineStyle: { opacity: 0 },
@@ -450,8 +555,8 @@ export function buildWindChartOption(
   const windCloudSeries: CustomSeriesOption = {
     name: '_windCloud',
     type: 'custom',
-    xAxisIndex: 2,
-    yAxisIndex: 3,
+    xAxisIndex: 3,
+    yAxisIndex: 4,
     silent: true,
     renderItem(params, api) {
       const item = cloudItems2[params.dataIndex];
@@ -502,8 +607,8 @@ export function buildWindChartOption(
   const windArrowSeries: CustomSeriesOption = {
     name: '_windArrows',
     type: 'custom',
-    xAxisIndex: 2,
-    yAxisIndex: 3,
+    xAxisIndex: 3,
+    yAxisIndex: 4,
     silent: true,
     renderItem(params, api) {
       const item = windItems[params.dataIndex];
@@ -536,8 +641,8 @@ export function buildWindChartOption(
 
   const lclSeries = makeLineSeries({
     name: 'LCL',
-    xAxisIndex: 2,
-    yAxisIndex: 3,
+    xAxisIndex: 3,
+    yAxisIndex: 4,
     color: CHART_COLORS.lcl,
     data: cloudBase.map((d) => [d.time.getTime(), d.value == null ? null : metersToHPaExact(d.value)]),
     z: 4,
@@ -546,8 +651,8 @@ export function buildWindChartOption(
   const elevationLineSeries: LineSeriesOption = {
     name: '_elevation',
     type: 'line',
-    xAxisIndex: 2,
-    yAxisIndex: 3,
+    xAxisIndex: 3,
+    yAxisIndex: 4,
     silent: true,
     symbol: 'none',
     lineStyle: { opacity: 0 },
@@ -575,8 +680,8 @@ export function buildWindChartOption(
       ? {
           name: '_modelGridElevation',
           type: 'line',
-          xAxisIndex: 2,
-          yAxisIndex: 3,
+          xAxisIndex: 3,
+          yAxisIndex: 4,
           silent: true,
           symbol: 'none',
           lineStyle: { opacity: 0 },
@@ -605,8 +710,8 @@ export function buildWindChartOption(
   const pressureLabelSeries: LineSeriesOption = {
     name: '_pressureLabels',
     type: 'line',
-    xAxisIndex: 2,
-    yAxisIndex: 3,
+    xAxisIndex: 3,
+    yAxisIndex: 4,
     silent: true,
     symbol: 'none',
     lineStyle: { opacity: 0 },
@@ -652,7 +757,9 @@ export function buildWindChartOption(
     rainAnchorSeries,
     cloudRectSeries,
     rainSeries,
-    // Grid 2 – cloud rects z=1, arrows z=3, lines above
+    // Grid 2
+    ...(rainSpotItems.length > 0 ? [rainSpotAnchorSeries, rainSpotSeries] : []),
+    // Grid 3 – cloud rects z=1, arrows z=3, lines above
     windAnchorSeries,
     altitudeGridSeries,
     windCloudSeries,
@@ -669,7 +776,7 @@ export function buildWindChartOption(
     xAxis: xAxes,
     yAxis: yAxes,
     axisPointer: {
-      link: [{ xAxisIndex: [0, 1, 2] }],
+      link: [{ xAxisIndex: [0, 1, 2, 3] }],
       lineStyle: { color: '#999', type: 'dashed', width: 1 },
       label: {
         fontSize: 0,

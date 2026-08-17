@@ -69,4 +69,43 @@ describe('chart worker preparation', () => {
     expect(result.rainCloudChartData.cloudRects.at(0)?.x1).toEqual(result.xDomain[0]);
     expect(result.rainCloudChartData.cloudRects.at(-1)?.x2).toEqual(result.xDomain[1]);
   });
+
+  it('prepares one nearby-precipitation 5×5 glyph per hour', () => {
+    const windChartData = createData();
+    windChartData.rainSpot = {
+      time: windChartData.hourly.time,
+      gridSize: 5,
+      radiusKm: 20,
+      cells: [
+        {
+          row: 0,
+          column: 0,
+          latitude: 47.1,
+          longitude: 7.9,
+          precipitation: new Float32Array([0.1, 0.2]),
+        },
+        {
+          row: 2,
+          column: 2,
+          latitude: 47,
+          longitude: 8,
+          precipitation: new Float32Array([1, 2]),
+        },
+      ],
+    };
+
+    const result = prepareChartData({
+      windChartData,
+      maxAltitude: 4000,
+      model: 'icon_d2',
+    });
+
+    expect(result.rainSpotChartData).toMatchObject({ gridSize: 5, radiusKm: 20 });
+    expect(result.rainSpotChartData.glyphs).toHaveLength(2);
+    expect(result.rainSpotChartData.glyphs[0]).toMatchObject({ maximum: 1, wetCellCount: 2 });
+    expect(result.rainSpotChartData.glyphs[0].precipitation[0]).toBeCloseTo(0.1);
+    expect(result.rainSpotChartData.glyphs[0].precipitation[12]).toBe(1);
+    expect(result.rainSpotChartData.glyphs[0].precipitation[1]).toBeNaN();
+    expect(result.rainSpotChartData.glyphs[1]).toMatchObject({ maximum: 2, wetCellCount: 2 });
+  });
 });
