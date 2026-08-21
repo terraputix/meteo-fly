@@ -6,14 +6,21 @@
 
 <svelte:head>
   <title>Meteo-Fly About</title>
+  <link rel="canonical" href="https://meteo-fly.com/about" />
   <meta
     name="description"
     content="Meteo-Fly provides transparent, model-aware weather forecasts for paragliding and hang gliding with wind, cloud, and meteogram visualizations."
   />
   <meta property="og:title" content="Meteo-Fly About" />
+  <meta property="og:url" content="https://meteo-fly.com/about" />
   <meta
     property="og:description"
     content="Meteo-Fly provides transparent, model-aware weather forecasts for paragliding and hang gliding with wind, cloud, and meteogram visualizations."
+  />
+  <meta name="twitter:title" content="About Meteo-Fly" />
+  <meta
+    name="twitter:description"
+    content="How Meteo-Fly visualizes wind, cloud, rain, humidity, cloud base, and atmospheric soundings for free-flight pilots."
   />
 </svelte:head>
 

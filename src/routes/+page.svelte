@@ -1,5 +1,6 @@
 <script lang="ts">
   import { buildVisitedURL, saveLastVisitedURL } from '$lib/services/storage';
+  import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { afterNavigate, replaceState } from '$app/navigation';
   import { isMobile } from '$lib/stores/media';
@@ -17,7 +18,9 @@
   import { isWeatherCacheOutdatedMessage } from '$lib/services/weatherCache';
   import type { PaneAPI } from 'paneforge';
 
-  let parameters: PageParameters = $state(getInitialParameters($page.url.searchParams));
+  let parameters: PageParameters = $state(
+    getInitialParameters(browser ? $page.url.searchParams : new URLSearchParams())
+  );
   let showChart = $state(false);
   let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
   let selectedHour = $state(parameters.hour ?? 0);
@@ -397,15 +400,22 @@
 
 <svelte:head>
   <title>Meteo-Fly - Wind & Weather Forecast for Paragliding & Hang Gliding</title>
+  <link rel="canonical" href="https://meteo-fly.com/" />
   <meta
     name="description"
     content="Professional wind & weather forecast visualization for paragliding and hang gliding. Interactive wind charts for multiple meteorological models including ICON, ECMWF, GFS, UKMO, and MeteoFrance."
   />
   <meta name="robots" content="index, follow" />
   <meta property="og:title" content="Meteo-Fly - Wind & Weather Forecast for Paragliding & Hang Gliding" />
+  <meta property="og:url" content="https://meteo-fly.com/" />
   <meta
     property="og:description"
     content="Professional wind & weather forecast visualization for paragliding and hang gliding. Interactive wind charts for multiple meteorological models including ICON, ECMWF, GFS, UKMO, and MeteoFrance."
+  />
+  <meta name="twitter:title" content="Meteo-Fly - Wind & Weather Forecast for Paragliding & Hang Gliding" />
+  <meta
+    name="twitter:description"
+    content="Interactive multi-model wind and weather forecasts for paragliding and hang gliding."
   />
 </svelte:head>
 
