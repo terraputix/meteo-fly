@@ -37,7 +37,7 @@ npm run lint
 npm test
 ```
 
-The application is built with SvelteKit and deployed as a static client-side application.
+The application is built with SvelteKit, statically prerendered, and hydrated in the browser for interactive use.
 
 ## Project provenance
 
