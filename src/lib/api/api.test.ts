@@ -54,14 +54,19 @@ function createResponse({
   daily = createDailySection(),
   latitude = 46.8,
   longitude = 8.2,
+  timezone = 'UTC',
+  timezoneAbbr = 'UTC',
 }: {
   hourly?: VariablesWithTime | null;
   daily?: VariablesWithTime | null;
   latitude?: number;
   longitude?: number;
+  timezone?: string;
+  timezoneAbbr?: string;
 }): WeatherApiResponse {
   return {
-    timezoneAbbreviation: () => 'UTC',
+    timezone: () => timezone,
+    timezoneAbbreviation: () => timezoneAbbr,
     latitude: () => latitude,
     longitude: () => longitude,
     elevation: () => 500,
@@ -73,6 +78,10 @@ function createResponse({
 describe('API Configuration', () => {
   beforeEach(() => {
     vi.mocked(fetchWeatherApi).mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('should generate correct parameters for ICON-D2 model', () => {
@@ -142,11 +151,7 @@ describe('API Configuration', () => {
       vi.stubEnv('TZ', 'Europe/Berlin');
     });
 
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
-    it('should correctly format start_date and end_date and include local timezone', () => {
+    it('should correctly format start_date and end_date and request automatic timezone detection', () => {
       const location = { latitude: 52.52, longitude: 13.4 };
       const hourlyParams = { hourly: ['temperature_2m', 'wind_speed_10m'] };
       const model = 'icon_d2';
@@ -167,7 +172,19 @@ describe('API Configuration', () => {
       expect(params.start_date).toBe(expectedStartDate);
       expect(params.end_date).toBe(expectedEndDate);
       expect(params.cell_selection).toBe('land');
-      expect(params.timezone).toBe('Europe/Berlin'); // Verify the mocked local timezone is passed
+      expect(params.timezone).toBe('auto');
+    });
+
+    it('increments forecast calendar days in the resolved timezone across DST', () => {
+      const location = { latitude: 0, longitude: 0 };
+      const hourlyParams = { hourly: ['temperature_2m'] };
+      const referenceDate = new Date('2026-03-29T00:30:00Z');
+
+      const today = createQueryParams(location, hourlyParams, 'icon_global', 'nearest', referenceDate, 1, 'UTC', 0);
+      const tomorrow = createQueryParams(location, hourlyParams, 'icon_global', 'nearest', referenceDate, 1, 'UTC', 1);
+
+      expect(today.start_date).toBe('2026-03-29');
+      expect(tomorrow.start_date).toBe('2026-03-30');
     });
   });
 
@@ -220,6 +237,7 @@ describe('API Configuration', () => {
       const controller = new AbortController();
 
       await expect(request(controller.signal)).rejects.toBe(abortError);
+      expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[1]).toMatchObject({ timezone: 'auto' });
       expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[5]).toEqual({ signal: controller.signal });
     });
   });
@@ -227,6 +245,27 @@ describe('API Configuration', () => {
   describe('missing weather data', () => {
     const location = { latitude: 46.8, longitude: 8.2 };
     const start = new Date('2026-07-16T00:00:00Z');
+
+    it('retries with the forecast location calendar date and retains its timezone', async () => {
+      vi.stubEnv('TZ', 'UTC');
+      vi.mocked(fetchWeatherApi).mockImplementation(async (_url, params) => {
+        const names = params.hourly as string[];
+        return [
+          createResponse({
+            timezone: 'America/Los_Angeles',
+            timezoneAbbr: 'PDT',
+            hourly: createHourlySection(names, {}),
+          }),
+        ];
+      });
+
+      const result = await fetchWindChartData(location, 'icon_d2', new Date('2026-07-16T01:00:00Z'));
+
+      expect(vi.mocked(fetchWeatherApi)).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[1]).toMatchObject({ start_date: '2026-07-16' });
+      expect(vi.mocked(fetchWeatherApi).mock.calls[1]?.[1]).toMatchObject({ start_date: '2026-07-15' });
+      expect(result).toMatchObject({ timezone: 'America/Los_Angeles', timezoneAbbr: 'PDT' });
+    });
 
     it('pads a short flat variable and leaves missing pressure levels absent', async () => {
       vi.mocked(fetchWeatherApi).mockImplementationOnce(async (_url, params) => {

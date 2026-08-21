@@ -194,6 +194,7 @@ export function buildSkewTData(
     traces,
     elevation: weatherData.elevation,
     modelGridElevation,
+    timezone: weatherData.timezone,
     timezoneAbbr: weatherData.timezoneAbbr,
     pressureLevels: allLevels.map((l) => l.hPa),
   };

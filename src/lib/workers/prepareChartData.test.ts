@@ -5,6 +5,7 @@ import { prepareChartData } from './prepareChartData';
 function createData(): WindChartData {
   return {
     elevation: 500,
+    timezone: 'UTC',
     timezoneAbbr: 'UTC',
     sunrise: new Date('2026-07-16T04:00:00Z'),
     sunset: new Date('2026-07-16T20:00:00Z'),

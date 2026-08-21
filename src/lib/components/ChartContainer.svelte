@@ -116,7 +116,7 @@
     </div>
 
     {#if chartView === 'wind'}
-      <WindChart {windChartData} bind:maxAltitude {model} {daylightOnly} isLoading={isWindChartLoading} />
+      <WindChart {windChartData} bind:maxAltitude {model} bind:daylightOnly isLoading={isWindChartLoading} />
       <Footer>
         {#snippet heading()}
           <button
@@ -197,7 +197,8 @@
       {startDate}
       bind:hour
       {traceHours}
-      timezoneAbbr={skewTData?.timezoneAbbr ?? ''}
+      timezone={skewTData?.timezone ?? windChartData.timezone}
+      timezoneAbbr={skewTData?.timezoneAbbr ?? windChartData.timezoneAbbr}
       {maxForecastDays}
       {chartView}
       {keyboardNavigationEnabled}

@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomSeriesOption, CustomSeriesRenderItemAPI, CustomSeriesRenderItemParams } from 'echarts';
 import { buildTooltipStore, createActiveState } from './tooltipFormatter';
-import { buildWindChartOption, getWindChartHeight, RAIN_SPOT_TOP, RAIN_TOP } from './buildWindChartOption';
+import {
+  buildWindChartOption,
+  getWindChartHeight,
+  RAIN_SPOT_TOP,
+  RAIN_TOP,
+  TEMP_HEIGHT_PX,
+  TEMP_TOP,
+} from './buildWindChartOption';
 import { metersToHPaExact } from '$lib/meteo/pressureLevels';
+import { fmtTime } from '$lib/helpers';
 
 interface NamedSeries {
   name?: string;
@@ -10,6 +18,7 @@ interface NamedSeries {
   markLine?: { data?: unknown };
   xAxisIndex?: number;
   yAxisIndex?: number;
+  markPoint?: { data?: unknown; symbolSize?: unknown };
 }
 
 interface RainSeriesItem {
@@ -60,11 +69,31 @@ describe('wind chart option', () => {
       lcl,
       500,
       'UTC',
+      'UTC',
       times,
       store,
       createActiveState()
     );
     const series = option.series as NamedSeries[];
+
+    const daylightMarkers = series.find((item) => item.name === '__anchor_temp')?.markPoint;
+    expect(daylightMarkers?.symbolSize).toEqual([13, 13]);
+    expect(daylightMarkers?.data).toMatchObject([
+      {
+        name: 'Sunrise',
+        xAxis: times[0].getTime(),
+        y: TEMP_TOP + TEMP_HEIGHT_PX + 24,
+        symbolOffset: [-7, -9],
+        label: { position: 'right', offset: [0, 2], formatter: fmtTime(times[0], 'UTC') },
+      },
+      {
+        name: 'Sunset',
+        xAxis: times[1].getTime(),
+        y: TEMP_TOP + TEMP_HEIGHT_PX + 24,
+        symbolOffset: [7, -9],
+        label: { position: 'left', offset: [0, 2], formatter: fmtTime(times[1], 'UTC') },
+      },
+    ]);
 
     expect(series.find((item) => item.name === '__anchor_rain')?.markLine?.data).toEqual([
       [{ coord: [times[0].getTime(), 1] }, { coord: [times[1].getTime(), 1] }],
@@ -118,6 +147,7 @@ describe('wind chart option', () => {
       lcl,
       500,
       'UTC',
+      'UTC',
       times,
       buildTooltipStore(temperatureData, fullRainCloudData, [], lcl),
       createActiveState()
@@ -168,6 +198,7 @@ describe('wind chart option', () => {
       [],
       lcl,
       500,
+      'UTC',
       'UTC',
       times,
       buildTooltipStore(temperatureData, fullRainCloudData, [], lcl, rainSpotData),

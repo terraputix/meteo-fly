@@ -37,7 +37,6 @@
     modelGridElevation = $bindable(undefined as number | undefined),
     model = $bindable<WeatherModel>('icon_seamless'),
     cellSelection = $bindable<CellSelection>('nearest'),
-    daylightOnly = $bindable(false),
     onLocationChange = undefined as ((location: Location) => void) | undefined,
     onToggleChart = undefined as (() => void) | undefined,
     onMapViewChange = undefined as (() => void) | undefined,
@@ -50,7 +49,6 @@
     modelGridElevation?: number | undefined;
     model?: WeatherModel;
     cellSelection?: CellSelection;
-    daylightOnly?: boolean;
     onLocationChange?: ((location: Location) => void) | undefined;
     onToggleChart?: (() => void) | undefined;
     onMapViewChange?: (() => void) | undefined;
@@ -637,7 +635,7 @@
     </button>
 
     <div class="pointer-events-auto">
-      <ChartSettingsPopover bind:cellSelection bind:daylightOnly />
+      <ChartSettingsPopover bind:cellSelection />
     </div>
 
     <button
