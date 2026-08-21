@@ -89,6 +89,77 @@
         </div>
       </div>
 
+      <div id="thermal-potential" class="scroll-mt-6 py-6 sm:py-8">
+        <h2 class="text-xl font-semibold text-slate-900">Thermal potential</h2>
+        <p class="mt-3 text-sm text-slate-600 sm:text-base">
+          The Skew-T reports profile-based thermal potential using the conventional soaring Thermal Index:
+          <strong>TI = environmental temperature − dry-adiabatic surface-parcel temperature</strong>. Negative TI means
+          the parcel is warmer than its environment. The dry top is the first level where TI returns to zero; an
+          inversion that blocks the parcel is treated as a cap, even if an unstable layer exists above it.
+        </p>
+        <p class="mt-3 text-sm text-slate-600 sm:text-base">
+          <strong>Surface temp for 1.2 km lift</strong> is the temperature required for a connected dry-thermal layer to
+          reach approximately 4,000 ft AGL. Meteo-Fly checks intervening native model levels so a lower cap is not
+          skipped. Orange segments below the time slider mark hours that reach this depth.
+          <strong>Cumulus possible</strong>
+          means the calculated dry lift reaches the LCL; <strong>Likely blue</strong> means it is capped below the LCL.
+        </p>
+        <p class="mt-3 text-sm text-slate-600 sm:text-base">
+          Skew-T data is requested without Open-Meteo's statistical elevation downscaling. Surface values, surface
+          pressure, LCL, and thermal depth therefore refer to the model grid-cell elevation. The model-surface line is
+          positioned at the forecast surface pressure, and the DEM elevation is not drawn on the Skew-T. LCL pressure is
+          interpolated from the model's actual geopotential-height profile rather than a standard atmosphere.
+        </p>
+        <p class="mt-3 text-sm text-slate-600 sm:text-base">
+          The translucent orange area in the Skew-T is the connected buoyant layer between the environmental and surface
+          parcel curves. Its width is the Thermal Index difference. Hovering it shows parcel temperature and TI at that
+          pressure; the parcel and shading stop at the dry top.
+        </p>
+        <div class="mt-4 rounded-xl border border-orange-100 bg-orange-50 p-4 text-sm text-slate-700 sm:text-base">
+          <p class="font-semibold text-slate-800">GFS convective velocity scale</p>
+          <p class="mt-2">
+            For GFS Seamless, Meteo-Fly combines boundary-layer height with surface sensible and latent heat flux to
+            calculate the Deardorff convective velocity scale <strong>w*</strong>. It is only shown during positive
+            surface heating. GFS supplies these surface fields at roughly 13 km resolution and pressure profiles at
+            roughly 25 km, so the result is a regional dry-convection scale—not the climb rate of an individual thermal
+            or an expected vario reading. Other models retain the profile-only diagnostics.
+          </p>
+        </div>
+        <p class="mt-4 text-xs text-slate-500 sm:text-sm">
+          Method references:
+          <a
+            href="https://www.weather.gov/otx/Soaring_Forecast_Information"
+            class="underline"
+            target="_blank"
+            rel="noopener noreferrer">US National Weather Service soaring forecast</a
+          >,
+          <a
+            href="https://www.faa.gov/regulations_policies/handbooks_manuals/aviation/glider_handbook"
+            class="underline"
+            target="_blank"
+            rel="noopener noreferrer">FAA Glider Flying Handbook</a
+          >,
+          <a href="https://www.weather.gov/lmk/indices" class="underline" target="_blank" rel="noopener noreferrer"
+            >NWS parcel theory and CAPE</a
+          >,
+          <a href="https://open-meteo.com/en/docs" class="underline" target="_blank" rel="noopener noreferrer"
+            >Open-Meteo pressure-level documentation</a
+          >,
+          <a
+            href="https://open-meteo.com/en/docs/gfs-api#models"
+            class="underline"
+            target="_blank"
+            rel="noopener noreferrer">Open-Meteo GFS variable availability</a
+          >, and
+          <a
+            href="https://doi.org/10.1175/1520-0469(1970)027%3C1211:CVATSF%3E2.0.CO;2"
+            class="underline"
+            target="_blank"
+            rel="noopener noreferrer">Deardorff convective velocity scale</a
+          >.
+        </p>
+      </div>
+
       <div class="py-6 sm:py-8">
         <h2 class="text-xl font-semibold text-slate-900">Grid cell selection</h2>
         <p class="mt-3 text-sm text-slate-600 sm:text-base">

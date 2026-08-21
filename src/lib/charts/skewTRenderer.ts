@@ -1,4 +1,3 @@
-import { metersToHPa } from '$lib/meteo/pressureLevels';
 import {
   RD,
   CP,
@@ -9,7 +8,8 @@ import {
 } from '$lib/meteo/thermo';
 import { CHART_COLORS } from '$lib/charts/chartColors';
 import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
-import { type SkewTData, type SkewTLevelData, type SkewTTrace } from '$lib/meteo/types';
+import { calculateDryParcelTemperature } from '$lib/meteo/thermal';
+import { type SkewTData, type SkewTLevelData, type SkewTTrace, type ThermalLevelData } from '$lib/meteo/types';
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
 
@@ -117,6 +117,15 @@ function computeTempRange(
     }
     if (isFinite(level.dewpoint)) {
       const skewed = level.dewpoint + SKEW_OFFSET * (1 - yn);
+      lo = Math.min(lo, skewed);
+      hi = Math.max(hi, skewed);
+    }
+  }
+  for (const level of trace.thermal.levels) {
+    if (trace.thermal.topPressure == null || level.pressure < trace.thermal.topPressure) continue;
+    const yn = yNorm(level.pressure, minP, maxP);
+    if (isFinite(level.parcelTemperature)) {
+      const skewed = level.parcelTemperature + SKEW_OFFSET * (1 - yn);
       lo = Math.min(lo, skewed);
       hi = Math.max(hi, skewed);
     }
@@ -416,50 +425,183 @@ function drawTraces(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: Pl
   ctx.restore();
 }
 
-// ─── Annotations ───────────────────────────────────────────────────────────────
+function interpolateThermalLevelAtPressure(trace: SkewTTrace, pressure: number): ThermalLevelData | null {
+  const exact = trace.thermal.levels.find((level) => Math.abs(level.pressure - pressure) < 0.01);
+  if (exact) return exact;
 
-function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout, elevation: number) {
-  const { plotLeft, plotWidth } = layout;
+  for (let i = 0; i < trace.thermal.levels.length - 1; i++) {
+    const lower = trace.thermal.levels[i];
+    const upper = trace.thermal.levels[i + 1];
+    if (pressure >= lower.pressure || pressure <= upper.pressure) continue;
 
-  const lclPressure = metersToHPa(trace.lcl);
-  const lclY = pressureToCanvasY(layout, lclPressure);
+    const ratio =
+      (Math.log(pressure) - Math.log(lower.pressure)) / (Math.log(upper.pressure) - Math.log(lower.pressure));
+    const interpolate = (from: number, to: number) => from + (to - from) * ratio;
+    const environmentTemperature = interpolate(lower.environmentTemperature, upper.environmentTemperature);
+    const parcelTemperature = calculateDryParcelTemperature(trace.surfaceTemp, trace.surfacePressure, pressure);
+    return {
+      pressure,
+      heightMeters: interpolate(lower.heightMeters, upper.heightMeters),
+      environmentTemperature,
+      parcelTemperature,
+      thermalIndex: environmentTemperature - parcelTemperature,
+      triggerTemperature: interpolate(lower.triggerTemperature, upper.triggerTemperature),
+      isSurface: false,
+    };
+  }
+
+  return null;
+}
+
+function thermalLevelsToTop(trace: SkewTTrace): ThermalLevelData[] {
+  const topPressure = trace.thermal.topPressure;
+  if (topPressure == null) return [];
+
+  const levels = trace.thermal.levels.filter((level) => level.pressure >= topPressure);
+  let topLevel = interpolateThermalLevelAtPressure(trace, topPressure);
+  if (topLevel && !trace.thermal.topIsAboveProfile) {
+    topLevel = { ...topLevel, environmentTemperature: topLevel.parcelTemperature, thermalIndex: 0 };
+  }
+  if (topLevel) {
+    const existingIndex = levels.findIndex((level) => Math.abs(level.pressure - topPressure) < 0.01);
+    if (existingIndex >= 0) levels[existingIndex] = topLevel;
+    else levels.push(topLevel);
+  }
+  return levels.sort((a, b) => b.pressure - a.pressure);
+}
+
+function drawThermalBuoyancy(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout) {
+  const levels = thermalLevelsToTop(trace).filter(
+    (level) => level.pressure >= layout.minP && level.pressure <= layout.maxP
+  );
+  if (levels.length < 2) return;
+
+  const surfaceProfileTemperature = interpolateAtPressure(trace.levels, trace.surfacePressure, 'temperature');
+  const environmentPoints = levels.map((level) => {
+    const temperature =
+      level.isSurface && surfaceProfileTemperature != null && Number.isFinite(surfaceProfileTemperature)
+        ? surfaceProfileTemperature
+        : level.environmentTemperature;
+    return tempPressureToCanvas(layout, temperature, level.pressure);
+  });
+  const parcelPoints = levels.map((level) => tempPressureToCanvas(layout, level.parcelTemperature, level.pressure));
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(layout.plotLeft, layout.plotTop, layout.plotWidth, layout.plotHeight);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(234, 88, 12, 0.14)';
+  ctx.beginPath();
+  ctx.moveTo(environmentPoints[0][0], environmentPoints[0][1]);
+  for (let i = 1; i < environmentPoints.length; i++) ctx.lineTo(environmentPoints[i][0], environmentPoints[i][1]);
+  for (let i = parcelPoints.length - 1; i >= 0; i--) ctx.lineTo(parcelPoints[i][0], parcelPoints[i][1]);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawThermalDiagnostics(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout) {
+  const { topPressure, topHeightMeters, topIsAboveProfile } = trace.thermal;
+  if (topPressure == null || topHeightMeters == null) return;
+
+  const parcelPoints = thermalLevelsToTop(trace)
+    .filter(
+      (level) =>
+        Number.isFinite(level.parcelTemperature) &&
+        level.pressure >= topPressure &&
+        level.pressure >= layout.minP &&
+        level.pressure <= layout.maxP
+    )
+    .map((level) => tempPressureToCanvas(layout, level.parcelTemperature, level.pressure));
+
+  drawLine(ctx, parcelPoints, CHART_COLORS.thermalParcel, 1.5, [5, 3], 0.9);
+
+  if (topPressure < layout.minP || topPressure > layout.maxP) return;
+
+  const y = pressureToCanvasY(layout, topPressure);
   drawLine(
     ctx,
     [
-      [plotLeft, lclY],
-      [plotLeft + plotWidth, lclY],
+      [layout.plotLeft, y],
+      [layout.plotLeft + layout.plotWidth, y],
     ],
-    CHART_COLORS.lcl,
+    CHART_COLORS.thermalTop,
     1,
-    [3, 3]
+    [5, 3]
   );
   drawText(
     ctx,
-    `LCL (${Math.round(trace.lcl)}m)`,
-    plotLeft + plotWidth - 4,
-    lclY - 4,
-    CHART_COLORS.lcl,
-    'right',
-    'bottom'
+    `${topIsAboveProfile ? 'Dry top >' : 'Dry top'} ${Math.round(trace.thermal.topHeightAglMeters ?? 0)}m AGL`,
+    layout.plotLeft + 4,
+    y - 4,
+    CHART_COLORS.thermalTop,
+    'left',
+    'bottom',
+    '10px sans-serif'
   );
+}
 
-  // Surface temperature & dewpoint markers at elevation line
-  const elevPressure = metersToHPa(elevation);
-  if (elevPressure >= layout.minP && elevPressure <= layout.maxP) {
-    const elevY = pressureToCanvasY(layout, elevPressure);
-    const [stX] = tempPressureToCanvas(layout, trace.surfaceTemp, elevPressure);
-    const [sdX] = tempPressureToCanvas(layout, trace.surfaceDewpoint, elevPressure);
+// ─── Annotations ───────────────────────────────────────────────────────────────
+
+function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout) {
+  const { plotLeft, plotWidth } = layout;
+
+  if (trace.lclPressure != null && trace.lclPressure >= layout.minP && trace.lclPressure <= layout.maxP) {
+    const lclY = pressureToCanvasY(layout, trace.lclPressure);
+    drawLine(
+      ctx,
+      [
+        [plotLeft, lclY],
+        [plotLeft + plotWidth, lclY],
+      ],
+      CHART_COLORS.lcl,
+      1,
+      [3, 3]
+    );
+    drawText(
+      ctx,
+      `LCL (${Math.round(trace.lclHeightAglMeters)}m AGL)`,
+      plotLeft + plotWidth - 4,
+      lclY - 4,
+      CHART_COLORS.lcl,
+      'right',
+      'bottom'
+    );
+
+    if (trace.thermal.reachesLcl === true) {
+      const lclLevel = interpolateThermalLevelAtPressure(trace, trace.lclPressure);
+      if (lclLevel) {
+        const [parcelX] = tempPressureToCanvas(layout, lclLevel.parcelTemperature, trace.lclPressure);
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = CHART_COLORS.lcl;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(parcelX, lclY, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  // Surface temperature & dewpoint markers at the forecast surface pressure
+  const surfacePressure = trace.surfacePressure;
+  if (surfacePressure >= layout.minP && surfacePressure <= layout.maxP) {
+    const surfaceY = pressureToCanvasY(layout, surfacePressure);
+    const [stX] = tempPressureToCanvas(layout, trace.surfaceTemp, surfacePressure);
+    const [sdX] = tempPressureToCanvas(layout, trace.surfaceDewpoint, surfacePressure);
 
     ctx.save();
     ctx.fillStyle = CHART_COLORS.temperature;
     ctx.beginPath();
-    ctx.arc(stX, elevY, 3, 0, Math.PI * 2);
+    ctx.arc(stX, surfaceY, 3, 0, Math.PI * 2);
     ctx.fill();
     drawText(
       ctx,
       `${trace.surfaceTemp.toFixed(1)}°C`,
       stX + 6,
-      elevY + 8,
+      surfaceY + 8,
       CHART_COLORS.temperature,
       'center',
       'top',
@@ -468,13 +610,13 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
 
     ctx.fillStyle = CHART_COLORS.dewpoint;
     ctx.beginPath();
-    ctx.arc(sdX, elevY, 3, 0, Math.PI * 2);
+    ctx.arc(sdX, surfaceY, 3, 0, Math.PI * 2);
     ctx.fill();
     drawText(
       ctx,
       `${trace.surfaceDewpoint.toFixed(1)}°C`,
       sdX + 6,
-      elevY + 8,
+      surfaceY + 8,
       CHART_COLORS.dewpoint,
       'center',
       'top',
@@ -538,55 +680,37 @@ function drawCloudCover(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout
   ctx.restore();
 }
 
-// ─── Elevation line ────────────────────────────────────────────────────────────
+// ─── Model surface ─────────────────────────────────────────────────────────────
 
-function drawElevationLine(
+function drawModelSurfaceLine(
   ctx: CanvasRenderingContext2D,
-  elevation: number,
-  layout: PlotLayout,
-  modelGridElevation?: number
+  surfacePressure: number,
+  modelGridElevation: number,
+  layout: PlotLayout
 ) {
   const { plotLeft, plotWidth, minP, maxP } = layout;
+  if (surfacePressure < minP || surfacePressure > maxP) return;
 
-  const drawOneLine = (
-    elev: number,
-    color: string,
-    label: string,
-    position: 'left' | 'right',
-    align: 'top' | 'bottom'
-  ) => {
-    const p = metersToHPa(elev);
-    if (p < minP || p > maxP) return;
-    const y = pressureToCanvasY(layout, p);
-
-    drawLine(
-      ctx,
-      [
-        [plotLeft, y],
-        [plotLeft + plotWidth, y],
-      ],
-      color,
-      1,
-      [3, 3]
-    );
-
-    const dy = align === 'top' ? 4 : -4;
-    drawText(ctx, label, position === 'left' ? plotLeft + 4 : plotLeft + plotWidth - 4, y + dy, color, position, align);
-  };
-
-  const gridBelow = modelGridElevation != null && modelGridElevation > elevation;
-
-  if (modelGridElevation != null) {
-    drawOneLine(
-      modelGridElevation,
-      CHART_COLORS.modelGridElevation,
-      `Model Grid Elev. ${modelGridElevation}m`,
-      'left',
-      gridBelow ? 'bottom' : 'top'
-    );
-  }
-
-  drawOneLine(elevation, CHART_COLORS.elevation, `DEM Elev. ${elevation}m`, 'right', gridBelow ? 'top' : 'bottom');
+  const y = pressureToCanvasY(layout, surfacePressure);
+  drawLine(
+    ctx,
+    [
+      [plotLeft, y],
+      [plotLeft + plotWidth, y],
+    ],
+    CHART_COLORS.modelGridElevation,
+    1,
+    [3, 3]
+  );
+  drawText(
+    ctx,
+    `Model Grid Elev. ${Math.round(modelGridElevation)}m`,
+    plotLeft + 4,
+    y - 4,
+    CHART_COLORS.modelGridElevation,
+    'left',
+    'bottom'
+  );
 }
 
 // ─── Hover overlay ─────────────────────────────────────────────────────────────
@@ -615,8 +739,7 @@ export function renderHoverOverlay(
   layout: PlotLayout,
   trace: SkewTTrace,
   hitResult: HitTestResult,
-  canvasWidth: number,
-  elevation: number
+  canvasWidth: number
 ): void {
   const { plotLeft, plotTop, plotWidth, plotHeight } = layout;
   const mouseY = pressureToCanvasY(layout, hitResult.pressure);
@@ -720,11 +843,11 @@ export function renderHoverOverlay(
     drawText(ctx, label, boxX + boxW / 2, boxY + boxH / 2, '#333', 'center', 'middle', 'bold 11px sans-serif');
   }
 
-  const elevP = metersToHPa(elevation);
-  const elevY = pressureToCanvasY(layout, elevP);
+  const surfacePressure = trace.surfacePressure;
+  const surfaceY = pressureToCanvasY(layout, surfacePressure);
 
   // Collect x-axis labels to draw after clip restore
-  const axisLabels: { x: number; text: string; atElevation: boolean }[] = [];
+  const axisLabels: { x: number; text: string; atSurface: boolean }[] = [];
 
   // Clip to plot area for all internal elements
   ctx.save();
@@ -788,6 +911,44 @@ export function renderHoverOverlay(
     }
   }
 
+  // ── Surface parcel and Thermal Index ────────────────────────────────────────
+  {
+    const topPressure = trace.thermal.topPressure;
+    const thermalLevel =
+      topPressure != null && hitResult.pressure >= topPressure && hitResult.pressure <= trace.surfacePressure
+        ? interpolateThermalLevelAtPressure(trace, hitResult.pressure)
+        : null;
+    if (thermalLevel) {
+      const [parcelX] = tempPressureToCanvas(layout, thermalLevel.parcelTemperature, hitResult.pressure);
+      const parcelLabel = `Parcel ${thermalLevel.parcelTemperature.toFixed(1)}°C`;
+      const thermalIndexLabel = `TI ${thermalLevel.thermalIndex > 0 ? '+' : ''}${thermalLevel.thermalIndex.toFixed(1)}°C`;
+
+      ctx.save();
+      ctx.fillStyle = CHART_COLORS.thermalParcel;
+      ctx.beginPath();
+      ctx.arc(parcelX, mouseY, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.font = '11px sans-serif';
+      const boxWidth = Math.max(ctx.measureText(parcelLabel).width, ctx.measureText(thermalIndexLabel).width) + 12;
+      const boxHeight = 36;
+      const preferredX = parcelX + 8;
+      const boxX =
+        preferredX + boxWidth <= plotLeft + plotWidth ? preferredX : Math.max(plotLeft, parcelX - boxWidth - 8);
+      const boxY = Math.max(plotTop, Math.min(mouseY - boxHeight / 2, plotTop + plotHeight - boxHeight));
+      ctx.fillStyle = 'rgba(255,255,255,0.94)';
+      ctx.strokeStyle = CHART_COLORS.thermalParcel;
+      ctx.lineWidth = 1;
+      roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      drawText(ctx, parcelLabel, boxX + 6, boxY + 10, CHART_COLORS.thermalParcel, 'left', 'middle', '11px sans-serif');
+      drawText(ctx, thermalIndexLabel, boxX + 6, boxY + 26, '#7c2d12', 'left', 'middle', 'bold 11px sans-serif');
+    }
+  }
+
   // ── Specific humidity isohume ────────────────────────────────────────────────
   {
     const p0 = hitResult.pressure;
@@ -812,16 +973,16 @@ export function renderHoverOverlay(
       if (pts.length >= 2) {
         drawLine(ctx, pts, CHART_COLORS.isohume, 1.5, [4, 4], 0.9);
         const labelText = `q = ${(q * 1000).toFixed(1)} g/kg`;
-        if (elevP >= p0 && elevP <= maxP) {
-          const es_elev = (w_kg * elevP) / (EPS + w_kg);
-          if (es_elev > 0) {
-            const tC_elev = inverseSaturationVaporPressure(es_elev);
-            const [lx] = tempPressureToCanvas(layout, tC_elev, elevP);
-            axisLabels.push({ x: lx, text: labelText, atElevation: true });
+        if (surfacePressure >= p0 && surfacePressure <= maxP) {
+          const surfaceVaporPressure = (w_kg * surfacePressure) / (EPS + w_kg);
+          if (surfaceVaporPressure > 0) {
+            const surfaceTemperature = inverseSaturationVaporPressure(surfaceVaporPressure);
+            const [lx] = tempPressureToCanvas(layout, surfaceTemperature, surfacePressure);
+            axisLabels.push({ x: lx, text: labelText, atSurface: true });
           }
         } else {
           const [lx] = pts[pts.length - 1];
-          axisLabels.push({ x: lx, text: labelText, atElevation: false });
+          axisLabels.push({ x: lx, text: labelText, atSurface: false });
         }
       }
     }
@@ -846,13 +1007,13 @@ export function renderHoverOverlay(
       drawLine(ctx, dryPts, CHART_COLORS.dryAdiabat, 1.5, [6, 4]);
       const thetaC = thetaK - 273.15;
       const labelText = `θ = ${thetaC.toFixed(1)}°C`;
-      if (elevP >= hoverP && elevP <= maxP) {
-        const tC_elev = thetaK * Math.pow(elevP / 1000, RD / CP) - 273.15;
-        const [lx] = tempPressureToCanvas(layout, tC_elev, elevP);
-        axisLabels.push({ x: lx, text: labelText, atElevation: true });
+      if (surfacePressure >= hoverP && surfacePressure <= maxP) {
+        const surfaceTemperature = thetaK * Math.pow(surfacePressure / 1000, RD / CP) - 273.15;
+        const [lx] = tempPressureToCanvas(layout, surfaceTemperature, surfacePressure);
+        axisLabels.push({ x: lx, text: labelText, atSurface: true });
       } else {
         const [lx] = dryPts[dryPts.length - 1];
-        axisLabels.push({ x: lx, text: labelText, atElevation: false });
+        axisLabels.push({ x: lx, text: labelText, atSurface: false });
       }
     }
 
@@ -875,14 +1036,14 @@ export function renderHoverOverlay(
 
   ctx.restore(); // plot clip
 
-  // Draw labels at their computed positions (elevation line or fallback)
+  // Draw labels at their computed positions (model surface or fallback)
   for (const lbl of axisLabels) {
-    const ly = lbl.atElevation ? elevY : layout.plotTop + layout.plotHeight + 2;
-    const lc = lbl.atElevation ? CHART_COLORS.skewtElevation : '#666';
+    const ly = lbl.atSurface ? surfaceY : layout.plotTop + layout.plotHeight + 2;
+    const lc = lbl.atSurface ? CHART_COLORS.skewtSurface : '#666';
     drawText(ctx, lbl.text, lbl.x, ly, lc, 'center', 'bottom', '9px sans-serif');
-    if (lbl.atElevation) {
+    if (lbl.atSurface) {
       ctx.save();
-      ctx.fillStyle = CHART_COLORS.skewtElevation;
+      ctx.fillStyle = CHART_COLORS.skewtSurface;
       ctx.beginPath();
       ctx.arc(lbl.x, ly, 2, 0, Math.PI * 2);
       ctx.fill();
@@ -930,10 +1091,12 @@ export function renderSkewT(
 
   drawGrid(ctx, layout);
   drawCloudCover(ctx, trace, layout);
-  drawElevationLine(ctx, skewTData.elevation, layout, skewTData.modelGridElevation);
   drawAxis(ctx, layout);
+  drawThermalBuoyancy(ctx, trace, layout);
+  drawModelSurfaceLine(ctx, trace.surfacePressure, skewTData.modelGridElevation, layout);
   drawTraces(ctx, trace, layout);
-  drawAnnotations(ctx, trace, layout, skewTData.elevation);
+  drawThermalDiagnostics(ctx, trace, layout);
+  drawAnnotations(ctx, trace, layout);
 
   const hitTest: HitTestFn = (cx, cy) => {
     if (cx < plotLeft || cx > plotLeft + plotWidth || cy < plotTop || cy > plotTop + plotHeight) return null;

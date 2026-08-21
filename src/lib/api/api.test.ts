@@ -240,9 +240,41 @@ describe('API Configuration', () => {
 
       const result = await fetchSkewTData(location, 'icon_d2', start);
 
+      expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[1]).toMatchObject({ elevation: 'nan' });
+      expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[1].hourly).toContain('surface_pressure');
+      expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[1].hourly).not.toContain('boundary_layer_height');
+      expect(result.modelGridElevation).toBe(500);
       expect(result.hourly.temperatureProfile._1000hPa).toEqual(new Float32Array([18, 19, 20]));
       expect(result.hourly.dewpointProfile._1000hPa).toBeUndefined();
       expect(Array.from(result.hourly.temperature_2m).every(Number.isNaN)).toBe(true);
+      expect(Array.from(result.hourly.surfacePressure).every(Number.isNaN)).toBe(true);
+      expect(Array.from(result.hourly.boundaryLayerHeight).every(Number.isNaN)).toBe(true);
+    });
+
+    it('requests and parses thermal-strength inputs for GFS Seamless', async () => {
+      vi.mocked(fetchWeatherApi).mockImplementationOnce(async (_url, params) => {
+        const names = params.hourly as string[];
+        return [
+          createResponse({
+            daily: null,
+            hourly: createHourlySection(names, {
+              boundary_layer_height: [1000, 1200, 1400],
+              sensible_heat_flux: [100, 150, 200],
+              latent_heat_flux: [50, 60, 70],
+            }),
+          }),
+        ];
+      });
+
+      const result = await fetchSkewTData(location, 'gfs_seamless', start);
+      const requested = vi.mocked(fetchWeatherApi).mock.calls[0]?.[1].hourly;
+
+      expect(requested).toEqual(
+        expect.arrayContaining(['boundary_layer_height', 'sensible_heat_flux', 'latent_heat_flux'])
+      );
+      expect(Array.from(result.hourly.boundaryLayerHeight)).toEqual([1000, 1200, 1400]);
+      expect(Array.from(result.hourly.sensibleHeatFlux)).toEqual([100, 150, 200]);
+      expect(Array.from(result.hourly.latentHeatFlux)).toEqual([50, 60, 70]);
     });
 
     it.each([

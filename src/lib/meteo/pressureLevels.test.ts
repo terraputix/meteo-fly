@@ -7,6 +7,7 @@ import {
   getNativeLevelsForModel,
   getTopPressureForModel,
   hPaToMeters,
+  interpolatePressureAtHeight,
   metersToHPaExact,
 } from './pressureLevels';
 
@@ -52,6 +53,21 @@ describe('continuous pressure conversion', () => {
 
     expect(pressure).toBeCloseTo(616.4, 1);
     expect(hPaToMeters(pressure)).toBe(4000);
+  });
+});
+
+describe('pressure-height profile interpolation', () => {
+  it('interpolates pressure logarithmically between actual geopotential heights', () => {
+    expect(
+      interpolatePressureAtHeight(1500, [
+        { hPa: 900, heightMeters: 1000 },
+        { hPa: 800, heightMeters: 2000 },
+      ])
+    ).toBeCloseTo(Math.sqrt(900 * 800));
+  });
+
+  it('does not extrapolate outside the available profile', () => {
+    expect(interpolatePressureAtHeight(500, [{ hPa: 900, heightMeters: 1000 }])).toBeNull();
   });
 });
 

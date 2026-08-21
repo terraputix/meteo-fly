@@ -1,7 +1,14 @@
 import type { SkewTWeatherData, WeatherModel } from '$lib/api/types';
 import { getAtLevel, type VerticalProfile } from '$lib/api/types';
-import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, type TaggedPressureLevel } from './pressureLevels';
+import {
+  getAllTaggedLevelsForModel,
+  getNativeLevelsForFetch,
+  interpolatePressureAtHeight,
+  metersToHPaExact,
+  type TaggedPressureLevel,
+} from './pressureLevels';
 import { calculateLcl } from './lcl';
+import { calculateThermalDiagnostics, calculateThermalStrength, THERMAL_TRIGGER_HEIGHT_AGL_METERS } from './thermal';
 import { interpolateWind } from './wind';
 import type { MaxAltitude, SkewTLevelData, SkewTTrace, SkewTData, PressureLevel } from './types';
 
@@ -173,8 +180,7 @@ function buildLevelDataAtHour({
 export function buildSkewTData(
   weatherData: SkewTWeatherData,
   model: WeatherModel,
-  maxAltitude: MaxAltitude,
-  modelGridElevation?: number
+  maxAltitude: MaxAltitude
 ): SkewTData {
   const traces: SkewTTrace[] = [];
   const nativeLevels = getNativeLevelsForFetch(model, maxAltitude);
@@ -184,18 +190,75 @@ export function buildSkewTData(
     const surfaceTemp = weatherData.hourly.temperature_2m?.[i] ?? NaN;
     const surfaceDewpoint = weatherData.hourly.dewpoint_2m?.[i] ?? NaN;
     const lclValue = calculateLcl(surfaceTemp, surfaceDewpoint);
-    const lclHeight = lclValue + weatherData.elevation;
+    const lclHeight = lclValue + weatherData.modelGridElevation;
 
     const levels = buildLevelDataAtHour({ weatherData, hourIndex: i, levels: allLevels, nativeLevels });
-    traces.push({ time, levels, lcl: lclHeight, surfaceTemp, surfaceDewpoint });
+    const nativeDiagnosticLevels = buildLevelDataAtHour({
+      weatherData,
+      hourIndex: i,
+      levels: nativeLevels.map((level) => ({ ...level, source: 'model' })),
+      nativeLevels,
+    });
+    const requestedSurfacePressure = weatherData.hourly.surfacePressure?.[i] ?? NaN;
+    const surfacePressure = Number.isFinite(requestedSurfacePressure)
+      ? requestedSurfacePressure
+      : metersToHPaExact(weatherData.modelGridElevation);
+    const lclPressure = interpolatePressureAtHeight(lclHeight, [
+      { hPa: surfacePressure, heightMeters: weatherData.modelGridElevation },
+      ...nativeDiagnosticLevels
+        .filter((level) => level.pressure < surfacePressure && level.heightMeters > weatherData.modelGridElevation)
+        .map((level) => ({ hPa: level.pressure, heightMeters: level.heightMeters })),
+    ]);
+    const thermal = calculateThermalDiagnostics({
+      surfaceTemperature: surfaceTemp,
+      surfacePressure,
+      elevation: weatherData.modelGridElevation,
+      lclHeightMeters: lclHeight,
+      maximumHeightMeters: maxAltitude,
+      levels: nativeDiagnosticLevels.map((level) => ({
+        pressure: level.pressure,
+        heightMeters: level.heightMeters,
+        temperature: level.temperature,
+      })),
+    });
+    const thermalStrength =
+      model === 'gfs_seamless'
+        ? calculateThermalStrength({
+            surfaceTemperature: surfaceTemp,
+            surfaceDewpoint,
+            surfacePressure,
+            boundaryLayerHeightAglMeters: weatherData.hourly.boundaryLayerHeight[i] ?? NaN,
+            sensibleHeatFlux: weatherData.hourly.sensibleHeatFlux[i] ?? NaN,
+            latentHeatFlux: weatherData.hourly.latentHeatFlux[i] ?? NaN,
+          })
+        : null;
+    traces.push({
+      time,
+      levels,
+      lcl: lclHeight,
+      lclHeightAglMeters: lclValue,
+      lclPressure,
+      surfaceTemp,
+      surfaceDewpoint,
+      surfacePressure,
+      thermal,
+      thermalStrength,
+    });
   });
+
+  const thermalTriggerTime =
+    traces.find(
+      (trace) =>
+        trace.thermal.topHeightAglMeters != null &&
+        trace.thermal.topHeightAglMeters >= THERMAL_TRIGGER_HEIGHT_AGL_METERS
+    )?.time ?? null;
 
   return {
     traces,
-    elevation: weatherData.elevation,
-    modelGridElevation,
+    modelGridElevation: weatherData.modelGridElevation,
     timezone: weatherData.timezone,
     timezoneAbbr: weatherData.timezoneAbbr,
     pressureLevels: allLevels.map((l) => l.hPa),
+    thermalTriggerTime,
   };
 }

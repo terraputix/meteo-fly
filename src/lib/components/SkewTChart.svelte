@@ -12,6 +12,7 @@
   import type { WeatherModel } from '$lib/api/types';
   import { getTopPressureForModel } from '$lib/meteo/pressureLevels';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
+  import ThermalSummary from '$lib/components/ThermalSummary.svelte';
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
   export let skewTData: SkewTData | null = null;
@@ -41,12 +42,20 @@
     return { dpr, width };
   }
 
-  const legendItems = [
+  const legendItems: Array<{
+    label: string;
+    color: string;
+    dash: boolean;
+    opacity?: number;
+    fill?: boolean;
+  }> = [
     { label: 'Temperature', color: CHART_COLORS.temperature, dash: false },
     { label: 'Dewpoint', color: CHART_COLORS.dewpoint, dash: false },
     { label: 'Dry adiabat', color: CHART_COLORS.dryAdiabat, dash: true, opacity: 0.7 },
     { label: 'Moist adiabat', color: CHART_COLORS.moistAdiabat, dash: true, opacity: 0.6 },
     { label: 'Isohume', color: CHART_COLORS.isohume, dash: true, opacity: 0.65 },
+    { label: 'Surface parcel', color: CHART_COLORS.thermalParcel, dash: true, opacity: 0.9 },
+    { label: 'Buoyant layer', color: CHART_COLORS.thermalTop, dash: false, opacity: 0.14, fill: true },
   ];
 
   function render() {
@@ -106,7 +115,7 @@
     overlayCtx.save();
     overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     overlayCtx.clearRect(0, 0, width, totalHeight);
-    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width, skewTData.elevation);
+    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width);
     overlayCtx.restore();
   }
 
@@ -181,21 +190,32 @@
     {#each legendItems as item (item.label)}
       <span class="legend-item">
         <svg width="24" height="12" viewBox="0 0 24 12">
-          <line
-            x1="0"
-            y1="6"
-            x2="24"
-            y2="6"
-            stroke={item.color}
-            stroke-width="2"
-            stroke-dasharray={item.dash ? '4,2' : '0'}
-            opacity={item.opacity ?? 1}
-          />
+          {#if item.fill}
+            <rect x="0" y="2" width="24" height="8" rx="2" fill={item.color} opacity={item.opacity ?? 1} />
+          {:else}
+            <line
+              x1="0"
+              y1="6"
+              x2="24"
+              y2="6"
+              stroke={item.color}
+              stroke-width="2"
+              stroke-dasharray={item.dash ? '4,2' : '0'}
+              opacity={item.opacity ?? 1}
+            />
+          {/if}
         </svg>
         <span class="legend-label">{item.label}</span>
       </span>
     {/each}
   </div>
+
+  {#if skewTData?.traces[hour] ?? skewTData?.traces[0]}
+    {@const trace = skewTData?.traces[hour] ?? skewTData?.traces[0]}
+    {#if trace}
+      <ThermalSummary {trace} {model} />
+    {/if}
+  {/if}
 </div>
 
 <style>

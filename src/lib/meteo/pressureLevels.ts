@@ -25,6 +25,27 @@ export function metersToHPaExact(heightMeters: number): number {
   return pascals / 100;
 }
 
+export function interpolatePressureAtHeight(heightMeters: number, levels: readonly PressureLevel[]): number | null {
+  if (!Number.isFinite(heightMeters)) return null;
+
+  const validLevels = levels
+    .filter((level) => Number.isFinite(level.heightMeters) && Number.isFinite(level.hPa) && level.hPa > 0)
+    .sort((a, b) => a.heightMeters - b.heightMeters);
+  const exact = validLevels.find((level) => Math.abs(level.heightMeters - heightMeters) < 0.01);
+  if (exact) return exact.hPa;
+
+  for (let i = 0; i < validLevels.length - 1; i++) {
+    const lower = validLevels[i];
+    const upper = validLevels[i + 1];
+    if (heightMeters <= lower.heightMeters || heightMeters >= upper.heightMeters) continue;
+
+    const ratio = (heightMeters - lower.heightMeters) / (upper.heightMeters - lower.heightMeters);
+    return Math.exp(Math.log(lower.hPa) + (Math.log(upper.hPa) - Math.log(lower.hPa)) * ratio);
+  }
+
+  return null;
+}
+
 const ALL_PRESSURE_LEVELS = [
   1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 675, 650, 625, 600, 575, 550, 525, 500, 475, 450,
   425, 400, 375, 350, 325, 300, 275, 250, 225, 200,

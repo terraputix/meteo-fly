@@ -74,8 +74,12 @@ export interface SkewTWeatherData {
     geopotentialHeightProfile: VerticalProfile;
     temperature_2m: Float32Array;
     dewpoint_2m: Float32Array;
+    surfacePressure: Float32Array;
+    boundaryLayerHeight: Float32Array;
+    sensibleHeatFlux: Float32Array;
+    latentHeatFlux: Float32Array;
   };
-  elevation: number;
+  modelGridElevation: number;
   timezone: string;
   timezoneAbbr: string;
 }
