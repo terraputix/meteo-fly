@@ -178,11 +178,12 @@ export function createQueryParams(
   hourlyParams: HourlyParams,
   model: WeatherModel,
   cellSelection: CellSelection,
-  start: Date,
+  referenceDate: Date,
   numberOfDays: number,
-  dateTimezone?: string
+  dateTimezone?: string,
+  dayOffset: number = 0
 ) {
-  const startDate = formatDateToYYYYMMDD(start, dateTimezone);
+  const startDate = addDaysToDate(formatDateToYYYYMMDD(referenceDate, dateTimezone), dayOffset);
 
   return {
     ...hourlyParams,
@@ -228,15 +229,25 @@ export async function fetchModelGridElevation(
 export async function fetchWindChartData(
   location: Location,
   model: WeatherModel = 'icon_seamless',
-  start: Date,
+  referenceDate: Date,
   numberOfDays: number = 1,
   maxAltitude: MaxAltitude = 4000,
   cellSelection: CellSelection = 'nearest',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  dayOffset: number = 0
 ): Promise<WindChartData> {
   const modelVariables = getVariablesForModel(model, maxAltitude);
   const hourlyParams = createHourlyParams(modelVariables);
-  let params = createQueryParams(location, hourlyParams, model, cellSelection, start, numberOfDays);
+  let params = createQueryParams(
+    location,
+    hourlyParams,
+    model,
+    cellSelection,
+    referenceDate,
+    numberOfDays,
+    undefined,
+    dayOffset
+  );
 
   const fetchResponse = async () =>
     getFirstResponse(
@@ -251,9 +262,10 @@ export async function fetchWindChartData(
     hourlyParams,
     model,
     cellSelection,
-    start,
+    referenceDate,
     numberOfDays,
-    timezone
+    timezone,
+    dayOffset
   );
   if (localDateParams.start_date !== params.start_date || localDateParams.end_date !== params.end_date) {
     params = localDateParams;
@@ -315,19 +327,21 @@ function getSkewTVariablesForModel(model: WeatherModel, maxAltitude: MaxAltitude
 export async function fetchSkewTData(
   location: Location,
   model: WeatherModel = 'icon_seamless',
-  start: Date,
+  referenceDate: Date,
   maxAltitude: MaxAltitude = 4000,
   cellSelection: CellSelection = 'nearest',
   signal?: AbortSignal,
-  dateTimezone?: string
+  dateTimezone?: string,
+  dayOffset: number = 0
 ): Promise<SkewTWeatherData> {
   const variables = getSkewTVariablesForModel(model, maxAltitude);
+  const startDate = addDaysToDate(formatDateToYYYYMMDD(referenceDate, dateTimezone), dayOffset);
   let params = {
     hourly: [...variables.flatMap((v) => v.apiNames), 'temperature_2m', 'dew_point_2m'],
     latitude: location.latitude,
     longitude: location.longitude,
-    start_date: formatDateToYYYYMMDD(start, dateTimezone),
-    end_date: formatDateToYYYYMMDD(start, dateTimezone),
+    start_date: startDate,
+    end_date: startDate,
     models: model,
     cell_selection: cellSelection,
     timezone: REQUEST_TIMEZONE,
@@ -341,7 +355,7 @@ export async function fetchSkewTData(
 
   let response = await fetchResponse();
   let timezone = getResponseTimezone(response);
-  const localStartDate = formatDateToYYYYMMDD(start, timezone);
+  const localStartDate = addDaysToDate(formatDateToYYYYMMDD(referenceDate, timezone), dayOffset);
   if (localStartDate !== params.start_date) {
     params = { ...params, start_date: localStartDate, end_date: localStartDate };
     response = await fetchResponse();

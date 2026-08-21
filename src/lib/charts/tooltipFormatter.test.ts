@@ -28,7 +28,7 @@ describe('wind tooltip pressure coordinate', () => {
   });
 
   it('formats forecast time in the resolved location timezone', () => {
-    const time = new Date('2026-07-16T10:00:00Z');
+    const time = new Date('2026-07-16T10:30:00Z');
     const temperatureData = {
       temperatureData: [{ time, value: 20 }],
       dewpointData: [{ time, value: 12 }],
@@ -36,16 +36,35 @@ describe('wind tooltip pressure coordinate', () => {
       sunrise: time,
       sunset: time,
     };
-    const store = buildTooltipStore(temperatureData, { cloudRects: [], rainDots: [] }, [], []);
+    const store = buildTooltipStore(
+      temperatureData,
+      {
+        cloudRects: [
+          {
+            x1: new Date(time.getTime() - 30 * 60_000),
+            x2: new Date(time.getTime() + 30 * 60_000),
+            y1: 0,
+            y2: 1 / 3,
+            cloudCover: 35,
+          },
+        ],
+        rainDots: [{ time, rain: 1.5 }],
+      },
+      [],
+      []
+    );
 
     const html = createTooltipFormatter(
       store,
       createActiveState(),
-      'America/New_York'
+      'Asia/Kolkata'
     )({
-      value: [time.getTime(), 20],
+      value: [time.getTime() + 5 * 60_000, 20],
     });
 
-    expect(html).toContain('06:00');
+    expect(html).toContain('16:00');
+    expect(html).toContain('20.0&nbsp;°C');
+    expect(html).toContain('35&nbsp;%');
+    expect(html).toContain('1.5&nbsp;mm/h');
   });
 });

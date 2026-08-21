@@ -120,6 +120,18 @@ describe('API Configuration', () => {
       expect(params.cell_selection).toBe('land');
       expect(params.timezone).toBe('auto');
     });
+
+    it('increments forecast calendar days in the resolved timezone across DST', () => {
+      const location = { latitude: 0, longitude: 0 };
+      const hourlyParams = { hourly: ['temperature_2m'] };
+      const referenceDate = new Date('2026-03-29T00:30:00Z');
+
+      const today = createQueryParams(location, hourlyParams, 'icon_global', 'nearest', referenceDate, 1, 'UTC', 0);
+      const tomorrow = createQueryParams(location, hourlyParams, 'icon_global', 'nearest', referenceDate, 1, 'UTC', 1);
+
+      expect(today.start_date).toBe('2026-03-29');
+      expect(tomorrow.start_date).toBe('2026-03-30');
+    });
   });
 
   describe('request cancellation', () => {
