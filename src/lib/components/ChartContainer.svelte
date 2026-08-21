@@ -197,7 +197,8 @@
       {startDate}
       bind:hour
       {traceHours}
-      timezoneAbbr={skewTData?.timezoneAbbr ?? ''}
+      timezone={skewTData?.timezone ?? windChartData.timezone}
+      timezoneAbbr={skewTData?.timezoneAbbr ?? windChartData.timezoneAbbr}
       {maxForecastDays}
       {chartView}
       {keyboardNavigationEnabled}

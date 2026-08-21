@@ -34,6 +34,7 @@ export interface WindChartData {
   hourly: HourlyData;
   elevation: number;
   modelGridElevation?: number;
+  timezone: string;
   timezoneAbbr: string;
   sunrise: Date;
   sunset: Date;
@@ -75,6 +76,7 @@ export interface SkewTWeatherData {
     dewpoint_2m: Float32Array;
   };
   elevation: number;
+  timezone: string;
   timezoneAbbr: string;
 }
 

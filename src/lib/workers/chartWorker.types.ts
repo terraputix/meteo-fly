@@ -47,6 +47,7 @@ export interface ChartWorkerSuccessOutput {
     lcl: LclPoint[];
     elevation: number;
     modelGridElevation: number | undefined;
+    timezone: string;
     timezoneAbbr: string;
     temperatureChartData: TemperatureChartData;
     rainCloudChartData: RainCloudChartData;

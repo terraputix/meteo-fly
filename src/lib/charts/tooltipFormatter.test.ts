@@ -20,10 +20,32 @@ describe('wind tooltip pressure coordinate', () => {
     active.gridIndex = 2;
     active.hoveredWindPressure = 910;
 
-    const html = createTooltipFormatter(store, active)({ value: [time.getTime(), 910] });
+    const html = createTooltipFormatter(store, active, 'UTC')({ value: [time.getTime(), 910] });
 
     expect(html).toContain('988&nbsp;m');
     expect(html).toContain('20&nbsp;km/h');
     expect(html).not.toContain('111&nbsp;m');
+  });
+
+  it('formats forecast time in the resolved location timezone', () => {
+    const time = new Date('2026-07-16T10:00:00Z');
+    const temperatureData = {
+      temperatureData: [{ time, value: 20 }],
+      dewpointData: [{ time, value: 12 }],
+      humidityData: [{ time, value: 60 }],
+      sunrise: time,
+      sunset: time,
+    };
+    const store = buildTooltipStore(temperatureData, { cloudRects: [], rainDots: [] }, [], []);
+
+    const html = createTooltipFormatter(
+      store,
+      createActiveState(),
+      'America/New_York'
+    )({
+      value: [time.getTime(), 20],
+    });
+
+    expect(html).toContain('06:00');
   });
 });

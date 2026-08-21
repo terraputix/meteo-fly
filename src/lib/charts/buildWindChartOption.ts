@@ -66,13 +66,21 @@ const SUNSET_PATH =
   'M12 10V2 M4.93 10.93l1.41 1.41 M2 18h2 M20 18h2 M19.07 10.93l-1.41 1.41 M22 22H2 M16 6l-4 4-4-4 M16 18a4 4 0 0 0-8 0';
 
 // ─── Shared x-axis factory ───────────────────────────────────────────────────
-function makeXAxis(gridIndex: number, showLabels: boolean, xMin: number, xMax: number): XAXisComponentOption {
+function makeXAxis(
+  gridIndex: number,
+  showLabels: boolean,
+  xMin: number,
+  xMax: number,
+  timezone: string
+): XAXisComponentOption {
   return {
     type: 'time',
     gridIndex,
     min: xMin,
     max: xMax,
-    axisLabel: showLabels ? { formatter: (v: number) => fmtTime(new Date(v)), fontSize: 11 } : { show: false },
+    axisLabel: showLabels
+      ? { formatter: (v: number) => fmtTime(new Date(v), timezone), fontSize: 11 }
+      : { show: false },
     axisTick: { show: showLabels },
     axisLine: { show: true, lineStyle: { color: CHART_COLORS.axisLine } },
     splitLine: { show: false },
@@ -103,6 +111,7 @@ export function buildWindChartOption(
   cloudData: CloudCoverData[],
   cloudBase: LclPoint[],
   elevation: number,
+  timezone: string,
   timezoneAbbr: string,
   xDomain: [Date, Date],
   store: TooltipStore,
@@ -153,10 +162,10 @@ export function buildWindChartOption(
 
   // ── X axes ─────────────────────────────────────────────────────────────────
   const xAxes: XAXisComponentOption[] = [
-    makeXAxis(0, false, xMin, xMax),
-    makeXAxis(1, false, xMin, xMax),
+    makeXAxis(0, false, xMin, xMax, timezone),
+    makeXAxis(1, false, xMin, xMax, timezone),
     {
-      ...makeXAxis(2, true, xMin, xMax),
+      ...makeXAxis(2, true, xMin, xMax, timezone),
       name: `Time [${timezoneAbbr}]`,
       nameLocation: 'middle',
       nameGap: 28,
@@ -290,7 +299,7 @@ export function buildWindChartOption(
         symbol: `path://${SUNRISE_PATH}`,
         label: {
           position: 'right',
-          formatter: fmtTime(tempChartData.sunrise),
+          formatter: fmtTime(tempChartData.sunrise, timezone),
         },
       },
       {
@@ -300,7 +309,7 @@ export function buildWindChartOption(
         symbol: `path://${SUNSET_PATH}`,
         label: {
           position: 'left',
-          formatter: fmtTime(tempChartData.sunset),
+          formatter: fmtTime(tempChartData.sunset, timezone),
         },
       },
     ],
@@ -683,7 +692,7 @@ export function buildWindChartOption(
   // Unified tooltip formatter
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const tooltipFormatter = createTooltipFormatter(store, activeState);
+  const tooltipFormatter = createTooltipFormatter(store, activeState, timezone);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Assemble

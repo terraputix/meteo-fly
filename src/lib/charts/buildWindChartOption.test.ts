@@ -59,6 +59,7 @@ describe('wind chart option', () => {
       lcl,
       500,
       'UTC',
+      'UTC',
       times,
       store,
       createActiveState()
@@ -69,12 +70,12 @@ describe('wind chart option', () => {
       {
         name: 'Sunrise',
         xAxis: times[0].getTime(),
-        label: { position: 'right', formatter: fmtTime(times[0]) },
+        label: { position: 'right', formatter: fmtTime(times[0], 'UTC') },
       },
       {
         name: 'Sunset',
         xAxis: times[1].getTime(),
-        label: { position: 'left', formatter: fmtTime(times[1]) },
+        label: { position: 'left', formatter: fmtTime(times[1], 'UTC') },
       },
     ]);
 
@@ -129,6 +130,7 @@ describe('wind chart option', () => {
       [],
       lcl,
       500,
+      'UTC',
       'UTC',
       times,
       buildTooltipStore(temperatureData, fullRainCloudData, [], lcl),

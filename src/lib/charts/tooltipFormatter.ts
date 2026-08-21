@@ -143,7 +143,8 @@ function swatch(color: string, dashed = false): string {
 
 export function createTooltipFormatter(
   store: TooltipStore,
-  active: ActiveState
+  active: ActiveState,
+  timezone: string
 ): (paramsRaw: TooltipParam | TooltipParam[]) => string {
   return (paramsRaw: TooltipParam | TooltipParam[]): string => {
     const params = Array.isArray(paramsRaw) ? paramsRaw : [paramsRaw];
@@ -162,7 +163,7 @@ export function createTooltipFormatter(
 
     // Snap to the nearest hour (data is hourly).
     const snap = Math.round(hoveredTime / 3_600_000) * 3_600_000;
-    const timeStr = fmtTime(new Date(snap));
+    const timeStr = fmtTime(new Date(snap), timezone);
 
     const { gridIndex, hoveredWindPressure } = active;
 

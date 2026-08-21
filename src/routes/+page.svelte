@@ -344,7 +344,8 @@
         requestParameters.startDate,
         requestParameters.maxAltitude,
         requestParameters.cellSelection,
-        request.signal
+        request.signal,
+        windChartData?.timezone
       );
       if (!skewTRequest.isCurrent(request)) return;
       skewTWeatherData = result;

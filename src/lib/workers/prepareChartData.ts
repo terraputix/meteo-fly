@@ -118,6 +118,7 @@ export function prepareChartData(input: ChartWorkerInput): ChartWorkerSuccessOut
     lcl: calculateLclWeather(data),
     elevation: windChartData.elevation,
     modelGridElevation: windChartData.modelGridElevation,
+    timezone: windChartData.timezone,
     timezoneAbbr: windChartData.timezoneAbbr,
     temperatureChartData: prepareTemperatureData(data),
     rainCloudChartData: prepareRainAndCloudData(data),
