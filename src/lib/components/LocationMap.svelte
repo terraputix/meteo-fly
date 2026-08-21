@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { goto } from '$app/navigation';
   import maplibregl, {
     NavigationControl,
     type Map,
@@ -10,7 +9,7 @@
   } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { LngLatLike } from 'maplibre-gl';
-  import { base } from '$app/paths';
+  import { resolve } from '$app/paths';
   import type { Location } from '$lib/api/types';
   import { locationStore, type LocationState } from '$lib/services/location/store';
 
@@ -60,7 +59,7 @@
   const gridCellConnectorSourceId = 'grid-cell-connector';
   const gridCellConnectorLayerId = 'grid-cell-connector-line';
   const defaultTerrainExaggeration = 1;
-  const aboutUrl = `${base}/about`;
+  const aboutUrl = resolve('/about');
   let mapContainer: HTMLElement;
   let map: Map = $state.raw(undefined!)!;
   let marker: Marker;
@@ -579,8 +578,10 @@
     if (unsubscribe) {
       unsubscribe();
     }
-    mapContainer.removeEventListener('contextmenu', onContextMenu);
-    document.removeEventListener('click', closeContextMenu);
+    mapContainer?.removeEventListener('contextmenu', onContextMenu);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('click', closeContextMenu);
+    }
     if (selectedGridCellMarker) {
       selectedGridCellMarker.remove();
     }
@@ -604,6 +605,13 @@
   <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
 
   <div class="controls-stack pointer-events-none absolute right-3 z-10 flex flex-col items-end gap-2">
+    <header
+      class="pointer-events-auto w-full rounded-xl border border-slate-200/80 bg-white/92 px-3 py-2 text-right shadow-lg backdrop-blur-md"
+    >
+      <h1 class="text-sm font-semibold text-slate-900">Meteo-Fly</h1>
+      <p class="text-[10px] font-medium tracking-wide text-slate-500 uppercase">Paragliding weather</p>
+    </header>
+
     <div class="pointer-events-auto">
       <ModelSelector bind:model />
     </div>
@@ -638,12 +646,9 @@
       <ChartSettingsPopover bind:cellSelection />
     </div>
 
-    <button
-      type="button"
+    <a
+      href={aboutUrl}
       class="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white/92 shadow-lg backdrop-blur-md transition hover:bg-white"
-      onclick={() =>
-        // eslint-disable-next-line svelte/no-navigation-without-resolve
-        goto(aboutUrl)}
       aria-label="About"
       title="About"
     >
@@ -661,7 +666,7 @@
           <path d="M12 16v-4M12 9h.01" />
         </svg>
       </span>
-    </button>
+    </a>
   </div>
 
   {#if contextMenuPos}
