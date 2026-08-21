@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomSeriesOption, CustomSeriesRenderItemAPI, CustomSeriesRenderItemParams } from 'echarts';
 import { buildTooltipStore, createActiveState } from './tooltipFormatter';
-import { buildWindChartOption, getWindChartHeight } from './buildWindChartOption';
+import { buildWindChartOption, getWindChartHeight, TEMP_HEIGHT_PX, TEMP_TOP } from './buildWindChartOption';
 import { metersToHPaExact } from '$lib/meteo/pressureLevels';
 import { fmtTime } from '$lib/helpers';
 
@@ -9,7 +9,7 @@ interface NamedSeries {
   name?: string;
   data?: unknown;
   markLine?: { data?: unknown };
-  markPoint?: { data?: unknown };
+  markPoint?: { data?: unknown; symbolSize?: unknown };
 }
 
 interface RainSeriesItem {
@@ -66,16 +66,22 @@ describe('wind chart option', () => {
     );
     const series = option.series as NamedSeries[];
 
-    expect(series.find((item) => item.name === '__anchor_temp')?.markPoint?.data).toMatchObject([
+    const daylightMarkers = series.find((item) => item.name === '__anchor_temp')?.markPoint;
+    expect(daylightMarkers?.symbolSize).toEqual([13, 13]);
+    expect(daylightMarkers?.data).toMatchObject([
       {
         name: 'Sunrise',
         xAxis: times[0].getTime(),
-        label: { position: 'right', formatter: fmtTime(times[0], 'UTC') },
+        y: TEMP_TOP + TEMP_HEIGHT_PX + 24,
+        symbolOffset: [-7, -9],
+        label: { position: 'right', offset: [0, 2], formatter: fmtTime(times[0], 'UTC') },
       },
       {
         name: 'Sunset',
         xAxis: times[1].getTime(),
-        label: { position: 'left', formatter: fmtTime(times[1], 'UTC') },
+        y: TEMP_TOP + TEMP_HEIGHT_PX + 24,
+        symbolOffset: [7, -9],
+        label: { position: 'left', offset: [0, 2], formatter: fmtTime(times[1], 'UTC') },
       },
     ]);
 

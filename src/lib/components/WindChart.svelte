@@ -10,7 +10,13 @@
   } from 'echarts/components';
   import { CanvasRenderer } from 'echarts/renderers';
   import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
-  import { buildWindChartOption, getChartHeight, getWindChartHeight, WIND_TOP } from '$lib/charts/buildWindChartOption';
+  import {
+    buildWindChartOption,
+    DAYLIGHT_CONTEXT_TOP,
+    getChartHeight,
+    getWindChartHeight,
+    WIND_TOP,
+  } from '$lib/charts/buildWindChartOption';
   import type { WindChartData } from '$lib/api/types';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
   import type { WeatherModel } from '$lib/api/types';
@@ -286,15 +292,17 @@
 
   <button
     type="button"
+    aria-pressed={daylightOnly}
     aria-label={daylightOnly ? 'Extend chart to full day' : 'Compress chart to daylight hours'}
     title={daylightOnly ? 'Extend to full day' : 'Compress to daylight hours'}
-    class="absolute bottom-1 left-3 z-[5] flex h-6 w-6 items-center justify-center rounded border border-slate-200/80 bg-white text-slate-400 shadow-sm transition hover:border-amber-300 hover:text-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+    class="absolute left-1 z-[5] flex h-5 w-5 items-center justify-center rounded-full bg-slate-100/80 text-slate-400 transition hover:bg-amber-50 hover:text-amber-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-inset focus-visible:outline-none"
+    style="top: {DAYLIGHT_CONTEXT_TOP + 6}px;"
     onclick={() => (daylightOnly = !daylightOnly)}
   >
     {#if daylightOnly}
-      <UnfoldHorizontalIcon class="h-3.5 w-3.5" aria-hidden="true" />
+      <UnfoldHorizontalIcon class="h-3 w-3" aria-hidden="true" />
     {:else}
-      <FoldHorizontalIcon class="h-3.5 w-3.5" aria-hidden="true" />
+      <FoldHorizontalIcon class="h-3 w-3" aria-hidden="true" />
     {/if}
   </button>
 

@@ -29,9 +29,10 @@ export const MARGIN_RIGHT = 25;
 export const TEMP_HEIGHT_PX = 130;
 export const RAIN_HEIGHT_PX = 66;
 
-export const TEMP_TOP = 30;
+export const TEMP_TOP = 10;
 const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX;
-const RAIN_GAP = 10;
+const RAIN_GAP = 32;
+export const DAYLIGHT_CONTEXT_TOP = TEMP_BOTTOM_PX;
 export const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
 const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
 const WIND_GAP = 20;
@@ -276,13 +277,13 @@ export function buildWindChartOption(
   tempAnchorSeries.markPoint = {
     silent: true,
     animation: false,
-    symbolSize: [16, 16],
+    symbolSize: [13, 13],
     symbolKeepAspect: true,
     tooltip: { show: false },
     itemStyle: {
       color: 'transparent',
       borderColor: CHART_COLORS.daylightMarker,
-      borderWidth: 1.5,
+      borderWidth: 1.25,
     },
     label: {
       show: true,
@@ -295,20 +296,24 @@ export function buildWindChartOption(
       {
         name: 'Sunrise',
         xAxis: tempChartData.sunrise.getTime(),
-        y: TEMP_TOP,
+        y: TEMP_BOTTOM_PX + 24,
         symbol: `path://${SUNRISE_PATH}`,
+        symbolOffset: [-7, -9],
         label: {
           position: 'right',
+          offset: [0, 2],
           formatter: fmtTime(tempChartData.sunrise, timezone),
         },
       },
       {
         name: 'Sunset',
         xAxis: tempChartData.sunset.getTime(),
-        y: TEMP_TOP,
+        y: TEMP_BOTTOM_PX + 24,
         symbol: `path://${SUNSET_PATH}`,
+        symbolOffset: [7, -9],
         label: {
           position: 'left',
+          offset: [0, 2],
           formatter: fmtTime(tempChartData.sunset, timezone),
         },
       },
