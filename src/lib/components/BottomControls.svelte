@@ -7,6 +7,7 @@
     startDate,
     hour = $bindable(0),
     traceHours = [],
+    timezone = 'UTC',
     timezoneAbbr = '',
     maxForecastDays = 8,
     chartView = 'wind',
@@ -17,6 +18,7 @@
     startDate: Date;
     hour?: number;
     traceHours?: Date[];
+    timezone?: string;
     timezoneAbbr?: string;
     maxForecastDays?: number;
     chartView?: ChartView;
@@ -48,6 +50,7 @@
       weekday: 'short',
       month: 'short',
       day: 'numeric',
+      timeZone: timezone,
     });
   }
 
@@ -78,6 +81,7 @@
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
+      timeZone: timezone,
     });
   }
 

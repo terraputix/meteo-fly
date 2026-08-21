@@ -8,6 +8,7 @@ describe('wind chart data', () => {
     const times = [new Date('2026-07-16T10:00:00Z'), new Date('2026-07-16T11:00:00Z')];
     const data: WindChartData = {
       elevation: 500,
+      timezone: 'UTC',
       timezoneAbbr: 'UTC',
       sunrise: times[0],
       sunset: times[1],

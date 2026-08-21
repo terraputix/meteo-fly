@@ -44,7 +44,8 @@
   type WeatherRequestParameters = {
     location: Location;
     model: PageParameters['selectedModel'];
-    startDate: Date;
+    referenceDate: Date;
+    dayOffset: number;
     maxAltitude: PageParameters['maxAltitude'];
     cellSelection: PageParameters['cellSelection'];
   };
@@ -196,7 +197,8 @@
         longitude: parameters.location.longitude,
       },
       model: parameters.selectedModel,
-      startDate: new Date(startDate),
+      referenceDate: new Date(),
+      dayOffset: parameters.selectedDay - 1,
       maxAltitude: parameters.maxAltitude,
       cellSelection: parameters.cellSelection,
     };
@@ -296,11 +298,12 @@
       const result = await fetchWindChartData(
         requestParameters.location,
         requestParameters.model,
-        requestParameters.startDate,
+        requestParameters.referenceDate,
         1,
         requestParameters.maxAltitude,
         requestParameters.cellSelection,
-        request.signal
+        request.signal,
+        requestParameters.dayOffset
       );
       if (!windRequest.isCurrent(request)) return;
 
@@ -341,10 +344,12 @@
       const result = await fetchSkewTData(
         requestParameters.location,
         requestParameters.model,
-        requestParameters.startDate,
+        requestParameters.referenceDate,
         requestParameters.maxAltitude,
         requestParameters.cellSelection,
-        request.signal
+        request.signal,
+        windChartData?.timezone,
+        requestParameters.dayOffset
       );
       if (!skewTRequest.isCurrent(request)) return;
       skewTWeatherData = result;
@@ -450,7 +455,6 @@
           bind:chartOpen={showChart}
           bind:model={parameters.selectedModel}
           bind:cellSelection={parameters.cellSelection}
-          bind:daylightOnly={parameters.daylightOnly}
           selectedGridCell={windChartData?.selectedGridCell ?? null}
           gridCellElevation={windChartData?.elevation}
           modelGridElevation={windChartData?.modelGridElevation}
@@ -500,7 +504,7 @@
             <ChartContainer
               {windChartData}
               {skewTWeatherData}
-              {startDate}
+              startDate={windChartData.hourly.time[0] ?? startDate}
               {isWindChartLoading}
               {isSkewTLoading}
               skewTError={skewTFailure?.message ?? null}

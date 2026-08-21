@@ -1,25 +1,48 @@
 <script lang="ts">
   import { init, use, type EChartsType } from 'echarts/core';
   import { CustomChart, LineChart } from 'echarts/charts';
-  import { GridComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
+  import {
+    GridComponent,
+    MarkAreaComponent,
+    MarkLineComponent,
+    MarkPointComponent,
+    TooltipComponent,
+  } from 'echarts/components';
   import { CanvasRenderer } from 'echarts/renderers';
   import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
-  import { buildWindChartOption, getChartHeight, getWindChartHeight, WIND_TOP } from '$lib/charts/buildWindChartOption';
+  import {
+    buildWindChartOption,
+    DAYLIGHT_CONTEXT_TOP,
+    getChartHeight,
+    getWindChartHeight,
+    WIND_TOP,
+  } from '$lib/charts/buildWindChartOption';
   import type { WindChartData } from '$lib/api/types';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
   import type { WeatherModel } from '$lib/api/types';
   import { MAX_ALTITUDE_OPTIONS, type MaxAltitude } from '$lib/meteo/types';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+  import FoldHorizontalIcon from '@lucide/svelte/icons/fold-horizontal';
+  import UnfoldHorizontalIcon from '@lucide/svelte/icons/unfold-horizontal';
 
-  use([LineChart, CustomChart, GridComponent, TooltipComponent, MarkAreaComponent, MarkLineComponent, CanvasRenderer]);
+  use([
+    LineChart,
+    CustomChart,
+    GridComponent,
+    TooltipComponent,
+    MarkAreaComponent,
+    MarkLineComponent,
+    MarkPointComponent,
+    CanvasRenderer,
+  ]);
 
   let {
     windChartData = null,
     maxAltitude = $bindable<MaxAltitude>(4000),
     model = 'icon_seamless',
     isLoading = false,
-    daylightOnly = false,
+    daylightOnly = $bindable(false),
   }: {
     windChartData: WindChartData | null;
     maxAltitude: MaxAltitude;
@@ -126,6 +149,7 @@
           lcl,
           elevation,
           modelGridElevation,
+          timezone,
           timezoneAbbr,
           temperatureChartData,
           rainCloudChartData,
@@ -144,6 +168,7 @@
             cloudData,
             lcl,
             elevation,
+            timezone,
             timezoneAbbr,
             xDomain,
             store,
@@ -264,6 +289,22 @@
       aria-hidden="true"
     />
   </label>
+
+  <button
+    type="button"
+    aria-pressed={daylightOnly}
+    aria-label={daylightOnly ? 'Extend chart to full day' : 'Compress chart to daylight hours'}
+    title={daylightOnly ? 'Extend to full day' : 'Compress to daylight hours'}
+    class="absolute left-1 z-[5] flex h-5 w-5 items-center justify-center rounded-full bg-slate-100/80 text-slate-400 transition hover:bg-amber-50 hover:text-amber-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-inset focus-visible:outline-none"
+    style="top: {DAYLIGHT_CONTEXT_TOP + 6}px;"
+    onclick={() => (daylightOnly = !daylightOnly)}
+  >
+    {#if daylightOnly}
+      <UnfoldHorizontalIcon class="h-3 w-3" aria-hidden="true" />
+    {:else}
+      <FoldHorizontalIcon class="h-3 w-3" aria-hidden="true" />
+    {/if}
+  </button>
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
   <div

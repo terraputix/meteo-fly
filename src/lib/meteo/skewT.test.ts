@@ -66,6 +66,7 @@ function createMockSkewTData(): SkewTWeatherData {
       geopotentialHeightProfile: {},
     },
     elevation: 500,
+    timezone: 'UTC',
     timezoneAbbr: 'UTC',
   };
 }
@@ -77,6 +78,7 @@ describe('Skew-T data building', () => {
 
     expect(result.traces).toHaveLength(3);
     expect(result.elevation).toBe(500);
+    expect(result.timezone).toBe('UTC');
     expect(result.timezoneAbbr).toBe('UTC');
   });
 

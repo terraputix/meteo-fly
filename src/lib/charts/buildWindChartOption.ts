@@ -31,7 +31,8 @@ export const RAIN_HEIGHT_PX = 66;
 
 export const TEMP_TOP = 10;
 const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX;
-const RAIN_GAP = 10;
+const RAIN_GAP = 32;
+export const DAYLIGHT_CONTEXT_TOP = TEMP_BOTTOM_PX;
 export const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
 const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
 const WIND_GAP = 20;
@@ -60,15 +61,27 @@ interface LevelBand {
 
 // Canonical arrow path
 const MODEL_ARROW_PATH = 'M 0 7 L 0 -7 L 3.15 -1.54 L 0 -7 L -3.15 -1.54';
+const SUNRISE_PATH =
+  'M12 2v8 M4.93 10.93l1.41 1.41 M2 18h2 M20 18h2 M19.07 10.93l-1.41 1.41 M22 22H2 M8 6l4-4 4 4 M16 18a4 4 0 0 0-8 0';
+const SUNSET_PATH =
+  'M12 10V2 M4.93 10.93l1.41 1.41 M2 18h2 M20 18h2 M19.07 10.93l-1.41 1.41 M22 22H2 M16 6l-4 4-4-4 M16 18a4 4 0 0 0-8 0';
 
 // ─── Shared x-axis factory ───────────────────────────────────────────────────
-function makeXAxis(gridIndex: number, showLabels: boolean, xMin: number, xMax: number): XAXisComponentOption {
+function makeXAxis(
+  gridIndex: number,
+  showLabels: boolean,
+  xMin: number,
+  xMax: number,
+  timezone: string
+): XAXisComponentOption {
   return {
     type: 'time',
     gridIndex,
     min: xMin,
     max: xMax,
-    axisLabel: showLabels ? { formatter: (v: number) => fmtTime(new Date(v)), fontSize: 11 } : { show: false },
+    axisLabel: showLabels
+      ? { formatter: (v: number) => fmtTime(new Date(v), timezone), fontSize: 11 }
+      : { show: false },
     axisTick: { show: showLabels },
     axisLine: { show: true, lineStyle: { color: CHART_COLORS.axisLine } },
     splitLine: { show: false },
@@ -99,6 +112,7 @@ export function buildWindChartOption(
   cloudData: CloudCoverData[],
   cloudBase: LclPoint[],
   elevation: number,
+  timezone: string,
   timezoneAbbr: string,
   xDomain: [Date, Date],
   store: TooltipStore,
@@ -149,10 +163,10 @@ export function buildWindChartOption(
 
   // ── X axes ─────────────────────────────────────────────────────────────────
   const xAxes: XAXisComponentOption[] = [
-    makeXAxis(0, false, xMin, xMax),
-    makeXAxis(1, false, xMin, xMax),
+    makeXAxis(0, false, xMin, xMax, timezone),
+    makeXAxis(1, false, xMin, xMax, timezone),
     {
-      ...makeXAxis(2, true, xMin, xMax),
+      ...makeXAxis(2, true, xMin, xMax, timezone),
       name: `Time [${timezoneAbbr}]`,
       nameLocation: 'middle',
       nameGap: 28,
@@ -259,6 +273,53 @@ export function buildWindChartOption(
   const tempTimePairs = toTimePairs(tempChartData.temperatureData);
 
   const tempAnchorSeries = makeAnchorSeries('__anchor_temp', 0, 0, tempTimePairs);
+
+  tempAnchorSeries.markPoint = {
+    silent: true,
+    animation: false,
+    symbolSize: [13, 13],
+    symbolKeepAspect: true,
+    tooltip: { show: false },
+    itemStyle: {
+      color: 'transparent',
+      borderColor: CHART_COLORS.daylightMarker,
+      borderWidth: 1.25,
+    },
+    label: {
+      show: true,
+      color: CHART_COLORS.daylightMarker,
+      fontSize: 10,
+      fontWeight: 600,
+      distance: 4,
+    },
+    data: [
+      {
+        name: 'Sunrise',
+        xAxis: tempChartData.sunrise.getTime(),
+        y: TEMP_BOTTOM_PX + 24,
+        symbol: `path://${SUNRISE_PATH}`,
+        symbolOffset: [-7, -9],
+        label: {
+          position: 'right',
+          offset: [0, 2],
+          formatter: fmtTime(tempChartData.sunrise, timezone),
+        },
+      },
+      {
+        name: 'Sunset',
+        xAxis: tempChartData.sunset.getTime(),
+        y: TEMP_BOTTOM_PX + 24,
+        symbol: `path://${SUNSET_PATH}`,
+        symbolOffset: [7, -9],
+        label: {
+          position: 'left',
+          offset: [0, 2],
+          formatter: fmtTime(tempChartData.sunset, timezone),
+        },
+      },
+    ],
+    z: 10,
+  };
 
   const tempSeries = makeLineSeries({
     name: 'Temperature',
@@ -636,7 +697,7 @@ export function buildWindChartOption(
   // Unified tooltip formatter
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const tooltipFormatter = createTooltipFormatter(store, activeState);
+  const tooltipFormatter = createTooltipFormatter(store, activeState, timezone);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Assemble

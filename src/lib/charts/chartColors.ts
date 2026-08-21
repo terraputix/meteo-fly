@@ -18,4 +18,5 @@ export const CHART_COLORS = {
   axisLine: '#ccc',
   gridLine: '#eee',
   sunriseFill: 'rgba(255,220,0,0.18)',
+  daylightMarker: '#b7791f',
 } as const;

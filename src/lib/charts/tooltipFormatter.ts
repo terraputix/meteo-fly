@@ -9,6 +9,7 @@ import type { LclPoint } from '$lib/meteo/lcl';
 // Pre-built look-up maps keyed by timestamp so the formatter is O(1).
 
 export interface TooltipStore {
+  sortedTimes: number[];
   tempByTime: Map<number, { temp: number; dew: number; hum: number }>;
   rainByTime: Map<number, number>;
   cloudLowByTime: Map<number, number>;
@@ -41,7 +42,7 @@ export function buildTooltipStore(
   const cloudMidByTime = new Map<number, number>();
   const cloudHighByTime = new Map<number, number>();
   rainData.cloudRects.forEach((r) => {
-    const mid = Math.round((r.x1.getTime() + r.x2.getTime()) / 2 / 3_600_000) * 3_600_000;
+    const mid = (r.x1.getTime() + r.x2.getTime()) / 2;
     if (r.y1 < 0.01) cloudLowByTime.set(mid, r.cloudCover);
     else if (r.y1 < 0.4) cloudMidByTime.set(mid, r.cloudCover);
     else cloudHighByTime.set(mid, r.cloudCover);
@@ -65,6 +66,7 @@ export function buildTooltipStore(
   });
 
   return {
+    sortedTimes: Array.from(tempByTime.keys()).sort((a, b) => a - b),
     tempByTime,
     rainByTime,
     cloudLowByTime,
@@ -143,7 +145,8 @@ function swatch(color: string, dashed = false): string {
 
 export function createTooltipFormatter(
   store: TooltipStore,
-  active: ActiveState
+  active: ActiveState,
+  timezone: string
 ): (paramsRaw: TooltipParam | TooltipParam[]) => string {
   return (paramsRaw: TooltipParam | TooltipParam[]): string => {
     const params = Array.isArray(paramsRaw) ? paramsRaw : [paramsRaw];
@@ -160,9 +163,9 @@ export function createTooltipFormatter(
     }
     if (hoveredTime == null) return '';
 
-    // Snap to the nearest hour (data is hourly).
-    const snap = Math.round(hoveredTime / 3_600_000) * 3_600_000;
-    const timeStr = fmtTime(new Date(snap));
+    const snap = snapToNearest(store.sortedTimes, hoveredTime);
+    if (snap == null) return '';
+    const timeStr = fmtTime(new Date(snap), timezone);
 
     const { gridIndex, hoveredWindPressure } = active;
 
