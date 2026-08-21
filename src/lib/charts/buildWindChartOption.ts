@@ -29,7 +29,7 @@ export const MARGIN_RIGHT = 25;
 export const TEMP_HEIGHT_PX = 130;
 export const RAIN_HEIGHT_PX = 66;
 
-export const TEMP_TOP = 10;
+export const TEMP_TOP = 30;
 const TEMP_BOTTOM_PX = TEMP_TOP + TEMP_HEIGHT_PX;
 const RAIN_GAP = 10;
 export const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
@@ -60,6 +60,10 @@ interface LevelBand {
 
 // Canonical arrow path
 const MODEL_ARROW_PATH = 'M 0 7 L 0 -7 L 3.15 -1.54 L 0 -7 L -3.15 -1.54';
+const SUNRISE_PATH =
+  'M12 2v8 M4.93 10.93l1.41 1.41 M2 18h2 M20 18h2 M19.07 10.93l-1.41 1.41 M22 22H2 M8 6l4-4 4 4 M16 18a4 4 0 0 0-8 0';
+const SUNSET_PATH =
+  'M12 10V2 M4.93 10.93l1.41 1.41 M2 18h2 M20 18h2 M19.07 10.93l-1.41 1.41 M22 22H2 M16 6l-4 4-4-4 M16 18a4 4 0 0 0-8 0';
 
 // ─── Shared x-axis factory ───────────────────────────────────────────────────
 function makeXAxis(gridIndex: number, showLabels: boolean, xMin: number, xMax: number): XAXisComponentOption {
@@ -259,6 +263,49 @@ export function buildWindChartOption(
   const tempTimePairs = toTimePairs(tempChartData.temperatureData);
 
   const tempAnchorSeries = makeAnchorSeries('__anchor_temp', 0, 0, tempTimePairs);
+
+  tempAnchorSeries.markPoint = {
+    silent: true,
+    animation: false,
+    symbolSize: [16, 16],
+    symbolKeepAspect: true,
+    tooltip: { show: false },
+    itemStyle: {
+      color: 'transparent',
+      borderColor: CHART_COLORS.daylightMarker,
+      borderWidth: 1.5,
+    },
+    label: {
+      show: true,
+      color: CHART_COLORS.daylightMarker,
+      fontSize: 10,
+      fontWeight: 600,
+      distance: 4,
+    },
+    data: [
+      {
+        name: 'Sunrise',
+        xAxis: tempChartData.sunrise.getTime(),
+        y: TEMP_TOP,
+        symbol: `path://${SUNRISE_PATH}`,
+        label: {
+          position: 'right',
+          formatter: fmtTime(tempChartData.sunrise),
+        },
+      },
+      {
+        name: 'Sunset',
+        xAxis: tempChartData.sunset.getTime(),
+        y: TEMP_TOP,
+        symbol: `path://${SUNSET_PATH}`,
+        label: {
+          position: 'left',
+          formatter: fmtTime(tempChartData.sunset),
+        },
+      },
+    ],
+    z: 10,
+  };
 
   const tempSeries = makeLineSeries({
     name: 'Temperature',

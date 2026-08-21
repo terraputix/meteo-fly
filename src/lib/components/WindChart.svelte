@@ -1,7 +1,13 @@
 <script lang="ts">
   import { init, use, type EChartsType } from 'echarts/core';
   import { CustomChart, LineChart } from 'echarts/charts';
-  import { GridComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
+  import {
+    GridComponent,
+    MarkAreaComponent,
+    MarkLineComponent,
+    MarkPointComponent,
+    TooltipComponent,
+  } from 'echarts/components';
   import { CanvasRenderer } from 'echarts/renderers';
   import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
   import { buildWindChartOption, getChartHeight, getWindChartHeight, WIND_TOP } from '$lib/charts/buildWindChartOption';
@@ -11,15 +17,26 @@
   import { MAX_ALTITUDE_OPTIONS, type MaxAltitude } from '$lib/meteo/types';
   import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+  import FoldHorizontalIcon from '@lucide/svelte/icons/fold-horizontal';
+  import UnfoldHorizontalIcon from '@lucide/svelte/icons/unfold-horizontal';
 
-  use([LineChart, CustomChart, GridComponent, TooltipComponent, MarkAreaComponent, MarkLineComponent, CanvasRenderer]);
+  use([
+    LineChart,
+    CustomChart,
+    GridComponent,
+    TooltipComponent,
+    MarkAreaComponent,
+    MarkLineComponent,
+    MarkPointComponent,
+    CanvasRenderer,
+  ]);
 
   let {
     windChartData = null,
     maxAltitude = $bindable<MaxAltitude>(4000),
     model = 'icon_seamless',
     isLoading = false,
-    daylightOnly = false,
+    daylightOnly = $bindable(false),
   }: {
     windChartData: WindChartData | null;
     maxAltitude: MaxAltitude;
@@ -264,6 +281,20 @@
       aria-hidden="true"
     />
   </label>
+
+  <button
+    type="button"
+    aria-label={daylightOnly ? 'Extend chart to full day' : 'Compress chart to daylight hours'}
+    title={daylightOnly ? 'Extend to full day' : 'Compress to daylight hours'}
+    class="absolute bottom-1 left-3 z-[5] flex h-6 w-6 items-center justify-center rounded border border-slate-200/80 bg-white text-slate-400 shadow-sm transition hover:border-amber-300 hover:text-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+    onclick={() => (daylightOnly = !daylightOnly)}
+  >
+    {#if daylightOnly}
+      <UnfoldHorizontalIcon class="h-3.5 w-3.5" aria-hidden="true" />
+    {:else}
+      <FoldHorizontalIcon class="h-3.5 w-3.5" aria-hidden="true" />
+    {/if}
+  </button>
 
   <!-- Use a wrapper with fixed height to prevent layout shift -->
   <div

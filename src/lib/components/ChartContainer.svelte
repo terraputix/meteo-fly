@@ -116,7 +116,7 @@
     </div>
 
     {#if chartView === 'wind'}
-      <WindChart {windChartData} bind:maxAltitude {model} {daylightOnly} isLoading={isWindChartLoading} />
+      <WindChart {windChartData} bind:maxAltitude {model} bind:daylightOnly isLoading={isWindChartLoading} />
       <Footer>
         {#snippet heading()}
           <button

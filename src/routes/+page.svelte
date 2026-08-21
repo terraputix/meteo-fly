@@ -450,7 +450,6 @@
           bind:chartOpen={showChart}
           bind:model={parameters.selectedModel}
           bind:cellSelection={parameters.cellSelection}
-          bind:daylightOnly={parameters.daylightOnly}
           selectedGridCell={windChartData?.selectedGridCell ?? null}
           gridCellElevation={windChartData?.elevation}
           modelGridElevation={windChartData?.modelGridElevation}

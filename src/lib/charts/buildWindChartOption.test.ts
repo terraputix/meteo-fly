@@ -3,11 +3,13 @@ import type { CustomSeriesOption, CustomSeriesRenderItemAPI, CustomSeriesRenderI
 import { buildTooltipStore, createActiveState } from './tooltipFormatter';
 import { buildWindChartOption, getWindChartHeight } from './buildWindChartOption';
 import { metersToHPaExact } from '$lib/meteo/pressureLevels';
+import { fmtTime } from '$lib/helpers';
 
 interface NamedSeries {
   name?: string;
   data?: unknown;
   markLine?: { data?: unknown };
+  markPoint?: { data?: unknown };
 }
 
 interface RainSeriesItem {
@@ -62,6 +64,19 @@ describe('wind chart option', () => {
       createActiveState()
     );
     const series = option.series as NamedSeries[];
+
+    expect(series.find((item) => item.name === '__anchor_temp')?.markPoint?.data).toMatchObject([
+      {
+        name: 'Sunrise',
+        xAxis: times[0].getTime(),
+        label: { position: 'right', formatter: fmtTime(times[0]) },
+      },
+      {
+        name: 'Sunset',
+        xAxis: times[1].getTime(),
+        label: { position: 'left', formatter: fmtTime(times[1]) },
+      },
+    ]);
 
     expect(series.find((item) => item.name === '__anchor_rain')?.markLine?.data).toEqual([
       [{ coord: [times[0].getTime(), 1] }, { coord: [times[1].getTime(), 1] }],
