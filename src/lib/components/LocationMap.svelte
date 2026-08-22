@@ -1,12 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import maplibregl, {
-    NavigationControl,
-    type Map,
-    type MapMouseEvent,
-    type MapTouchEvent,
-    type Marker,
-  } from 'maplibre-gl';
+  import maplibregl, { type Map, type MapMouseEvent, type MapTouchEvent, type Marker } from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { LngLatLike } from 'maplibre-gl';
   import { resolve } from '$app/paths';
@@ -26,6 +20,8 @@
     MAP_DOUBLE_ACTIVATION_INTERVAL_MS,
     MAP_DOUBLE_ACTIVATION_MAX_DISTANCE_PX,
   } from './mapLocationSelection';
+
+  const { NavigationControl } = maplibregl;
 
   let {
     latitude = $bindable(46.41526),
@@ -605,11 +601,9 @@
   <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
 
   <div class="controls-stack pointer-events-none absolute right-3 z-10 flex flex-col items-end gap-2">
-    <header
-      class="pointer-events-auto w-full rounded-xl border border-slate-200/80 bg-white/92 px-3 py-2 text-right shadow-lg backdrop-blur-md"
-    >
-      <h1 class="text-sm font-semibold text-slate-900">Meteo-Fly</h1>
-      <p class="text-[10px] font-medium tracking-wide text-slate-500 uppercase">Paragliding weather</p>
+    <header class="sr-only">
+      <h1>Meteo-Fly</h1>
+      <p>Interactive weather forecasts for paragliding and hang gliding.</p>
     </header>
 
     <div class="pointer-events-auto">
