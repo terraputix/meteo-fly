@@ -27,6 +27,41 @@ describe('wind tooltip pressure coordinate', () => {
     expect(html).not.toContain('111&nbsp;m');
   });
 
+  it('shows the nearby hourly precipitation summary in the rain grid', () => {
+    const time = new Date('2026-07-16T10:00:00Z');
+    const temperatureData = {
+      temperatureData: [{ time, value: 20 }],
+      dewpointData: [{ time, value: 12 }],
+      humidityData: [{ time, value: 60 }],
+      sunrise: time,
+      sunset: time,
+    };
+    const precipitation = new Float32Array(25);
+    precipitation[12] = 2.5;
+    const store = buildTooltipStore(temperatureData, { cloudRects: [], rainDots: [] }, [], [], {
+      gridSize: 5,
+      radiusKm: 20,
+      glyphs: [
+        {
+          time,
+          x1: new Date('2026-07-16T09:30:00Z'),
+          x2: new Date('2026-07-16T10:30:00Z'),
+          precipitation,
+          maximum: 2.5,
+          wetCellCount: 1,
+        },
+      ],
+    });
+    const active = createActiveState();
+    active.gridIndex = 1;
+
+    const html = createTooltipFormatter(store, active, 'UTC')({ value: [time.getTime(), 1] });
+
+    expect(html).toContain('Nearby ±20&nbsp;km (1h)');
+    expect(html).toContain('max 2.5&nbsp;mm');
+    expect(html).toContain('1/25 wet');
+  });
+
   it('formats forecast time in the resolved location timezone', () => {
     const time = new Date('2026-07-16T10:30:00Z');
     const temperatureData = {

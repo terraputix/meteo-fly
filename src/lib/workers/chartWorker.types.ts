@@ -38,6 +38,21 @@ export interface RainCloudChartData {
   }>;
 }
 
+export interface RainSpotGlyph {
+  time: Date;
+  x1: Date;
+  x2: Date;
+  precipitation: Float32Array;
+  maximum: number;
+  wetCellCount: number;
+}
+
+export interface RainSpotChartData {
+  glyphs: RainSpotGlyph[];
+  gridSize: number;
+  radiusKm: number;
+}
+
 export interface ChartWorkerSuccessOutput {
   requestId: number;
   success: true;
@@ -51,6 +66,7 @@ export interface ChartWorkerSuccessOutput {
     timezoneAbbr: string;
     temperatureChartData: TemperatureChartData;
     rainCloudChartData: RainCloudChartData;
+    rainSpotChartData: RainSpotChartData;
     xDomain: [Date, Date];
   };
 }

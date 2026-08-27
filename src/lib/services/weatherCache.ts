@@ -58,6 +58,7 @@ function createCachedResponse(response: Response, cachedAt: number): Response {
 
 function getWeatherCacheDataset(request: Request): WeatherCacheDataset | null {
   const searchParams = new URL(request.url).searchParams;
+  if (searchParams.get('latitude')?.includes(',') && searchParams.get('hourly') === 'precipitation') return 'wind';
   if (searchParams.has('daily')) return 'wind';
   if (searchParams.has('hourly')) return 'skewt';
   return null;

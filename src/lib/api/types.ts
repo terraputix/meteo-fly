@@ -3,6 +3,9 @@ export interface Location {
   longitude: number;
 }
 
+export const RAIN_SPOT_GRID_SIZE = 5;
+export const RAIN_SPOT_RADIUS_KM = 20;
+
 export type WeatherModel =
   | 'icon_d2'
   | 'icon_seamless'
@@ -32,6 +35,7 @@ export function getAtLevel(data: VerticalProfile, pressure: number): Float32Arra
 
 export interface WindChartData {
   hourly: HourlyData;
+  rainSpot?: RainSpotData;
   elevation: number;
   modelGridElevation?: number;
   timezone: string;
@@ -39,6 +43,21 @@ export interface WindChartData {
   sunrise: Date;
   sunset: Date;
   selectedGridCell: Location | null;
+}
+
+export interface RainSpotCell {
+  row: number;
+  column: number;
+  latitude: number;
+  longitude: number;
+  precipitation: Float32Array;
+}
+
+export interface RainSpotData {
+  time: Date[];
+  cells: RainSpotCell[];
+  gridSize: number;
+  radiusKm: number;
 }
 
 export interface HourlyData {

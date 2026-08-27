@@ -3,12 +3,13 @@ import { getWindFieldAllLevels } from '$lib/charts/wind';
 import { calculateLclWeather } from '$lib/meteo/lcl';
 import { addSeconds } from '$lib/utils/dateExtensions';
 
-import type { WindChartData, VerticalProfile } from '$lib/api/types';
+import { RAIN_SPOT_GRID_SIZE, RAIN_SPOT_RADIUS_KM, type WindChartData, type VerticalProfile } from '$lib/api/types';
 import type {
   ChartWorkerInput,
   ChartWorkerSuccessOutput,
   TemperatureChartData,
   RainCloudChartData,
+  RainSpotChartData,
 } from './chartWorker.types';
 
 function filterDaylightHours(data: WindChartData): WindChartData {
@@ -97,6 +98,44 @@ function prepareRainAndCloudData(data: WindChartData): RainCloudChartData {
   };
 }
 
+function prepareRainSpotData(data: WindChartData): RainSpotChartData {
+  const rainSpot = data.rainSpot;
+  if (!rainSpot) return { glyphs: [], gridSize: RAIN_SPOT_GRID_SIZE, radiusKm: RAIN_SPOT_RADIUS_KM };
+
+  const visibleTimes = new Set(data.hourly.time.map((time) => time.getTime()));
+  const glyphs: RainSpotChartData['glyphs'] = [];
+
+  for (let timeIndex = 0; timeIndex < rainSpot.time.length; timeIndex++) {
+    const time = rainSpot.time[timeIndex];
+    if (!visibleTimes.has(time.getTime())) continue;
+
+    const precipitation = new Float32Array(rainSpot.gridSize * rainSpot.gridSize);
+    precipitation.fill(NaN);
+
+    for (const cell of rainSpot.cells) {
+      const value = cell.precipitation[timeIndex];
+      if (Number.isFinite(value)) precipitation[cell.row * rainSpot.gridSize + cell.column] = value;
+    }
+
+    const finiteValues = Array.from(precipitation).filter(Number.isFinite);
+    if (finiteValues.length === 0) continue;
+    glyphs.push({
+      time,
+      x1: addSeconds(time, -1800),
+      x2: addSeconds(time, 1800),
+      precipitation,
+      maximum: Math.max(...finiteValues),
+      wetCellCount: finiteValues.filter((value) => value >= 0.1).length,
+    });
+  }
+
+  return {
+    glyphs,
+    gridSize: rainSpot.gridSize,
+    radiusKm: rainSpot.radiusKm,
+  };
+}
+
 function calculateDomains(times: Date[]): [Date, Date] {
   const timestamps = times.map((time) => time.getTime()).filter(Number.isFinite);
   if (timestamps.length === 0) {
@@ -122,6 +161,7 @@ export function prepareChartData(input: ChartWorkerInput): ChartWorkerSuccessOut
     timezoneAbbr: windChartData.timezoneAbbr,
     temperatureChartData: prepareTemperatureData(data),
     rainCloudChartData: prepareRainAndCloudData(data),
+    rainSpotChartData: prepareRainSpotData(data),
     xDomain: calculateDomains(data.hourly.time),
   };
 }

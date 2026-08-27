@@ -2,6 +2,8 @@ import { fetchWeatherApi } from 'openmeteo';
 import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
 import type { WeatherApiResponse } from '@openmeteo/sdk/weather-api-response';
 import {
+  RAIN_SPOT_GRID_SIZE,
+  RAIN_SPOT_RADIUS_KM,
   type VerticalProfile,
   type WeatherModel,
   type CellSelection,
@@ -13,6 +15,7 @@ import {
   type HourlyData,
   type WindChartData,
   type SkewTWeatherData,
+  type RainSpotData,
 } from './types';
 import { getVariablesForModel, makeProfileVar } from './variables';
 import type { MaxAltitude } from '$lib/meteo/types';
@@ -163,6 +166,32 @@ function formatDateToYYYYMMDD(date: Date, timeZone?: string): string {
   return `${year}-${month}-${day}`;
 }
 
+export function createRainSpotCoordinates(
+  location: Location,
+  radiusKm: number = RAIN_SPOT_RADIUS_KM,
+  gridSize: number = RAIN_SPOT_GRID_SIZE
+): Location[] {
+  if (gridSize < 2) throw new Error('Rain spot grid must contain at least two points per axis');
+
+  const latitudeKmPerDegree = 111.32;
+  const longitudeKmPerDegree = latitudeKmPerDegree * Math.cos((location.latitude * Math.PI) / 180);
+  const latitudeDelta = radiusKm / latitudeKmPerDegree;
+  const longitudeDelta = Math.abs(longitudeKmPerDegree) < 0.001 ? 0 : radiusKm / longitudeKmPerDegree;
+
+  return Array.from({ length: gridSize * gridSize }, (_, index) => {
+    const row = Math.floor(index / gridSize);
+    const column = index % gridSize;
+    const northToSouth = 1 - (2 * row) / (gridSize - 1);
+    const westToEast = -1 + (2 * column) / (gridSize - 1);
+    const longitude = location.longitude + longitudeDelta * westToEast;
+
+    return {
+      latitude: Math.max(-90, Math.min(90, location.latitude + latitudeDelta * northToSouth)),
+      longitude: ((((longitude + 180) % 360) + 360) % 360) - 180,
+    };
+  });
+}
+
 function addDaysToDate(date: string, days: number): string {
   const [year, month, day] = date.split('-').map(Number);
   const result = new Date(Date.UTC(year, month - 1, day + days));
@@ -309,6 +338,77 @@ export async function fetchWindChartData(
   };
 
   return windChartData;
+}
+
+export async function fetchRainSpotData(
+  location: Location,
+  model: WeatherModel,
+  referenceDate: Date,
+  numberOfDays: number = 1,
+  signal?: AbortSignal,
+  dayOffset: number = 0
+): Promise<RainSpotData> {
+  const coordinates = createRainSpotCoordinates(location);
+  const hourlyParams = ['precipitation'];
+  const createParams = (dateTimezone?: string) => {
+    const startDate = addDaysToDate(formatDateToYYYYMMDD(referenceDate, dateTimezone), dayOffset);
+    return {
+      hourly: hourlyParams,
+      latitude: coordinates.map((coordinate) => coordinate.latitude),
+      longitude: coordinates.map((coordinate) => coordinate.longitude),
+      start_date: startDate,
+      end_date: addDaysToDate(startDate, numberOfDays - 1),
+      models: model,
+      cell_selection: 'nearest',
+      elevation: coordinates.map(() => 'nan'),
+      timezone: REQUEST_TIMEZONE,
+    };
+  };
+
+  let params = createParams();
+  const fetchResponses = () =>
+    fetchWeatherApi(url, params, undefined, undefined, undefined, signal ? { signal } : undefined);
+
+  let responses = await fetchResponses();
+  const responseTimezone = getResponseTimezone(getFirstResponse(responses, 'rain spot'));
+  const localDateParams = createParams(responseTimezone);
+  if (localDateParams.start_date !== params.start_date || localDateParams.end_date !== params.end_date) {
+    params = localDateParams;
+    responses = await fetchResponses();
+  }
+
+  if (responses.length !== coordinates.length) {
+    throw new Error(`Open-Meteo returned ${responses.length} of ${coordinates.length} rain spot locations`);
+  }
+
+  const firstHourly = getHourlySection(getFirstResponse(responses, 'rain spot'), 'rain spot');
+  const times = createHourlyTimes(firstHourly, 'rain spot');
+  const cells = responses.map((response, index) => {
+    const hourly = getHourlySection(response, 'rain spot');
+    const responseTimes = createHourlyTimes(hourly, 'rain spot');
+    if (
+      responseTimes.length !== times.length ||
+      responseTimes.some((time, timeIndex) => time.getTime() !== times[timeIndex].getTime())
+    ) {
+      throw new Error('Open-Meteo rain spot responses have inconsistent timelines');
+    }
+
+    return {
+      row: Math.floor(index / RAIN_SPOT_GRID_SIZE),
+      column: index % RAIN_SPOT_GRID_SIZE,
+      latitude: response.latitude(),
+      longitude: response.longitude(),
+      precipitation:
+        getHourlyValues(hourlyParams, hourly, 'precipitation', times.length) ?? createMissingValues(times.length),
+    };
+  });
+
+  return {
+    time: times,
+    cells,
+    gridSize: RAIN_SPOT_GRID_SIZE,
+    radiusKm: RAIN_SPOT_RADIUS_KM,
+  };
 }
 
 // ─── Skew-T data fetching ────────────────────────────────────────────────────
