@@ -1,5 +1,7 @@
 <script lang="ts">
   import { MIN_FORECAST_DAY, stepTimestep, type TimestepDirection } from '$lib/components/timestepNavigation';
+  import { THERMAL_TRIGGER_HEIGHT_AGL_METERS } from '$lib/meteo/thermal';
+  import type { SkewTTrace } from '$lib/meteo/types';
   import type { ChartView } from '$lib/services/types';
 
   let {
@@ -7,6 +9,8 @@
     startDate,
     hour = $bindable(0),
     traceHours = [],
+    thermalTraces = [],
+    thermalTriggerTime = null,
     timezone = 'UTC',
     timezoneAbbr = '',
     maxForecastDays = 8,
@@ -18,6 +22,8 @@
     startDate: Date;
     hour?: number;
     traceHours?: Date[];
+    thermalTraces?: SkewTTrace[];
+    thermalTriggerTime?: Date | null;
     timezone?: string;
     timezoneAbbr?: string;
     maxForecastDays?: number;
@@ -25,6 +31,29 @@
     keyboardNavigationEnabled?: boolean;
     onclose?: () => void;
   } = $props();
+
+  let selectedThermalTrace = $derived(thermalTraces[hour] ?? null);
+  let thermalTriggerIndex = $derived(
+    thermalTriggerTime == null ? -1 : traceHours.findIndex((time) => time.getTime() === thermalTriggerTime.getTime())
+  );
+
+  function reachesThermalThreshold(trace: SkewTTrace): boolean {
+    return (
+      trace.thermal.topHeightAglMeters != null && trace.thermal.topHeightAglMeters >= THERMAL_TRIGGER_HEIGHT_AGL_METERS
+    );
+  }
+
+  function formatTemperature(value: number): string {
+    return Number.isFinite(value) ? `${value.toFixed(1)} °C` : '—';
+  }
+
+  function formatHeatingStatus(trace: SkewTTrace): string {
+    if (reachesThermalThreshold(trace)) return 'Reached';
+    const triggerTemperature = trace.thermal.triggerTemperature;
+    if (!Number.isFinite(trace.surfaceTemp)) return 'Unavailable';
+    if (triggerTemperature == null || !Number.isFinite(triggerTemperature)) return 'Outside profile';
+    return `Needs +${Math.max(0, triggerTemperature - trace.surfaceTemp).toFixed(1)} °C`;
+  }
 
   const keyboardNavigationExclusionSelector = [
     'a[href]',
@@ -154,16 +183,42 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
-      <input
-        type="range"
-        min="0"
-        max={traceHours.length - 1}
-        value={hour}
-        oninput={handleSliderInput}
-        aria-label="Forecast time"
-        aria-valuetext={`${formatDayHour(traceHours[hour] ?? new Date())} ${timezoneAbbr}`.trim()}
-        class="h-2 flex-1 cursor-pointer rounded-lg bg-slate-200 accent-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600"
-      />
+      <div class="relative h-4 min-w-0 flex-1">
+        <input
+          type="range"
+          min="0"
+          max={traceHours.length - 1}
+          value={hour}
+          oninput={handleSliderInput}
+          aria-label="Forecast time"
+          aria-valuetext={`${formatDayHour(traceHours[hour] ?? new Date())} ${timezoneAbbr}`.trim()}
+          class="absolute top-0 left-0 h-2 w-full cursor-pointer rounded-lg bg-slate-200 accent-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600"
+        />
+        {#if chartView === 'skewt' && thermalTraces.length > 0}
+          <div
+            class="absolute right-0 bottom-0 left-0 flex h-1 overflow-hidden rounded-full bg-slate-100"
+            role="img"
+            aria-label="Orange hours reach 1.2 kilometres of dry lift"
+            title="Orange hours reach 1.2 km of dry lift"
+          >
+            {#each thermalTraces as trace, index (`${trace.time.getTime()}-${index}`)}
+              <span
+                class="h-full flex-1"
+                class:bg-orange-400={reachesThermalThreshold(trace)}
+                class:bg-slate-200={!reachesThermalThreshold(trace)}
+              ></span>
+            {/each}
+          </div>
+          {#if thermalTriggerIndex >= 0 && traceHours.length > 1}
+            <span
+              class="absolute top-0 h-3 w-0.5 -translate-x-1/2 bg-orange-600"
+              style:left={`${(thermalTriggerIndex / (traceHours.length - 1)) * 100}%`}
+              title="First hour reaching 1.2 km of dry lift"
+              aria-hidden="true"
+            ></span>
+          {/if}
+        {/if}
+      </div>
       <button
         type="button"
         onclick={nextTrace}
@@ -180,6 +235,30 @@
         <span class="text-slate-400"> {timezoneAbbr}</span>
       </span>
     </div>
+    {#if chartView === 'skewt' && selectedThermalTrace}
+      <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-2 text-[10px] text-slate-500">
+        <span>Surface {formatTemperature(selectedThermalTrace.surfaceTemp)}</span>
+        <span class="text-slate-300">•</span>
+        <span>
+          Surface temp for {THERMAL_TRIGGER_HEIGHT_AGL_METERS / 1000} km lift
+          {selectedThermalTrace.thermal.triggerTemperature == null
+            ? '—'
+            : formatTemperature(selectedThermalTrace.thermal.triggerTemperature)}
+        </span>
+        <span
+          class="rounded-full px-1.5 py-0.5 font-semibold"
+          class:bg-orange-100={reachesThermalThreshold(selectedThermalTrace)}
+          class:text-orange-800={reachesThermalThreshold(selectedThermalTrace)}
+          class:bg-slate-100={!reachesThermalThreshold(selectedThermalTrace)}
+          class:text-slate-600={!reachesThermalThreshold(selectedThermalTrace)}
+        >
+          {formatHeatingStatus(selectedThermalTrace)}
+        </span>
+        {#if thermalTriggerTime}
+          <span class="text-slate-400">First reached {formatDayHour(thermalTriggerTime)} {timezoneAbbr}</span>
+        {/if}
+      </div>
+    {/if}
   {/if}
 
   <div

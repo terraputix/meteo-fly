@@ -31,19 +31,51 @@ export interface SkewTLevelData {
   isInterpolated: boolean;
 }
 
+export interface ThermalLevelData {
+  pressure: number;
+  heightMeters: number;
+  environmentTemperature: number;
+  parcelTemperature: number;
+  thermalIndex: number;
+  triggerTemperature: number;
+  isSurface: boolean;
+}
+
+export interface ThermalDiagnostics {
+  levels: ThermalLevelData[];
+  topHeightMeters: number | null;
+  topHeightAglMeters: number | null;
+  topPressure: number | null;
+  topIsAboveProfile: boolean;
+  minimumThermalIndex: number | null;
+  triggerTemperature: number | null;
+  reachesLcl: boolean | null;
+}
+
+export interface ThermalStrengthData {
+  convectiveVelocityScale: number;
+  boundaryLayerHeightAglMeters: number;
+  surfaceBuoyancyFlux: number;
+}
+
 export interface SkewTTrace {
   time: Date;
   levels: SkewTLevelData[];
   lcl: number;
+  lclHeightAglMeters: number;
+  lclPressure: number | null;
   surfaceTemp: number;
   surfaceDewpoint: number;
+  surfacePressure: number;
+  thermal: ThermalDiagnostics;
+  thermalStrength: ThermalStrengthData | null;
 }
 
 export interface SkewTData {
   traces: SkewTTrace[];
-  elevation: number;
-  modelGridElevation?: number;
+  modelGridElevation: number;
   timezone: string;
   timezoneAbbr: string;
   pressureLevels: number[];
+  thermalTriggerTime: Date | null;
 }

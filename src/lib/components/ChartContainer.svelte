@@ -46,7 +46,7 @@
 
   let skewTData = $derived.by(() => {
     if (!skewTWeatherData || chartView !== 'skewt') return null;
-    return buildSkewTData(skewTWeatherData, model, maxAltitude, windChartData.modelGridElevation);
+    return buildSkewTData(skewTWeatherData, model, maxAltitude);
   });
   let traceHours = $derived(skewTData?.traces.map((t) => t.time) ?? []);
   let maxForecastDays = $derived(MODEL_FORECAST_DAYS[model]);
@@ -199,6 +199,8 @@
       {traceHours}
       timezone={skewTData?.timezone ?? windChartData.timezone}
       timezoneAbbr={skewTData?.timezoneAbbr ?? windChartData.timezoneAbbr}
+      thermalTraces={chartView === 'skewt' ? (skewTData?.traces ?? []) : []}
+      thermalTriggerTime={chartView === 'skewt' ? (skewTData?.thermalTriggerTime ?? null) : null}
       {maxForecastDays}
       {chartView}
       {keyboardNavigationEnabled}

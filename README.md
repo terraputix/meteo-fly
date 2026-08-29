@@ -7,7 +7,7 @@ an interactive map with forecast charts intended to help inspect weather models 
 
 ## Features
 
-- Wind, cloud, rain, humidity, and cloud-base meteograms
+- Wind, cloud, rain, humidity, cloud-base, profile-based thermal potential, and GFS convective velocity scale
 - Skew-T atmospheric soundings
 - Multiple ICON, GFS, ECMWF, Meteo-France, UKMO, GEM, and CMA models
 - Terrain-aware grid-cell selection and Hike & Fly analysis

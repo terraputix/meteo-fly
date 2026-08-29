@@ -324,6 +324,8 @@ function getSkewTVariablesForModel(model: WeatherModel, maxAltitude: MaxAltitude
   ];
 }
 
+const GFS_THERMAL_STRENGTH_VARIABLES = ['boundary_layer_height', 'sensible_heat_flux', 'latent_heat_flux'] as const;
+
 export async function fetchSkewTData(
   location: Location,
   model: WeatherModel = 'icon_seamless',
@@ -335,9 +337,16 @@ export async function fetchSkewTData(
   dayOffset: number = 0
 ): Promise<SkewTWeatherData> {
   const variables = getSkewTVariablesForModel(model, maxAltitude);
+  const thermalStrengthVariables = model === 'gfs_seamless' ? GFS_THERMAL_STRENGTH_VARIABLES : [];
   const startDate = addDaysToDate(formatDateToYYYYMMDD(referenceDate, dateTimezone), dayOffset);
   let params = {
-    hourly: [...variables.flatMap((v) => v.apiNames), 'temperature_2m', 'dew_point_2m'],
+    hourly: [
+      ...variables.flatMap((v) => v.apiNames),
+      'temperature_2m',
+      'dew_point_2m',
+      'surface_pressure',
+      ...thermalStrengthVariables,
+    ],
     latitude: location.latitude,
     longitude: location.longitude,
     start_date: startDate,
@@ -345,6 +354,7 @@ export async function fetchSkewTData(
     models: model,
     cell_selection: cellSelection,
     timezone: REQUEST_TIMEZONE,
+    elevation: 'nan',
   };
 
   const fetchResponse = async () =>
@@ -363,7 +373,7 @@ export async function fetchSkewTData(
   }
 
   const timezoneAbbr = response.timezoneAbbreviation() ?? 'UTC';
-  const elevation = response.elevation();
+  const modelGridElevation = response.elevation();
 
   const hourly = getHourlySection(response, 'Skew-T');
   const times = createHourlyTimes(hourly, 'Skew-T');
@@ -380,6 +390,10 @@ export async function fetchSkewTData(
     geopotentialHeightProfile: {},
     temperature_2m: createMissingValues(times.length),
     dewpoint_2m: createMissingValues(times.length),
+    surfacePressure: createMissingValues(times.length),
+    boundaryLayerHeight: createMissingValues(times.length),
+    sensibleHeatFlux: createMissingValues(times.length),
+    latentHeatFlux: createMissingValues(times.length),
   };
 
   variables.forEach((v) => {
@@ -395,16 +409,28 @@ export async function fetchSkewTData(
 
   const temperature2m = getHourlyValues(hourlyParams, hourly, 'temperature_2m', times.length);
   const dewpoint2m = getHourlyValues(hourlyParams, hourly, 'dew_point_2m', times.length);
+  const surfacePressure = getHourlyValues(hourlyParams, hourly, 'surface_pressure', times.length);
   if (temperature2m) {
     result.temperature_2m = temperature2m;
   }
   if (dewpoint2m) {
     result.dewpoint_2m = dewpoint2m;
   }
+  if (surfacePressure) {
+    result.surfacePressure = surfacePressure;
+  }
+  if (model === 'gfs_seamless') {
+    const boundaryLayerHeight = getHourlyValues(hourlyParams, hourly, 'boundary_layer_height', times.length);
+    const sensibleHeatFlux = getHourlyValues(hourlyParams, hourly, 'sensible_heat_flux', times.length);
+    const latentHeatFlux = getHourlyValues(hourlyParams, hourly, 'latent_heat_flux', times.length);
+    if (boundaryLayerHeight) result.boundaryLayerHeight = boundaryLayerHeight;
+    if (sensibleHeatFlux) result.sensibleHeatFlux = sensibleHeatFlux;
+    if (latentHeatFlux) result.latentHeatFlux = latentHeatFlux;
+  }
 
   return {
     hourly: result,
-    elevation,
+    modelGridElevation,
     timezone,
     timezoneAbbr,
   };

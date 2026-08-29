@@ -13,6 +13,10 @@ function createMockSkewTData(): SkewTWeatherData {
       time: times,
       temperature_2m: temps2m,
       dewpoint_2m: dewpoints2m,
+      surfacePressure: new Float32Array([950, 950, 950]),
+      boundaryLayerHeight: new Float32Array([1500, 1600, 1700]),
+      sensibleHeatFlux: new Float32Array([200, 220, 240]),
+      latentHeatFlux: new Float32Array([100, 110, 120]),
       temperatureProfile: {
         _1000hPa: new Float32Array([18, 20, 22]),
         _925hPa: new Float32Array([14, 16, 18]),
@@ -65,7 +69,7 @@ function createMockSkewTData(): SkewTWeatherData {
       } as SkewTWeatherData['hourly']['cloudCoverProfile'],
       geopotentialHeightProfile: {},
     },
-    elevation: 500,
+    modelGridElevation: 500,
     timezone: 'UTC',
     timezoneAbbr: 'UTC',
   };
@@ -77,25 +81,21 @@ describe('Skew-T data building', () => {
     const result = buildSkewTData(weatherData, 'icon_d2', 4000);
 
     expect(result.traces).toHaveLength(3);
-    expect(result.elevation).toBe(500);
+    expect(result.modelGridElevation).toBe(500);
     expect(result.timezone).toBe('UTC');
     expect(result.timezoneAbbr).toBe('UTC');
   });
 
-  it('includes modelGridElevation when provided', () => {
+  it('uses the raw model-grid elevation and profile pressure for the LCL', () => {
     const weatherData = createMockSkewTData();
-    const result = buildSkewTData(weatherData, 'icon_d2', 4000, 480);
+    weatherData.hourly.geopotentialHeightProfile = {
+      _900hPa: new Float32Array([1000, 1000, 1000]),
+      _850hPa: new Float32Array([1500, 1500, 1500]),
+    };
+    const result = buildSkewTData(weatherData, 'icon_d2', 4000);
 
-    expect(result.modelGridElevation).toBe(480);
-  });
-
-  it('uses modelGridElevation for LCL calculation', () => {
-    const weatherData = createMockSkewTData();
-    const result = buildSkewTData(weatherData, 'icon_d2', 4000, 550);
-
-    // LCL is calculated as lclValue + groundElevation
-    // For first trace: surfaceTemp=20, surfaceDewpoint=15 → approx 750m LCL AGL
-    expect(result.traces[0].lcl).toBe(1125); // at least ground elevation
+    expect(result.traces[0].lcl).toBe(1125);
+    expect(result.traces[0].lclPressure).toBeCloseTo(Math.exp(Math.log(900) + (Math.log(850) - Math.log(900)) * 0.25));
   });
 
   it('returns correct number of levels per trace (native + interpolated)', () => {
@@ -136,6 +136,36 @@ describe('Skew-T data building', () => {
       expect(trace.surfaceTemp).toBe(20 + 2 * i);
       expect(trace.surfaceDewpoint).toBe(15 + i);
     });
+  });
+
+  it('builds thermal diagnostics from native levels and surface pressure', () => {
+    const weatherData = createMockSkewTData();
+    const result = buildSkewTData(weatherData, 'icon_d2', 4000);
+
+    expect(result.traces[0].surfacePressure).toBe(950);
+    expect(result.traces[0].thermal.levels.some((level) => level.pressure === 875)).toBe(false);
+    expect(result.traces[0].thermal.levels.length).toBeLessThan(result.traces[0].levels.length);
+  });
+
+  it('builds a GFS thermal-strength estimate and omits it for other models', () => {
+    const weatherData = createMockSkewTData();
+
+    const gfs = buildSkewTData(weatherData, 'gfs_seamless', 4000);
+    const icon = buildSkewTData(weatherData, 'icon_d2', 4000);
+
+    expect(gfs.traces[0].thermalStrength?.convectiveVelocityScale).toBeGreaterThan(0);
+    expect(gfs.traces[0].thermalStrength?.boundaryLayerHeightAglMeters).toBe(1500);
+    expect(icon.traces[0].thermalStrength).toBeNull();
+  });
+
+  it('falls back to elevation-based surface pressure when the API value is missing', () => {
+    const weatherData = createMockSkewTData();
+    weatherData.hourly.surfacePressure.fill(NaN);
+
+    const result = buildSkewTData(weatherData, 'icon_d2', 4000);
+
+    expect(result.traces[0].surfacePressure).toBeGreaterThan(900);
+    expect(result.traces[0].surfacePressure).toBeLessThan(1000);
   });
 
   it('uses actual profile temperature when available', () => {
