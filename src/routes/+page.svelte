@@ -420,7 +420,7 @@
 </svelte:head>
 
 <div
-  class="relative h-screen w-full overflow-hidden bg-slate-100"
+  class="relative h-dvh w-full overflow-hidden bg-slate-100"
   style="--map-controls-top-offset: {mapControlsTopOffset};"
 >
   {#if showMapLoadingStatus}
