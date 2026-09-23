@@ -17,6 +17,7 @@
     getWindChartHeight,
     WIND_TOP,
   } from '$lib/charts/buildWindChartOption';
+  import { getWindChartSize } from '$lib/charts/chartSizing';
   import type { WindChartData } from '$lib/api/types';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
   import type { WeatherModel } from '$lib/api/types';
@@ -56,7 +57,9 @@
   let isBusy = $derived(isLoading || isRendering);
 
   let windHeight = $derived(getWindChartHeight(maxAltitude));
-  let totalHeight = $derived(getChartHeight(windHeight));
+  let availableWidth = $state(600);
+  let availableHeight = $state(0);
+  let chartSize = $derived(getWindChartSize(availableWidth, availableHeight, maxAltitude));
 
   // ─── Svelte action ────────────────────────────────────────────────────────
 
@@ -107,7 +110,17 @@
 
     chart.on('updateaxispointer', handleAxisPointer);
 
-    const resizeObserver = new ResizeObserver(() => chart?.resize());
+    function resizeChart() {
+      if (!chart) return;
+      chart.resize();
+      if (chart.getOption()?.grid) {
+        chart.setOption({
+          grid: [{}, {}, { height: Math.max(params.windHeight, node.clientHeight - getChartHeight(0)) }],
+        });
+      }
+    }
+
+    const resizeObserver = new ResizeObserver(resizeChart);
     resizeObserver.observe(node);
 
     function terminateWorker(target: Worker) {
@@ -173,7 +186,7 @@
             xDomain,
             store,
             activeState,
-            render.params.windHeight,
+            Math.max(render.params.windHeight, node.clientHeight - getChartHeight(0)),
             render.params.maxAltitude,
             render.params.model,
             modelGridElevation
@@ -236,6 +249,7 @@
 
     return {
       update(newParams: RenderChartParams) {
+        params = newParams;
         if (newParams.data !== prevData || newParams.daylightOnly !== prevDaylightOnly) {
           prevData = newParams.data;
           prevDaylightOnly = newParams.daylightOnly;
@@ -267,67 +281,78 @@
   }
 </script>
 
-<div class="chart-container" style="min-height: {totalHeight}px;">
-  <ChartLoadingOverlay visible={isBusy} message="Loading weather data…" />
+<div
+  class="relative flex-1 shrink-0"
+  style="min-height: {getChartHeight(windHeight)}px;"
+  bind:clientWidth={availableWidth}
+  bind:clientHeight={availableHeight}
+>
+  <div class="chart-container" style="width: {chartSize.width}px; height: {chartSize.height}px;">
+    <ChartLoadingOverlay visible={isBusy} message="Loading weather data…" />
 
-  <label
-    class="group absolute left-0 z-[5] flex h-5 w-[54px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
-    style="top: {WIND_TOP - 10}px;"
-  >
-    <select
-      bind:value={maxAltitude}
-      aria-label="Wind chart top height"
-      title="Wind chart top height"
-      class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-4 pl-0 text-right font-semibold text-slate-700 outline-none"
+    <label
+      class="group absolute left-0 z-[5] flex h-5 w-[54px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
+      style="top: {WIND_TOP - 10}px;"
     >
-      {#each MAX_ALTITUDE_OPTIONS as option (option.value)}
-        <option value={option.value}>{option.value}m</option>
-      {/each}
-    </select>
-    <ChevronDownIcon
-      class="pointer-events-none absolute right-0.5 h-3 w-3 text-slate-500 transition group-hover:text-slate-700"
-      aria-hidden="true"
-    />
-  </label>
+      <select
+        bind:value={maxAltitude}
+        aria-label="Wind chart top height"
+        title="Wind chart top height"
+        class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-4 pl-0 text-right font-semibold text-slate-700 outline-none"
+      >
+        {#each MAX_ALTITUDE_OPTIONS as option (option.value)}
+          <option value={option.value}>{option.value}m</option>
+        {/each}
+      </select>
+      <ChevronDownIcon
+        class="pointer-events-none absolute right-0.5 h-3 w-3 text-slate-500 transition group-hover:text-slate-700"
+        aria-hidden="true"
+      />
+    </label>
 
-  <button
-    type="button"
-    aria-pressed={daylightOnly}
-    aria-label={daylightOnly ? 'Extend chart to full day' : 'Compress chart to daylight hours'}
-    title={daylightOnly ? 'Extend to full day' : 'Compress to daylight hours'}
-    class="absolute left-1 z-[5] flex h-5 w-5 items-center justify-center rounded-full bg-slate-100/80 text-slate-400 transition hover:bg-amber-50 hover:text-amber-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-inset focus-visible:outline-none"
-    style="top: {DAYLIGHT_CONTEXT_TOP + 6}px;"
-    onclick={() => (daylightOnly = !daylightOnly)}
-  >
-    {#if daylightOnly}
-      <UnfoldHorizontalIcon class="h-3 w-3" aria-hidden="true" />
-    {:else}
-      <FoldHorizontalIcon class="h-3 w-3" aria-hidden="true" />
-    {/if}
-  </button>
+    <button
+      type="button"
+      aria-pressed={daylightOnly}
+      aria-label={daylightOnly ? 'Extend chart to full day' : 'Compress chart to daylight hours'}
+      title={daylightOnly ? 'Extend to full day' : 'Compress to daylight hours'}
+      class="absolute left-1 z-[5] flex h-5 w-5 items-center justify-center rounded-full bg-slate-100/80 text-slate-400 transition hover:bg-amber-50 hover:text-amber-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-inset focus-visible:outline-none"
+      style="top: {DAYLIGHT_CONTEXT_TOP + 6}px;"
+      onclick={() => (daylightOnly = !daylightOnly)}
+    >
+      {#if daylightOnly}
+        <UnfoldHorizontalIcon class="h-3 w-3" aria-hidden="true" />
+      {:else}
+        <FoldHorizontalIcon class="h-3 w-3" aria-hidden="true" />
+      {/if}
+    </button>
 
-  <!-- Use a wrapper with fixed height to prevent layout shift -->
-  <div
-    use:renderChart={{ data: windChartData, windHeight, maxAltitude, model, daylightOnly }}
-    class="chart-content"
-    style="opacity: {isBusy ? 0 : 1}; height: {totalHeight}px;"
-  ></div>
+    <div
+      use:renderChart={{ data: windChartData, windHeight, maxAltitude, model, daylightOnly }}
+      class="chart-content"
+      style="opacity: {isBusy ? 0 : 1};"
+    ></div>
+  </div>
 </div>
 
 <style>
   .chart-container {
     width: 100%;
-    max-width: 920px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
     padding: 0;
     contain: layout;
   }
 
   .chart-content {
+    position: absolute;
+    inset: 0;
+    height: 100%;
     width: 100%;
     transition: opacity 0.3s ease;
   }

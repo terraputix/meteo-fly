@@ -7,6 +7,7 @@
     type HitTestResult,
     type PlotLayout,
   } from '$lib/charts/skewTRenderer';
+  import { getSkewTChartSize, SKEWT_MIN_HEIGHT } from '$lib/charts/chartSizing';
   import { CHART_COLORS } from '$lib/charts/chartColors';
   import { MAX_ALTITUDE_OPTIONS, type MaxAltitude, type SkewTData } from '$lib/meteo/types';
   import type { WeatherModel } from '$lib/api/types';
@@ -20,7 +21,11 @@
   export let model: WeatherModel = 'icon_seamless';
   export let isLoading = false;
 
-  const totalHeight = 520;
+  let availableWidth = 600;
+  let availableHeight = SKEWT_MIN_HEIGHT;
+  $: chartSize = getSkewTChartSize(availableWidth, availableHeight);
+  $: totalHeight = chartSize.height;
+  $: chartWidth = chartSize.width;
 
   $: topPressureOptions = MAX_ALTITUDE_OPTIONS.map((option) => ({
     ...option,
@@ -37,7 +42,7 @@
 
   function canvasSize() {
     const dpr = window.devicePixelRatio || 1;
-    const width = container?.clientWidth || 600;
+    const width = chartWidth;
     return { dpr, width };
   }
 
@@ -77,7 +82,7 @@
     }
   }
 
-  $: if (canvas && skewTData && (hour, true)) render();
+  $: if (canvas && skewTData && (hour, totalHeight, chartWidth, true)) render();
 
   onMount(() => {
     if (!container) return;
@@ -142,39 +147,46 @@
   }
 </script>
 
-<div bind:this={container} class="skewt-chart-container" style="min-height: {totalHeight}px;">
+<div bind:this={container} class="skewt-chart-container">
   <ChartLoadingOverlay visible={isLoading} message="Loading sounding data…" />
 
-  <div class="chart-wrapper" style="position: relative;">
-    <label
-      class="group absolute left-0 z-[5] flex h-5 w-[58px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
-      style="top: {SKEWT_PLOT_TOP - 10}px;"
-    >
-      <select
-        bind:value={maxAltitude}
-        aria-label="Skew-T top height"
-        title="Skew-T top height: {maxAltitude}m"
-        class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-4 pl-0 text-right font-semibold text-slate-700 outline-none"
+  <div
+    class="relative flex-1"
+    style="min-height: {SKEWT_MIN_HEIGHT}px;"
+    bind:clientWidth={availableWidth}
+    bind:clientHeight={availableHeight}
+  >
+    <div class="absolute top-0 left-1/2 -translate-x-1/2" style="width: {chartWidth}px; height: {totalHeight}px;">
+      <label
+        class="group absolute left-0 z-[5] flex h-5 w-[58px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
+        style="top: {SKEWT_PLOT_TOP - 10}px;"
       >
-        {#each topPressureOptions as option (option.value)}
-          <option value={option.value}>{option.pressure}hPa</option>
-        {/each}
-      </select>
-      <ChevronDownIcon
-        class="pointer-events-none absolute right-0.5 h-3 w-3 text-slate-500 transition group-hover:text-slate-700"
-        aria-hidden="true"
-      />
-    </label>
+        <select
+          bind:value={maxAltitude}
+          aria-label="Skew-T top height"
+          title="Skew-T top height: {maxAltitude}m"
+          class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-4 pl-0 text-right font-semibold text-slate-700 outline-none"
+        >
+          {#each topPressureOptions as option (option.value)}
+            <option value={option.value}>{option.pressure}hPa</option>
+          {/each}
+        </select>
+        <ChevronDownIcon
+          class="pointer-events-none absolute right-0.5 h-3 w-3 text-slate-500 transition group-hover:text-slate-700"
+          aria-hidden="true"
+        />
+      </label>
 
-    <canvas
-      bind:this={canvas}
-      onpointermove={handlePointerMove}
-      onclick={handleClick}
-      onpointercancel={handlePointerCancel}
-      onpointerleave={handlePointerLeave}
-      class="chart-canvas"
-    ></canvas>
-    <canvas bind:this={overlayCanvas} class="overlay-canvas"></canvas>
+      <canvas
+        bind:this={canvas}
+        onpointermove={handlePointerMove}
+        onclick={handleClick}
+        onpointercancel={handlePointerCancel}
+        onpointerleave={handlePointerLeave}
+        class="chart-canvas"
+      ></canvas>
+      <canvas bind:this={overlayCanvas} class="overlay-canvas"></canvas>
+    </div>
   </div>
 
   <div class="skewt-legend">
@@ -201,7 +213,9 @@
 <style>
   .skewt-chart-container {
     width: 100%;
-    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
     margin: 0 auto;
     position: relative;
   }

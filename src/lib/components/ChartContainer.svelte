@@ -79,116 +79,118 @@
 </script>
 
 <div
-  class="relative mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
+  class="relative mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
 >
-  <div class="min-h-0 flex-1 overflow-y-auto bg-white px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
-    <div class="mb-2 flex items-center justify-center">
-      <div class="inline-flex rounded-xl bg-slate-100 p-1">
-        <button
-          type="button"
-          class="rounded-lg px-4 py-1.5 text-sm font-medium transition"
-          class:bg-white={chartView === 'wind'}
-          class:text-slate-900={chartView === 'wind'}
-          class:shadow-sm={chartView === 'wind'}
-          class:ring-1={chartView === 'wind'}
-          class:ring-slate-200={chartView === 'wind'}
-          class:text-slate-500={chartView !== 'wind'}
-          class:hover:text-slate-700={chartView !== 'wind'}
-          onclick={() => (chartView = 'wind')}
-        >
-          Wind Chart
-        </button>
-        <button
-          type="button"
-          class="rounded-lg px-4 py-1.5 text-sm font-medium transition"
-          class:bg-white={chartView === 'skewt'}
-          class:text-slate-900={chartView === 'skewt'}
-          class:shadow-sm={chartView === 'skewt'}
-          class:ring-1={chartView === 'skewt'}
-          class:ring-slate-200={chartView === 'skewt'}
-          class:text-slate-500={chartView !== 'skewt'}
-          class:hover:text-slate-700={chartView !== 'skewt'}
-          onclick={() => (chartView = 'skewt')}
-        >
-          Skew-T
-        </button>
-      </div>
-    </div>
-
-    {#if chartView === 'wind'}
-      <WindChart {windChartData} bind:maxAltitude {model} bind:daylightOnly isLoading={isWindChartLoading} />
-      <Footer>
-        {#snippet heading()}
+  <div class="min-h-0 flex-1 overflow-y-auto bg-white">
+    <div class="flex min-h-full flex-col px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
+      <div class="mb-2 flex shrink-0 items-center justify-center">
+        <div class="inline-flex rounded-xl bg-slate-100 p-1">
           <button
             type="button"
-            class="text-left text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase transition-opacity hover:opacity-100"
-            class:opacity-60={!legendOpen}
-            class:opacity-100={legendOpen}
-            onclick={() => (legendOpen = !legendOpen)}
+            class="rounded-lg px-4 py-1.5 text-sm font-medium transition"
+            class:bg-white={chartView === 'wind'}
+            class:text-slate-900={chartView === 'wind'}
+            class:shadow-sm={chartView === 'wind'}
+            class:ring-1={chartView === 'wind'}
+            class:ring-slate-200={chartView === 'wind'}
+            class:text-slate-500={chartView !== 'wind'}
+            class:hover:text-slate-700={chartView !== 'wind'}
+            onclick={() => (chartView = 'wind')}
           >
-            {legendOpen ? '▼' : '▶'} Legend
+            Wind Chart
           </button>
-        {/snippet}
-        {#snippet body()}
-          {#if legendOpen}
-            <div class="flex w-full flex-wrap justify-center gap-x-10 gap-y-4 pt-4">
-              <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
-                <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
-                  Clouds <small class="lowercase opacity-60">%</small>
-                </span>
-                <div class="flex flex-1 flex-col gap-0.75">
-                  <div
-                    class="h-1.25 w-full rounded-full border border-slate-200"
-                    style="background: {cloudGradient};"
-                  ></div>
-                  <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
-                    <span>0</span><span>100</span>
-                  </div>
-                </div>
-              </div>
-              <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
-                <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
-                  Wind <small class="lowercase opacity-60">km/h</small>
-                </span>
-                <div class="flex flex-1 flex-col gap-0.75">
-                  <div class="h-1.25 w-full rounded-full" style="background: {windGradient};"></div>
-                  <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
-                    <span>0</span><span>{windMaxSpeed}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          {/if}
-        {/snippet}
-      </Footer>
-    {:else if isSkewTLoading}
-      <div class="flex h-64 items-center justify-center">
-        <div class="text-sm text-slate-500">Loading sounding data...</div>
-      </div>
-    {:else if skewTError}
-      <div class="flex h-64 items-center justify-center px-4">
-        <div
-          class="flex max-w-md flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
-          role="alert"
-        >
-          <span>{skewTError}</span>
           <button
             type="button"
-            class="rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            onclick={onRetrySkewT}
+            class="rounded-lg px-4 py-1.5 text-sm font-medium transition"
+            class:bg-white={chartView === 'skewt'}
+            class:text-slate-900={chartView === 'skewt'}
+            class:shadow-sm={chartView === 'skewt'}
+            class:ring-1={chartView === 'skewt'}
+            class:ring-slate-200={chartView === 'skewt'}
+            class:text-slate-500={chartView !== 'skewt'}
+            class:hover:text-slate-700={chartView !== 'skewt'}
+            onclick={() => (chartView = 'skewt')}
           >
-            Retry
+            Skew-T
           </button>
         </div>
       </div>
-    {:else if skewTData && traceHours.length > 0}
-      <SkewTChart {skewTData} {hour} bind:maxAltitude {model} isLoading={isSkewTLoading} />
-      <Footer />
-    {:else}
-      <div class="flex h-64 items-center justify-center">
-        <div class="text-sm text-slate-500">No sounding data available</div>
-      </div>
-    {/if}
+
+      {#if chartView === 'wind'}
+        <WindChart {windChartData} bind:maxAltitude {model} bind:daylightOnly isLoading={isWindChartLoading} />
+        <Footer>
+          {#snippet heading()}
+            <button
+              type="button"
+              class="text-left text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase transition-opacity hover:opacity-100"
+              class:opacity-60={!legendOpen}
+              class:opacity-100={legendOpen}
+              onclick={() => (legendOpen = !legendOpen)}
+            >
+              {legendOpen ? '▼' : '▶'} Legend
+            </button>
+          {/snippet}
+          {#snippet body()}
+            {#if legendOpen}
+              <div class="flex w-full flex-wrap justify-center gap-x-10 gap-y-4 pt-4">
+                <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
+                  <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
+                    Clouds <small class="lowercase opacity-60">%</small>
+                  </span>
+                  <div class="flex flex-1 flex-col gap-0.75">
+                    <div
+                      class="h-1.25 w-full rounded-full border border-slate-200"
+                      style="background: {cloudGradient};"
+                    ></div>
+                    <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
+                      <span>0</span><span>100</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
+                  <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
+                    Wind <small class="lowercase opacity-60">km/h</small>
+                  </span>
+                  <div class="flex flex-1 flex-col gap-0.75">
+                    <div class="h-1.25 w-full rounded-full" style="background: {windGradient};"></div>
+                    <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
+                      <span>0</span><span>{windMaxSpeed}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {/if}
+          {/snippet}
+        </Footer>
+      {:else if isSkewTLoading}
+        <div class="flex h-64 items-center justify-center">
+          <div class="text-sm text-slate-500">Loading sounding data...</div>
+        </div>
+      {:else if skewTError}
+        <div class="flex h-64 items-center justify-center px-4">
+          <div
+            class="flex max-w-md flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
+            role="alert"
+          >
+            <span>{skewTError}</span>
+            <button
+              type="button"
+              class="rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              onclick={onRetrySkewT}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      {:else if skewTData && traceHours.length > 0}
+        <SkewTChart {skewTData} {hour} bind:maxAltitude {model} isLoading={isSkewTLoading} />
+        <Footer />
+      {:else}
+        <div class="flex h-64 items-center justify-center">
+          <div class="text-sm text-slate-500">No sounding data available</div>
+        </div>
+      {/if}
+    </div>
   </div>
 
   <div class="shrink-0 border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:px-5">
