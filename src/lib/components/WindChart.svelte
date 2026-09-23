@@ -283,7 +283,7 @@
 
 <div
   class="relative flex-1 shrink-0"
-  style="min-height: {getChartHeight(windHeight)}px;"
+  style="min-height: {getWindChartSize(availableWidth, 0, maxAltitude).height}px;"
   bind:clientWidth={availableWidth}
   bind:clientHeight={availableHeight}
 >
