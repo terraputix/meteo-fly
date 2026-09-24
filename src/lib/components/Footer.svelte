@@ -10,7 +10,7 @@
   } = $props();
 </script>
 
-<div class="mx-auto flex max-w-3xl flex-col px-4 py-4">
+<div class="mx-auto flex w-full max-w-3xl shrink-0 flex-col px-4 py-4">
   <div class="flex items-center justify-between gap-2">
     <div>
       {#if heading}

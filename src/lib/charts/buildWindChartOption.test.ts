@@ -99,7 +99,7 @@ describe('wind chart option', () => {
     expect(windAxes[3]).toMatchObject({ inverse: true });
     expect(windAxes[3].min).toBeCloseTo(metersToHPaExact(4000));
     expect(windAxes[3].max).toBeCloseTo(metersToHPaExact(0));
-    expect(getWindChartHeight(10000)).toBe(749);
+    expect(getWindChartHeight(10000)).toBe(Math.ceil(getWindChartHeight(4000) * 2.5));
 
     const altitudeGridData = series.find((item) => item.name === '_altitudeGrid')?.markLine?.data as Array<{
       yAxis: number;
