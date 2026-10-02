@@ -63,7 +63,8 @@ export class LocationControlManager extends BaseButtonControl {
 
   protected async onButtonClick() {
     try {
-      await locationActions.detectLocation();
+      const location = await locationActions.detectLocation();
+      if (this.map) this.locationOptions.onLocationDetected?.(location);
     } catch (error) {
       console.error('Location detection failed:', error);
     }
@@ -77,7 +78,6 @@ export class LocationControlManager extends BaseButtonControl {
     } else if (state.error) {
       this.setButtonState('error', state.error);
     } else if (state.current) {
-      this.locationOptions.onLocationDetected?.(state.current);
       this.setButtonState('success', undefined, state.accuracy ?? undefined);
     } else {
       this.setButtonState('idle');
