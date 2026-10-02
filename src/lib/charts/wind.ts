@@ -1,8 +1,8 @@
-import type { WindChartData, WeatherModel } from '$lib/api/types';
-import { getAtLevel } from '$lib/api/types';
-import { interpolateWind } from '$lib/meteo/wind';
-import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, type LevelSource } from '$lib/meteo/pressureLevels';
-import type { MaxAltitude } from '$lib/meteo/types';
+import type { WindChartData, WeatherModel } from '#lib/api/types.js';
+import { getAtLevel } from '#lib/api/types.js';
+import { interpolateWind } from '#lib/meteo/wind.js';
+import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, type LevelSource } from '#lib/meteo/pressureLevels.js';
+import type { MaxAltitude } from '#lib/meteo/types.js';
 
 export interface WindFieldLevel {
   time: Date;

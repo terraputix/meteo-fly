@@ -5,8 +5,8 @@ import {
   formatTileUrl,
   tilesForBbox,
   type DemTile,
-} from '$lib/meteo/dem';
-import { visitKey } from '$lib/meteo/hikeAndFly';
+} from '#lib/meteo/dem.js';
+import { visitKey } from '#lib/meteo/hikeAndFly.js';
 import { prepareHikeFlyData } from './prepareHikeFlyData';
 import type {
   HikeFlyWorkerComputeRequest,

@@ -5,7 +5,7 @@ import {
   visitKey,
   type HikeFlyConfig,
   type HikeFlyGridPoint,
-} from '$lib/meteo/hikeAndFly';
+} from '#lib/meteo/hikeAndFly.js';
 
 export interface PreparedHikeFlyData {
   width: number;

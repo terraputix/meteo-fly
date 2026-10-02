@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import type { PageLoad } from './$types';
-import { getLastVisitedURL } from '$lib/services/storage';
+import { getLastVisitedURL } from '#lib/services/storage.js';
 
 export const load: PageLoad = ({ url }) => {
   if (!browser) return;

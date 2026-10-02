@@ -9,7 +9,7 @@ import {
   fetchModelGridElevation,
   fetchSkewTData,
   fetchWindChartData,
-} from '$lib/api/api';
+} from '#lib/api/api.js';
 
 vi.mock('openmeteo', () => ({
   fetchWeatherApi: vi.fn(),

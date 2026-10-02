@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { Location } from '$lib/api/types';
+import type { Location } from '#lib/api/types.js';
 import { getCurrentLocation, GeolocationError } from './geolocation';
 
 export interface LocationState {

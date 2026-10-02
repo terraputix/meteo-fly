@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getLastVisitedURL } from '$lib/services/storage';
+  import { getLastVisitedURL } from '#lib/services/storage.js';
 
   const returnUrl = getLastVisitedURL() ?? '/';
 </script>

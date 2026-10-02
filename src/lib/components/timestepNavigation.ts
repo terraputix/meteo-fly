@@ -1,4 +1,4 @@
-import type { ChartView } from '$lib/services/types';
+import type { ChartView } from '#lib/services/types.js';
 
 export const MIN_FORECAST_DAY = -13;
 

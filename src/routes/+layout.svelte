@@ -1,9 +1,8 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
-  import { pwaInfo } from 'virtual:pwa-info';
-
-  const webManifest = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
+  import { asset, resolve } from '$app/paths';
+  import { observeServiceWorkerRegistration } from '#lib/services/serviceWorkerRegistration.js';
 
   let { children } = $props();
 
@@ -12,7 +11,7 @@
   let isOffline = $state(false);
   let isUpdating = $state(false);
   let updateError = $state<string | null>(null);
-  let updateServiceWorker: (() => Promise<void>) | undefined;
+  let serviceWorkerRegistration: ServiceWorkerRegistration | undefined;
   let offlineReadyTimer: ReturnType<typeof setTimeout> | undefined;
   const UPDATE_TIMEOUT_MS = 15_000;
 
@@ -26,6 +25,11 @@
 
   function activateWaitingServiceWorker() {
     return new Promise<void>((resolve, reject) => {
+      const waiting = serviceWorkerRegistration?.waiting;
+      if (!waiting) {
+        reject(new Error('No service worker update is waiting'));
+        return;
+      }
       const handleControllerChange = () => {
         cleanup();
         resolve();
@@ -40,15 +44,17 @@
       };
 
       navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
-      void updateServiceWorker!().catch((error) => {
+      try {
+        waiting.postMessage({ type: 'SKIP_WAITING' });
+      } catch (error) {
         cleanup();
         reject(error);
-      });
+      }
     });
   }
 
   async function applyUpdate() {
-    if (!updateServiceWorker || isUpdating) return;
+    if (!serviceWorkerRegistration || isUpdating) return;
     isUpdating = true;
     updateError = null;
 
@@ -65,6 +71,7 @@
 
   onMount(() => {
     let destroyed = false;
+    let stopObserving: (() => void) | undefined;
 
     const updateOnlineStatus = () => {
       isOffline = !navigator.onLine;
@@ -74,30 +81,28 @@
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
 
-    if (pwaInfo) {
-      void import('virtual:pwa-register').then(({ registerSW }) => {
-        if (destroyed) return;
-        updateServiceWorker = registerSW({
-          immediate: false,
-          onNeedRefresh() {
-            needRefresh = true;
-            updateError = null;
-          },
-          onOfflineReady() {
-            showOfflineReady();
-          },
-          onRegisteredSW(_url, registration) {
-            console.log(`SW Registered: ${registration}`);
-          },
-          onRegisterError(error) {
-            console.error('SW registration error', error);
-          },
+    if ('serviceWorker' in navigator) {
+      void navigator.serviceWorker
+        .register(`${resolve('')}service-worker.js`, { type: 'module' })
+        .then((registration) => {
+          if (destroyed) return;
+          serviceWorkerRegistration = registration;
+          stopObserving = observeServiceWorkerRegistration(registration, navigator.serviceWorker, {
+            onNeedRefresh() {
+              needRefresh = true;
+              updateError = null;
+            },
+            onOfflineReady: showOfflineReady,
+          });
+        })
+        .catch((error) => {
+          if (!destroyed) console.error('SW registration error', error);
         });
-      });
     }
 
     return () => {
       destroyed = true;
+      stopObserving?.();
       clearTimeout(offlineReadyTimer);
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
@@ -106,8 +111,7 @@
 </script>
 
 <svelte:head>
-  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-  {@html webManifest}
+  <link rel="manifest" href={asset('manifest.webmanifest')} />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Meteo-Fly" />
   <meta property="og:image" content="https://meteo-fly.com/icons/icon-512x512.png" />

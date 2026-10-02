@@ -1,5 +1,5 @@
-import type { SkewTWeatherData, WeatherModel } from '$lib/api/types';
-import { getAtLevel, type VerticalProfile } from '$lib/api/types';
+import type { SkewTWeatherData, WeatherModel } from '#lib/api/types.js';
+import { getAtLevel, type VerticalProfile } from '#lib/api/types.js';
 import { getAllTaggedLevelsForModel, getNativeLevelsForFetch, type TaggedPressureLevel } from './pressureLevels';
 import { calculateLcl } from './lcl';
 import { interpolateWind } from './wind';

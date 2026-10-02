@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { getSkewTChartSize, getWindChartSize, SKEWT_MIN_HEIGHT } from '$lib/charts/chartSizing';
-import { getChartHeight, getWindChartHeight, MARGIN_LEFT, MARGIN_RIGHT } from '$lib/charts/buildWindChartOption';
-import { MAX_ALTITUDE_OPTIONS } from '$lib/meteo/types';
-import { SKEWT_MARGIN } from '$lib/charts/skewTRenderer';
+import { getSkewTChartSize, getWindChartSize, SKEWT_MIN_HEIGHT } from '#lib/charts/chartSizing.js';
+import { getChartHeight, getWindChartHeight, MARGIN_LEFT, MARGIN_RIGHT } from '#lib/charts/buildWindChartOption.js';
+import { MAX_ALTITUDE_OPTIONS } from '#lib/meteo/types.js';
+import { SKEWT_MARGIN } from '#lib/charts/skewTRenderer.js';
 
 describe('wind chart sizing', () => {
   it('uses a 2:1 altitude plot at the reference elevation when space permits', () => {

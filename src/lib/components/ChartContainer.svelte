@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { WindChartData, WeatherModel, SkewTWeatherData } from '$lib/api/types';
-  import { MODEL_FORECAST_DAYS } from '$lib/api/models';
+  import type { WindChartData, WeatherModel, SkewTWeatherData } from '#lib/api/types.js';
+  import { MODEL_FORECAST_DAYS } from '#lib/api/models.js';
   import WindChart from './WindChart.svelte';
   import SkewTChart from './SkewTChart.svelte';
   import BottomControls from './BottomControls.svelte';
   import Footer from './Footer.svelte';
-  import { windColors, windMaxSpeed } from '$lib/charts/scales';
-  import { buildSkewTData } from '$lib/meteo/skewT';
-  import type { MaxAltitude } from '$lib/meteo/types';
-  import type { ChartView } from '$lib/services/types';
+  import { windColors, windMaxSpeed } from '#lib/charts/scales.js';
+  import { buildSkewTData } from '#lib/meteo/skewT.js';
+  import type { MaxAltitude } from '#lib/meteo/types.js';
+  import type { ChartView } from '#lib/services/types.js';
 
   let {
     windChartData,

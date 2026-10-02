@@ -1,12 +1,17 @@
-/// <reference lib="webworker" />
+import { dev, version } from '$app/env';
+import { assets, immutable, prerendered } from '$app/manifest';
+import { asset, resolve } from '$app/paths';
+import chartWorkerUrl from '#lib/workers/chartWorker.ts?worker&url';
+import hikeFlyWorkerUrl from '#lib/workers/hikeFlyWorker.ts?worker&url';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { clientsClaim } from 'workbox-core';
 import { CacheExpiration, ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
-import { classifyMapCacheResource, MAP_CACHE_NAMES, MAP_CACHE_POLICIES } from '$lib/services/mapCache';
-import { markUpdatePromptMigration } from '$lib/services/pwaUpdateMigration';
+import { classifyMapCacheResource, MAP_CACHE_NAMES, MAP_CACHE_POLICIES } from '#lib/services/mapCache.js';
+import { markUpdatePromptMigration } from '#lib/services/pwaUpdateMigration.js';
 import {
   cleanupLegacyWeatherCaches,
   handleWeatherRequest,
@@ -15,12 +20,18 @@ import {
   WEATHER_CACHE_NAME,
   type WeatherCacheDataset,
   type WeatherCacheOutdatedMessage,
-} from '$lib/services/weatherCache';
+} from '#lib/services/weatherCache.js';
 
 declare const self: ServiceWorkerGlobalScope;
 
 cleanupOutdatedCaches();
-precacheAndRoute(self.__WB_MANIFEST);
+precacheAndRoute([
+  ...immutable.map(({ path }) => ({ url: new URL(path, self.location.href).pathname, revision: null })),
+  ...[chartWorkerUrl, hikeFlyWorkerUrl, maplibreWorkerUrl].map((url) => ({ url, revision: null })),
+  ...assets.map(({ path }) => ({ url: asset(path), revision: version })),
+  ...prerendered.map(({ path }) => ({ url: resolve(path), revision: version })),
+  ...(dev ? [{ url: resolve(''), revision: version }] : []),
+]);
 
 clientsClaim();
 
@@ -41,7 +52,7 @@ self.addEventListener('message', (event) => {
   }
 });
 
-registerRoute(new NavigationRoute(createHandlerBoundToURL('/')));
+registerRoute(new NavigationRoute(createHandlerBoundToURL(resolve(''))));
 
 const cacheableMapResponse = () => new CacheableResponsePlugin({ statuses: [0, 200] });
 const expireMapCache = (policy: { maxEntries: number; maxAgeSeconds: number }) =>

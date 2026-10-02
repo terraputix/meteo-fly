@@ -24,6 +24,8 @@ knowledge.
 
 ## Development
 
+Use Node.js 24, as specified in `.node-version`. Cloudflare Pages and CI use this file to select the build runtime.
+
 ```sh
 npm install
 npm run dev
@@ -35,6 +37,7 @@ Before submitting changes:
 npm run check
 npm run lint
 npm test
+npm run build
 ```
 
 The application is built with SvelteKit, statically prerendered, and hydrated in the browser for interactive use.

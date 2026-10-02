@@ -1,7 +1,7 @@
 import type { IControl, Map } from 'maplibre-gl';
-import { locationActions } from '$lib/services/location/store';
-import type { LocationState } from '$lib/services/location/store';
-import type { Location } from '$lib/api/types';
+import { locationActions } from '#lib/services/location/store.js';
+import type { LocationState } from '#lib/services/location/store.js';
+import type { Location } from '#lib/api/types.js';
 
 interface BaseControlOptions {
   title: string;

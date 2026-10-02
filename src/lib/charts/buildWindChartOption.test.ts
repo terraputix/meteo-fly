@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { CustomSeriesOption, CustomSeriesRenderItemAPI, CustomSeriesRenderItemParams } from 'echarts';
 import { buildTooltipStore, createActiveState } from './tooltipFormatter';
 import { buildWindChartOption, getWindChartHeight, TEMP_HEIGHT_PX, TEMP_TOP } from './buildWindChartOption';
-import { metersToHPaExact } from '$lib/meteo/pressureLevels';
-import { fmtTime } from '$lib/helpers';
+import { metersToHPaExact } from '#lib/meteo/pressureLevels.js';
+import { fmtTime } from '#lib/helpers.js';
 
 interface NamedSeries {
   name?: string;

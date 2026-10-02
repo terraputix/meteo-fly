@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { MIN_FORECAST_DAY, stepTimestep, type TimestepDirection } from '$lib/components/timestepNavigation';
-  import type { ChartView } from '$lib/services/types';
+  import { MIN_FORECAST_DAY, stepTimestep, type TimestepDirection } from '#lib/components/timestepNavigation.js';
+  import type { ChartView } from '#lib/services/types.js';
 
   let {
     selectedDay = $bindable(),

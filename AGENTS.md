@@ -4,12 +4,12 @@
 
 **meteo-fly** is a browser-based weather visualization tool for paragliders and hang gliders. It combines an interactive map with a detailed meteogram panel for wind, cloud, rain, humidity, and cloud-base analysis.
 
-- **Framework**: SvelteKit with Svelte 5 and TypeScript
+- **Framework**: SvelteKit 3 with Svelte 5 and TypeScript
 - **Styling**: Tailwind CSS v4
 - **UI primitives**: `shadcn-svelte` for some more complex UI components built on reusable primitives
 - **Charts**: ECharts rendered from pure chart-preparation helpers
-- **Map**: MapLibre GL
-- **PWA**: `vite-plugin-pwa` with generated service worker and runtime caching for Open-Meteo requests
+- **Map**: MapLibre GL 6 with a bundled ES module worker (requires WebGL 2)
+- **PWA**: SvelteKit-built Workbox service worker, static web manifest, and browser service-worker registration
 - **Data**: Open-Meteo REST API via the `openmeteo` npm package
 - **Deployment**: Static client build with `@sveltejs/adapter-static`
 - **Tests**: Vitest
@@ -19,7 +19,7 @@
 ## Repository Layout
 
 - `src/routes/+layout.svelte`: global shell, metadata, PWA registration, and update/offline status
-- `src/service-worker.ts`: app-shell navigation, precaching, weather fallback, and bounded map runtime caches
+- `src/service-worker/index.ts`: app-shell navigation, precaching, weather fallback, and bounded map runtime caches
 - `src/routes/+page.svelte`: main page state, URL sync, and weather fetch lifecycle
 - `src/lib/api/`: Open-Meteo API integration, request config, and response types
 - `src/lib/meteo/`: pure meteorological calculations and altitude/pressure helpers
@@ -43,8 +43,8 @@
 - **Worker split**: Expensive chart shaping and Hike & Fly terrain/raster processing belong in pure helpers or workers, not in UI components.
 - **Chart stack**: Reuse existing chart builders and tooltip/state helpers before adding new rendering abstractions.
 - **Forecast models**: Supported models are defined canonically in `src/lib/api/types.ts`; UI selectors must stay aligned with that union.
-- **PWA**: Registration and update UI live in `+layout.svelte`; precache inputs live in `vite.config.ts`; navigation
-  fallback and runtime caching live in `src/service-worker.ts`.
+- **PWA**: Registration and update UI live in `+layout.svelte`; precache inputs come from `$app/manifest`; navigation
+  fallback and runtime caching live in `src/service-worker/index.ts`. The worker has its own TypeScript project.
 
 ---
 
@@ -63,7 +63,7 @@
 - **Svelte 5**: Prefer runes-style APIs for new or refactored Svelte code when consistent with the file.
 - **TypeScript**: No `any`. Reuse existing domain types from `src/lib/api/types.ts`, `src/lib/meteo/types.ts`, and service types.
 - **Styling**: Prefer Tailwind utility classes. For more complex UI building blocks, prefer existing `shadcn-svelte` components in `src/lib/components/ui/` before creating custom primitives. Avoid adding `<style>` blocks unless an existing component already uses one and a utility-only approach is impractical.
-- **Imports**: Use `$lib/` aliases for project imports. Avoid relative parent imports.
+- **Imports**: Use `#lib/` subpath imports with file extensions for project imports. Avoid relative parent imports.
 - **Worker-safe purity**: Anything in `src/lib/meteo/` and `src/lib/charts/` should stay free of browser globals and side effects.
 - **Charts**: Extend existing ECharts option/data factories instead of introducing a second charting system.
 
@@ -87,6 +87,7 @@
 ### Map & Location
 
 - Map UI lives primarily in `src/lib/components/LocationMap.svelte` and `src/lib/components/Controls.ts`.
+- MapLibre uses named imports and a Vite `?worker&url` bundle configured with `setWorkerUrl`; the worker is precached in `src/service-worker/index.ts`.
 - Location state and geolocation behavior live in `src/lib/services/location/`.
 
 ### Charting
@@ -100,14 +101,16 @@
 
 - For some more complex UI components, use `shadcn-svelte` primitives from `src/lib/components/ui/`.
 - Existing examples include `src/lib/components/ui/switch/switch.svelte` and the resizable panel components in `src/lib/components/ui/resizable/`.
-- When adding a new `shadcn-svelte` component, use the library CLI to generate it into `src/lib/components/ui/`, then adapt the generated files to the project's conventions such as `$lib/` imports, existing styling patterns, and Svelte 5 usage where appropriate.
+- When adding a new `shadcn-svelte` component, use the library CLI to generate it into `src/lib/components/ui/`, then adapt the generated files to the project's conventions such as `#lib/` imports, existing styling patterns, and Svelte 5 usage where appropriate.
 - Prefer extending generated `shadcn-svelte` primitives locally instead of duplicating or reimplementing the same component patterns elsewhere in the app.
 
 ### PWA / Metadata
 
-- Manifest and service-worker precache inputs are configured in `vite.config.ts`.
-- App-shell navigation and runtime cache policies are handled in `src/service-worker.ts`.
+- The web manifest lives in `static/manifest.webmanifest`; SvelteKit builds the worker using `$app/manifest`.
+- App-shell navigation and runtime cache policies are handled in `src/service-worker/index.ts`.
+- `runed`'s optional SvelteKit peer is overridden to the application version; the UI uses its framework-independent helpers.
 - Registration, update prompts, offline status, and document head metadata are handled in `src/routes/+layout.svelte`.
+- Installation events are observed by `src/lib/services/serviceWorkerRegistration.ts`.
 
 ---
 
