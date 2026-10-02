@@ -8,7 +8,7 @@
 - **Styling**: Tailwind CSS v4
 - **UI primitives**: `shadcn-svelte` for some more complex UI components built on reusable primitives
 - **Charts**: ECharts rendered from pure chart-preparation helpers
-- **Map**: MapLibre GL
+- **Map**: MapLibre GL 6 with a bundled ES module worker (requires WebGL 2)
 - **PWA**: SvelteKit-built Workbox service worker, static web manifest, and browser service-worker registration
 - **Data**: Open-Meteo REST API via the `openmeteo` npm package
 - **Deployment**: Static client build with `@sveltejs/adapter-static`
@@ -87,6 +87,7 @@
 ### Map & Location
 
 - Map UI lives primarily in `src/lib/components/LocationMap.svelte` and `src/lib/components/Controls.ts`.
+- MapLibre uses named imports and a Vite `?worker&url` bundle configured with `setWorkerUrl`; the worker is precached in `src/service-worker/index.ts`.
 - Location state and geolocation behavior live in `src/lib/services/location/`.
 
 ### Charting

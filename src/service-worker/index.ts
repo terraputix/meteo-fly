@@ -3,6 +3,7 @@ import { assets, immutable, prerendered } from '$app/manifest';
 import { asset, resolve } from '$app/paths';
 import chartWorkerUrl from '#lib/workers/chartWorker.ts?worker&url';
 import hikeFlyWorkerUrl from '#lib/workers/hikeFlyWorker.ts?worker&url';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { clientsClaim } from 'workbox-core';
@@ -26,7 +27,7 @@ declare const self: ServiceWorkerGlobalScope;
 cleanupOutdatedCaches();
 precacheAndRoute([
   ...immutable.map(({ path }) => ({ url: new URL(path, self.location.href).pathname, revision: null })),
-  ...[chartWorkerUrl, hikeFlyWorkerUrl].map((url) => ({ url, revision: null })),
+  ...[chartWorkerUrl, hikeFlyWorkerUrl, maplibreWorkerUrl].map((url) => ({ url, revision: null })),
   ...assets.map(({ path }) => ({ url: asset(path), revision: version })),
   ...prerendered.map(({ path }) => ({ url: resolve(path), revision: version })),
   ...(dev ? [{ url: resolve(''), revision: version }] : []),

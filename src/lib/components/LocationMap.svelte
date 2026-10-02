@@ -1,8 +1,18 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import maplibregl, { type Map, type MapMouseEvent, type MapTouchEvent, type Marker } from 'maplibre-gl';
+  import {
+    GPUInitializationError,
+    Map,
+    Marker,
+    NavigationControl,
+    setWorkerUrl,
+    type GeoJSONSource,
+    type LngLatLike,
+    type MapMouseEvent,
+    type MapTouchEvent,
+  } from 'maplibre-gl';
+  import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import type { LngLatLike } from 'maplibre-gl';
   import { resolve } from '$app/paths';
   import type { Location } from '#lib/api/types.js';
   import { locationStore, type LocationState } from '#lib/services/location/store.js';
@@ -20,8 +30,6 @@
     MAP_DOUBLE_ACTIVATION_INTERVAL_MS,
     MAP_DOUBLE_ACTIVATION_MAX_DISTANCE_PX,
   } from './mapLocationSelection';
-
-  const { NavigationControl } = maplibregl;
 
   let {
     latitude = $bindable(46.41526),
@@ -58,6 +66,7 @@
   const aboutUrl = resolve('about');
   let mapContainer: HTMLElement;
   let map: Map = $state.raw(undefined!)!;
+  let mapError = $state<string | null>(null);
   let marker: Marker;
   let elevationBadge: HTMLDivElement | undefined;
   let selectedGridCellMarker: Marker | null = null;
@@ -184,7 +193,7 @@
     }
 
     if (!selectedGridCell) {
-      const source = map.getSource(gridCellConnectorSourceId) as maplibregl.GeoJSONSource;
+      const source = map.getSource(gridCellConnectorSourceId) as GeoJSONSource;
       source.setData({
         type: 'FeatureCollection',
         features: [],
@@ -197,7 +206,7 @@
     const gridCellLongitude = selectedGridCell.longitude;
     const gridCellLatitude = selectedGridCell.latitude;
 
-    const source = map.getSource(gridCellConnectorSourceId) as maplibregl.GeoJSONSource;
+    const source = map.getSource(gridCellConnectorSourceId) as GeoJSONSource;
     source.setData({
       type: 'FeatureCollection',
       features: [
@@ -224,7 +233,7 @@
     if (!distanceMarker) {
       const element = document.createElement('div');
       element.className = 'grid-cell-distance-badge';
-      distanceMarker = new maplibregl.Marker({ element, anchor: 'center' }).setLngLat(midpoint).addTo(map);
+      distanceMarker = new Marker({ element, anchor: 'center' }).setLngLat(midpoint).addTo(map);
     } else {
       distanceMarker.setLngLat(midpoint);
     }
@@ -252,7 +261,7 @@
       element.className = 'selected-grid-cell-marker';
       element.innerHTML =
         '<span class="selected-grid-cell-marker__ring"></span><span class="selected-grid-cell-marker__dot"></span><span class="selected-grid-cell-marker__badge">Grid cell</span>';
-      selectedGridCellMarker = new maplibregl.Marker({ element, anchor: 'center' }).setLngLat(lngLat).addTo(map);
+      selectedGridCellMarker = new Marker({ element, anchor: 'center' }).setLngLat(lngLat).addTo(map);
 
       const badgeEl = element.querySelector('.selected-grid-cell-marker__badge');
       if (badgeEl) badgeEl.textContent = badgeText;
@@ -421,15 +430,22 @@
     touchDoubleActivation.reset();
   }
 
-  onMount(async () => {
-    map = new maplibregl.Map({
-      container: mapContainer,
-      style: 'https://tiles.openfreemap.org/styles/positron',
-      center: [longitude, latitude],
-      zoom: 8,
-      hash: true,
-      doubleClickZoom: false,
-    });
+  onMount(() => {
+    setWorkerUrl(maplibreWorkerUrl);
+    try {
+      map = new Map({
+        container: mapContainer,
+        style: 'https://tiles.openfreemap.org/styles/positron',
+        center: [longitude, latitude],
+        zoom: 8,
+        hash: true,
+        doubleClickZoom: false,
+      });
+    } catch (error) {
+      if (!(error instanceof GPUInitializationError)) throw error;
+      mapError = 'The map requires WebGL 2. Try enabling hardware acceleration or using another browser.';
+      return;
+    }
 
     map.addControl(
       new NavigationControl({
@@ -463,7 +479,7 @@
     elevationBadge = document.createElement('div');
     elevationBadge.className = 'selected-location-marker__elevation';
     selectedLocationElement.appendChild(elevationBadge);
-    marker = new maplibregl.Marker({
+    marker = new Marker({
       element: selectedLocationElement,
       draggable: true,
       anchor: 'center',
@@ -594,6 +610,12 @@
 
 <div class="relative h-full w-full">
   <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
+
+  {#if mapError}
+    <div class="absolute inset-0 flex items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-600">
+      <p role="alert">{mapError}</p>
+    </div>
+  {/if}
 
   <div class="controls-stack pointer-events-none absolute right-3 z-10 flex flex-col items-end gap-2">
     <header class="sr-only">
