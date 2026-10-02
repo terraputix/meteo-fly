@@ -1,9 +1,9 @@
-import { getCloudCoverData } from '$lib/charts/clouds';
-import { getWindFieldAllLevels } from '$lib/charts/wind';
-import { calculateLclWeather } from '$lib/meteo/lcl';
-import { addSeconds } from '$lib/utils/dateExtensions';
+import { getCloudCoverData } from '#lib/charts/clouds.js';
+import { getWindFieldAllLevels } from '#lib/charts/wind.js';
+import { calculateLclWeather } from '#lib/meteo/lcl.js';
+import { addSeconds } from '#lib/utils/dateExtensions.js';
 
-import type { WindChartData, VerticalProfile } from '$lib/api/types';
+import type { WindChartData, VerticalProfile } from '#lib/api/types.js';
 import type {
   ChartWorkerInput,
   ChartWorkerSuccessOutput,

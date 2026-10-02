@@ -1,9 +1,9 @@
-import type { TemperatureChartData, RainCloudChartData } from '$lib/workers/chartWorker.types';
-import type { WindFieldLevel } from '$lib/charts/wind';
-import { windColorScale } from '$lib/charts/scales';
-import { CHART_COLORS } from '$lib/charts/chartColors';
-import { fmtTime } from '$lib/helpers';
-import type { LclPoint } from '$lib/meteo/lcl';
+import type { TemperatureChartData, RainCloudChartData } from '#lib/workers/chartWorker.types.js';
+import type { WindFieldLevel } from '#lib/charts/wind.js';
+import { windColorScale } from '#lib/charts/scales.js';
+import { CHART_COLORS } from '#lib/charts/chartColors.js';
+import { fmtTime } from '#lib/helpers.js';
+import type { LclPoint } from '#lib/meteo/lcl.js';
 
 // ─── Tooltip store ──────────────────────────────────────────────────────────
 // Pre-built look-up maps keyed by timestamp so the formatter is O(1).

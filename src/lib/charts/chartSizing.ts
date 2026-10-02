@@ -4,9 +4,9 @@ import {
   MARGIN_LEFT,
   MARGIN_RIGHT,
   WIND_REFERENCE_ALTITUDE,
-} from '$lib/charts/buildWindChartOption';
-import { SKEWT_MARGIN } from '$lib/charts/skewTRenderer';
-import type { MaxAltitude } from '$lib/meteo/types';
+} from '#lib/charts/buildWindChartOption.js';
+import { SKEWT_MARGIN } from '#lib/charts/skewTRenderer.js';
+import type { MaxAltitude } from '#lib/meteo/types.js';
 
 export const SKEWT_MIN_HEIGHT = 520;
 

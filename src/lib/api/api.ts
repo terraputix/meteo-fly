@@ -15,7 +15,7 @@ import {
   type SkewTWeatherData,
 } from './types';
 import { getVariablesForModel, makeProfileVar } from './variables';
-import type { MaxAltitude } from '$lib/meteo/types';
+import type { MaxAltitude } from '#lib/meteo/types.js';
 
 export interface HourlyParams {
   hourly: string[];

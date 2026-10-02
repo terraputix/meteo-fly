@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateReachableArea, computeHeightAGL, haversineDistance } from '$lib/meteo/hikeAndFly';
+import { generateReachableArea, computeHeightAGL, haversineDistance } from '#lib/meteo/hikeAndFly.js';
 
 describe('haversineDistance', () => {
   it('returns 0 for same point', () => {

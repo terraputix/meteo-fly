@@ -1,3 +1,5 @@
+import adapter from '@sveltejs/adapter-static';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
@@ -6,7 +8,12 @@ import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 export default defineConfig({
   plugins: [
     tailwindcss(),
-    sveltekit(),
+    sveltekit({
+      preprocess: vitePreprocess(),
+      adapter: adapter({ fallback: '404.html' }),
+      serviceWorker: { register: false },
+    }),
+
     SvelteKitPWA({
       strategies: 'injectManifest',
       srcDir: 'src',

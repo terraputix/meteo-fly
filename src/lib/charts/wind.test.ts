@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { WindChartData } from '$lib/api/types';
-import { getNativeLevelsForModel } from '$lib/meteo/pressureLevels';
+import type { WindChartData } from '#lib/api/types.js';
+import { getNativeLevelsForModel } from '#lib/meteo/pressureLevels.js';
 import { getWindFieldAllLevels } from './wind';
 
 describe('wind chart data', () => {

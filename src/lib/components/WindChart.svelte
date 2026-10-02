@@ -9,20 +9,20 @@
     TooltipComponent,
   } from 'echarts/components';
   import { CanvasRenderer } from 'echarts/renderers';
-  import { buildTooltipStore, createActiveState, type ActiveState } from '$lib/charts/tooltipFormatter';
+  import { buildTooltipStore, createActiveState, type ActiveState } from '#lib/charts/tooltipFormatter.js';
   import {
     buildWindChartOption,
     DAYLIGHT_CONTEXT_TOP,
     getChartHeight,
     getWindChartHeight,
     WIND_TOP,
-  } from '$lib/charts/buildWindChartOption';
-  import { getWindChartSize } from '$lib/charts/chartSizing';
-  import type { WindChartData } from '$lib/api/types';
-  import type { ChartWorkerOutput, ChartWorkerRequest } from '$lib/workers/chartWorker.types';
-  import type { WeatherModel } from '$lib/api/types';
-  import { MAX_ALTITUDE_OPTIONS, type MaxAltitude } from '$lib/meteo/types';
-  import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
+  } from '#lib/charts/buildWindChartOption.js';
+  import { getWindChartSize } from '#lib/charts/chartSizing.js';
+  import type { WindChartData } from '#lib/api/types.js';
+  import type { ChartWorkerOutput, ChartWorkerRequest } from '#lib/workers/chartWorker.types.js';
+  import type { WeatherModel } from '#lib/api/types.js';
+  import { MAX_ALTITUDE_OPTIONS, type MaxAltitude } from '#lib/meteo/types.js';
+  import ChartLoadingOverlay from '#lib/components/ChartLoadingOverlay.svelte';
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
   import FoldHorizontalIcon from '@lucide/svelte/icons/fold-horizontal';
   import UnfoldHorizontalIcon from '@lucide/svelte/icons/unfold-horizontal';
@@ -211,7 +211,7 @@
     }
 
     function createWorker() {
-      const nextWorker = new Worker(new URL('$lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
+      const nextWorker = new Worker(new URL('#lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
       nextWorker.onmessage = (event: MessageEvent<ChartWorkerOutput>) => handleWorkerMessage(nextWorker, event);
       nextWorker.onerror = (error) => handleWorkerError(nextWorker, error);
       nextWorker.onmessageerror = (error) => handleWorkerError(nextWorker, error);

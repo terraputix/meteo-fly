@@ -1,5 +1,5 @@
 import { readable } from 'svelte/store';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
 export const isMobile = readable(false, (set) => {
   if (!browser) return;

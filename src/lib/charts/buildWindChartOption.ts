@@ -9,18 +9,18 @@ import type {
   YAXisComponentOption,
 } from 'echarts';
 
-import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
-import { CHART_COLORS } from '$lib/charts/chartColors';
-import { makeAnchorSeries, makeLineSeries } from '$lib/charts/seriesFactories';
-import { createTooltipFormatter, type TooltipStore, type ActiveState } from '$lib/charts/tooltipFormatter';
-import type { TemperatureChartData, RainCloudChartData } from '$lib/workers/chartWorker.types';
-import type { WindFieldLevel } from '$lib/charts/wind';
-import type { CloudCoverData } from '$lib/charts/clouds';
-import type { WeatherModel } from '$lib/api/types';
-import { getNativeLevelsForFetch, getNativeLevelsForModel, metersToHPaExact } from '$lib/meteo/pressureLevels';
-import { fmtTime } from '$lib/helpers';
-import type { MaxAltitude } from '$lib/meteo/types';
-import type { LclPoint } from '$lib/meteo/lcl';
+import { windColorScale, strokeWidthScale } from '#lib/charts/scales.js';
+import { CHART_COLORS } from '#lib/charts/chartColors.js';
+import { makeAnchorSeries, makeLineSeries } from '#lib/charts/seriesFactories.js';
+import { createTooltipFormatter, type TooltipStore, type ActiveState } from '#lib/charts/tooltipFormatter.js';
+import type { TemperatureChartData, RainCloudChartData } from '#lib/workers/chartWorker.types.js';
+import type { WindFieldLevel } from '#lib/charts/wind.js';
+import type { CloudCoverData } from '#lib/charts/clouds.js';
+import type { WeatherModel } from '#lib/api/types.js';
+import { getNativeLevelsForFetch, getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLevels.js';
+import { fmtTime } from '#lib/helpers.js';
+import type { MaxAltitude } from '#lib/meteo/types.js';
+import type { LclPoint } from '#lib/meteo/lcl.js';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 // All grids share the same left/right so x-axes align perfectly.

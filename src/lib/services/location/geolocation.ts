@@ -1,4 +1,4 @@
-import type { Location } from '$lib/api/types';
+import type { Location } from '#lib/api/types.js';
 
 interface GeolocationOptions {
   enableHighAccuracy?: boolean;

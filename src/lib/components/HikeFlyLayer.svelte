@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { MapLayerMouseEvent } from 'maplibre-gl';
   import { onDestroy } from 'svelte';
-  import { isMobile } from '$lib/stores/media';
-  import { HIKE_FLY_DEFAULT_GLIDE_RATIO, HIKE_FLY_DEFAULT_STEP_M } from '$lib/meteo/hikeAndFly';
-  import { resolveTileUrlPattern } from '$lib/meteo/dem';
-  import { HikeFlyWorkerController } from '$lib/workers/hikeFlyWorkerController';
+  import { isMobile } from '#lib/stores/media.js';
+  import { HIKE_FLY_DEFAULT_GLIDE_RATIO, HIKE_FLY_DEFAULT_STEP_M } from '#lib/meteo/hikeAndFly.js';
+  import { resolveTileUrlPattern } from '#lib/meteo/dem.js';
+  import { HikeFlyWorkerController } from '#lib/workers/hikeFlyWorkerController.js';
 
   let {
     map,
@@ -133,7 +133,7 @@
   }
 
   const workerController = new HikeFlyWorkerController({
-    createWorker: () => new Worker(new URL('$lib/workers/hikeFlyWorker.ts', import.meta.url), { type: 'module' }),
+    createWorker: () => new Worker(new URL('#lib/workers/hikeFlyWorker.ts', import.meta.url), { type: 'module' }),
     removeRenderedResult,
     renderResult: (data, objectUrl) => {
       if (!map) throw new Error('Map is unavailable');

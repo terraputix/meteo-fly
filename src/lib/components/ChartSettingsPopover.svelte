@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { CELL_SELECTION_OPTIONS, type CellSelection } from '$lib/api/types';
-  import * as Popover from '$lib/components/ui/popover/index.js';
+  import { CELL_SELECTION_OPTIONS, type CellSelection } from '#lib/api/types.js';
+  import * as Popover from '#lib/components/ui/popover/index.js';
   import SettingsIcon from '@lucide/svelte/icons/settings';
 
   let {

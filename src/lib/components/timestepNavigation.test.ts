@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ChartView } from '$lib/services/types';
+import type { ChartView } from '#lib/services/types.js';
 import { MIN_FORECAST_DAY, stepTimestep, type TimestepDirection, type TimestepState } from './timestepNavigation';
 
 function step(

@@ -4,16 +4,16 @@
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { LngLatLike } from 'maplibre-gl';
   import { resolve } from '$app/paths';
-  import type { Location } from '$lib/api/types';
-  import { locationStore, type LocationState } from '$lib/services/location/store';
+  import type { Location } from '#lib/api/types.js';
+  import { locationStore, type LocationState } from '#lib/services/location/store.js';
 
-  import { isMobile } from '$lib/stores/media';
+  import { isMobile } from '#lib/stores/media.js';
   import { LocationControlManager, TerrainControl } from './Controls';
   import ModelSelector from './ModelSelector.svelte';
   import ChartSettingsPopover from './ChartSettingsPopover.svelte';
   import HikeFlyLayer from './HikeFlyLayer.svelte';
-  import type { WeatherModel, CellSelection } from '$lib/api/types';
-  import { haversineDistance } from '$lib/meteo/hikeAndFly';
+  import type { WeatherModel, CellSelection } from '#lib/api/types.js';
+  import { haversineDistance } from '#lib/meteo/hikeAndFly.js';
   import {
     createDeferredMapLocationSelection,
     createMapDoubleActivationRecognizer,
@@ -55,7 +55,7 @@
   const gridCellConnectorSourceId = 'grid-cell-connector';
   const gridCellConnectorLayerId = 'grid-cell-connector-line';
   const defaultTerrainExaggeration = 1;
-  const aboutUrl = resolve('/about');
+  const aboutUrl = resolve('about');
   let mapContainer: HTMLElement;
   let map: Map = $state.raw(undefined!)!;
   let marker: Marker;
@@ -216,6 +216,7 @@
     });
 
     const midpoint: LngLatLike = [(longitude + gridCellLongitude) / 2, (latitude + gridCellLatitude) / 2];
+
     const distanceLabel = formatDistance(
       haversineDistance(latitude, longitude, selectedGridCell.latitude, selectedGridCell.longitude)
     );
@@ -251,13 +252,7 @@
       element.className = 'selected-grid-cell-marker';
       element.innerHTML =
         '<span class="selected-grid-cell-marker__ring"></span><span class="selected-grid-cell-marker__dot"></span><span class="selected-grid-cell-marker__badge">Grid cell</span>';
-
-      selectedGridCellMarker = new maplibregl.Marker({
-        element,
-        anchor: 'center',
-      })
-        .setLngLat(lngLat)
-        .addTo(map);
+      selectedGridCellMarker = new maplibregl.Marker({ element, anchor: 'center' }).setLngLat(lngLat).addTo(map);
 
       const badgeEl = element.querySelector('.selected-grid-cell-marker__badge');
       if (badgeEl) badgeEl.textContent = badgeText;
@@ -629,9 +624,11 @@
         aria-hidden="true"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6.5h12m-3-3 3 3-3 3" />
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6m3-3-3 3 3 3" />
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 17.5h12m-3-3 3 3-3 3" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6.5h12m-3-3 3 3-3 3"></path>
+
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6m3-3-3 3 3 3"></path>
+
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 17.5h12m-3-3 3 3-3 3"></path>
         </svg>
       </span>
     </button>
@@ -656,8 +653,8 @@
           stroke-width="2"
           stroke-linecap="round"
         >
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 16v-4M12 9h.01" />
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 16v-4M12 9h.01"></path>
         </svg>
       </span>
     </a>
@@ -690,10 +687,9 @@
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          stroke-width="2"
+          stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"></path></svg
         >
-          <path d="M12 19V5M5 12l7-7 7 7" />
-        </svg>
+
         Hike&Fly from here
       </button>
     </div>

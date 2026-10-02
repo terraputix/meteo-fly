@@ -5,8 +5,8 @@ import { clientsClaim } from 'workbox-core';
 import { CacheExpiration, ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
-import { classifyMapCacheResource, MAP_CACHE_NAMES, MAP_CACHE_POLICIES } from '$lib/services/mapCache';
-import { markUpdatePromptMigration } from '$lib/services/pwaUpdateMigration';
+import { classifyMapCacheResource, MAP_CACHE_NAMES, MAP_CACHE_POLICIES } from '#lib/services/mapCache.js';
+import { markUpdatePromptMigration } from '#lib/services/pwaUpdateMigration.js';
 import {
   cleanupLegacyWeatherCaches,
   handleWeatherRequest,
@@ -15,7 +15,7 @@ import {
   WEATHER_CACHE_NAME,
   type WeatherCacheDataset,
   type WeatherCacheOutdatedMessage,
-} from '$lib/services/weatherCache';
+} from '#lib/services/weatherCache.js';
 
 declare const self: ServiceWorkerGlobalScope;
 

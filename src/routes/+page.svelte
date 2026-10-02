@@ -1,25 +1,25 @@
 <script lang="ts">
-  import { buildVisitedURL, saveLastVisitedURL } from '$lib/services/storage';
-  import { browser } from '$app/environment';
-  import { page } from '$app/stores';
-  import { afterNavigate, replaceState } from '$app/navigation';
-  import { isMobile } from '$lib/stores/media';
-  import LocationMap from '$lib/components/LocationMap.svelte';
-  import ChartContainer from '$lib/components/ChartContainer.svelte';
-  import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '$lib/components/ui/resizable';
-  import { getInitialParameters } from '$lib/services/defaults';
-  import { type PageParameters } from '$lib/services/types';
-  import { fetchWindChartData, fetchModelGridElevation, fetchSkewTData } from '$lib/api/api';
-  import type { Location, WindChartData, SkewTWeatherData } from '$lib/api/types';
-  import { addDays } from '$lib/utils/dateExtensions';
+  import { buildVisitedURL, saveLastVisitedURL } from '#lib/services/storage.js';
+  import { browser } from '$app/env';
+  import { page } from '$app/state';
+  import { afterNavigate, goto } from '$app/navigation';
+  import { isMobile } from '#lib/stores/media.js';
+  import LocationMap from '#lib/components/LocationMap.svelte';
+  import ChartContainer from '#lib/components/ChartContainer.svelte';
+  import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '#lib/components/ui/resizable/index.js';
+  import { getInitialParameters } from '#lib/services/defaults.js';
+  import { type PageParameters } from '#lib/services/types.js';
+  import { fetchWindChartData, fetchModelGridElevation, fetchSkewTData } from '#lib/api/api.js';
+  import type { Location, WindChartData, SkewTWeatherData } from '#lib/api/types.js';
+  import { addDays } from '#lib/utils/dateExtensions.js';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { onDestroy, onMount, tick } from 'svelte';
-  import { createLatestRequest, isAbortError, type RequestHandle } from '$lib/services/latestRequest';
-  import { isWeatherCacheOutdatedMessage } from '$lib/services/weatherCache';
+  import { createLatestRequest, isAbortError, type RequestHandle } from '#lib/services/latestRequest.js';
+  import { isWeatherCacheOutdatedMessage } from '#lib/services/weatherCache.js';
   import type { PaneAPI } from 'paneforge';
 
   let parameters: PageParameters = $state(
-    getInitialParameters(browser ? $page.url.searchParams : new URLSearchParams())
+    getInitialParameters(browser ? page.url.searchParams : new URLSearchParams())
   );
   let showChart = $state(false);
   let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
@@ -65,9 +65,11 @@
   const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
   const showMapLoadingStatus = $derived(!showChart && isWindChartLoading && !windChartData);
   const showMapErrorStatus = $derived(!showChart && windFailure !== null);
+
   const mapControlsTopOffset = $derived(
     $isMobile ? (showMapErrorStatus ? '7.5rem' : showMapLoadingStatus ? '3.75rem' : '0.75rem') : '0.75rem'
   );
+
   const outdatedCachedAt = $derived(chartView === 'wind' ? windOutdatedCachedAt : skewTOutdatedCachedAt);
   const outdatedCachedAtLabel = $derived(
     outdatedCachedAt === null
@@ -109,7 +111,7 @@
     saveLastVisitedURL(newURL);
     if (currentSearch === search) return;
     // eslint-disable-next-line svelte/no-navigation-without-resolve
-    replaceState(newURL, window.history.state);
+    goto(newURL, { shallow: true, replace: true, state: window.history.state });
   }
 
   afterNavigate(syncURL);
@@ -412,7 +414,9 @@
     property="og:description"
     content="Professional wind & weather forecast visualization for paragliding and hang gliding. Interactive wind charts for multiple meteorological models including ICON, ECMWF, GFS, UKMO, and MeteoFrance."
   />
+
   <meta name="twitter:title" content="Meteo-Fly - Wind & Weather Forecast for Paragliding & Hang Gliding" />
+
   <meta
     name="twitter:description"
     content="Interactive multi-model wind and weather forecasts for paragliding and hang gliding."

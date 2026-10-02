@@ -1,4 +1,4 @@
-import type { WindChartData } from '$lib/api/types';
+import type { WindChartData } from '#lib/api/types.js';
 
 export interface LclPoint {
   time: Date;

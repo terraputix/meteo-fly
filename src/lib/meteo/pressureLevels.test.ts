@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODEL_OPTIONS } from '$lib/api/models';
+import { MODEL_OPTIONS } from '#lib/api/models.js';
 import { MAX_ALTITUDE_OPTIONS } from './types';
 import {
   getAllTaggedLevelsForModel,

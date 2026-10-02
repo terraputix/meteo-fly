@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { haversineDistance } from '$lib/meteo/hikeAndFly';
+import { haversineDistance } from '#lib/meteo/hikeAndFly.js';
 import { boundsForRadius, createElevationLookup, tilesForBbox, WEB_MERCATOR_MAX_LATITUDE } from './dem';
 
 describe('boundsForRadius', () => {

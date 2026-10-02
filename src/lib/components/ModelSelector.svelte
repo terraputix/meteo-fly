@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { WeatherModel } from '$lib/api/types';
-  import { MODEL_OPTIONS, type ModelOption } from '$lib/api/models';
-  import * as Popover from '$lib/components/ui/popover/index.js';
+  import type { WeatherModel } from '#lib/api/types.js';
+  import { MODEL_OPTIONS, type ModelOption } from '#lib/api/models.js';
+  import * as Popover from '#lib/components/ui/popover/index.js';
   import GridIcon from '@lucide/svelte/icons/grid-2x2';
   import CheckIcon from '@lucide/svelte/icons/check';
 

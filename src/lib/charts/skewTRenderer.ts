@@ -1,4 +1,4 @@
-import { metersToHPa } from '$lib/meteo/pressureLevels';
+import { metersToHPa } from '#lib/meteo/pressureLevels.js';
 import {
   RD,
   CP,
@@ -6,10 +6,10 @@ import {
   inverseSaturationVaporPressure,
   moistAdiabaticLapseRate,
   saturationVaporPressure,
-} from '$lib/meteo/thermo';
-import { CHART_COLORS } from '$lib/charts/chartColors';
-import { windColorScale, strokeWidthScale } from '$lib/charts/scales';
-import { type SkewTData, type SkewTLevelData, type SkewTTrace } from '$lib/meteo/types';
+} from '#lib/meteo/thermo.js';
+import { CHART_COLORS } from '#lib/charts/chartColors.js';
+import { windColorScale, strokeWidthScale } from '#lib/charts/scales.js';
+import { type SkewTData, type SkewTLevelData, type SkewTTrace } from '#lib/meteo/types.js';
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
 

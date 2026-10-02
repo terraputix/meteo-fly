@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { SkewTWeatherData } from '$lib/api/types';
+import type { SkewTWeatherData } from '#lib/api/types.js';
 import { buildSkewTData } from './skewT';
 import type { SkewTTrace, SkewTLevelData } from './types';
 

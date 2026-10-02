@@ -1,4 +1,4 @@
-import type { Location } from '$lib/api/types';
+import type { Location } from '#lib/api/types.js';
 
 export const MAP_DOUBLE_ACTIVATION_INTERVAL_MS = 250;
 export const MAP_DOUBLE_ACTIVATION_MAX_DISTANCE_PX = 30;

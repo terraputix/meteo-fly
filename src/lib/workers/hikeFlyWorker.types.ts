@@ -1,4 +1,4 @@
-import type { HikeFlyGridPoint } from '$lib/meteo/hikeAndFly';
+import type { HikeFlyGridPoint } from '#lib/meteo/hikeAndFly.js';
 
 export type HikeFlyImageCoordinate = [number, number];
 

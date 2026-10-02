@@ -1,7 +1,7 @@
 import type { PageParameters, ChartView } from './types';
 import { defaultCellSelection, defaultDay, defaultLocation, defaultWeatherModel } from './defaults';
-import type { CellSelection, WeatherModel, Location } from '$lib/api/types';
-import type { MaxAltitude } from '$lib/meteo/types';
+import type { CellSelection, WeatherModel, Location } from '#lib/api/types.js';
+import type { MaxAltitude } from '#lib/meteo/types.js';
 
 export function readURLParams(params: URLSearchParams): PageParameters | null {
   const lat = params.get('lat');

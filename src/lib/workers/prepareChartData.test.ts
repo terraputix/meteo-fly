@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { WindChartData } from '$lib/api/types';
+import type { WindChartData } from '#lib/api/types.js';
 import { prepareChartData } from './prepareChartData';
 
 function createData(): WindChartData {

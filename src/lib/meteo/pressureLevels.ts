@@ -1,4 +1,4 @@
-import type { WeatherModel } from '$lib/api/types';
+import type { WeatherModel } from '#lib/api/types.js';
 import type { PressureLevel } from './types';
 
 export type LevelSource = 'model' | 'interpolated';

@@ -6,13 +6,13 @@
     SKEWT_PLOT_TOP,
     type HitTestResult,
     type PlotLayout,
-  } from '$lib/charts/skewTRenderer';
-  import { getSkewTChartSize, SKEWT_MIN_HEIGHT } from '$lib/charts/chartSizing';
-  import { CHART_COLORS } from '$lib/charts/chartColors';
-  import { MAX_ALTITUDE_OPTIONS, type MaxAltitude, type SkewTData } from '$lib/meteo/types';
-  import type { WeatherModel } from '$lib/api/types';
-  import { getTopPressureForModel } from '$lib/meteo/pressureLevels';
-  import ChartLoadingOverlay from '$lib/components/ChartLoadingOverlay.svelte';
+  } from '#lib/charts/skewTRenderer.js';
+  import { getSkewTChartSize, SKEWT_MIN_HEIGHT } from '#lib/charts/chartSizing.js';
+  import { CHART_COLORS } from '#lib/charts/chartColors.js';
+  import { MAX_ALTITUDE_OPTIONS, type MaxAltitude, type SkewTData } from '#lib/meteo/types.js';
+  import type { WeatherModel } from '#lib/api/types.js';
+  import { getTopPressureForModel } from '#lib/meteo/pressureLevels.js';
+  import ChartLoadingOverlay from '#lib/components/ChartLoadingOverlay.svelte';
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
   export let skewTData: SkewTData | null = null;

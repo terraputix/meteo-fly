@@ -1,4 +1,4 @@
-import type { CellSelection, Location, WeatherModel } from '$lib/api/types';
+import type { CellSelection, Location, WeatherModel } from '#lib/api/types.js';
 import type { PageParameters } from './types';
 import { readURLParams } from './url';
 

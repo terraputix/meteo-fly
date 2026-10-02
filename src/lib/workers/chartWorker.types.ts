@@ -1,8 +1,8 @@
-import type { WindChartData, WeatherModel } from '$lib/api/types';
-import type { MaxAltitude } from '$lib/meteo/types';
-import type { CloudCoverData } from '$lib/charts/clouds';
-import type { WindFieldLevel } from '$lib/charts/wind';
-import type { LclPoint } from '$lib/meteo/lcl';
+import type { WindChartData, WeatherModel } from '#lib/api/types.js';
+import type { MaxAltitude } from '#lib/meteo/types.js';
+import type { CloudCoverData } from '#lib/charts/clouds.js';
+import type { WindFieldLevel } from '#lib/charts/wind.js';
+import type { LclPoint } from '#lib/meteo/lcl.js';
 
 export interface ChartWorkerInput {
   windChartData: WindChartData;
