@@ -24,6 +24,8 @@ knowledge.
 
 ## Development
 
+Use Node.js 24, as specified in `.node-version`. Cloudflare Pages and CI use this file to select the build runtime.
+
 ```sh
 npm install
 npm run dev
