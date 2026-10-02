@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import type { Location } from '#lib/api/types.js';
-import { getCurrentLocation, GeolocationError } from './geolocation';
+import { getCurrentLocation, GeolocationError } from '#lib/services/location/geolocation.js';
 
 export interface LocationState {
   current: Location | null;
@@ -19,7 +19,7 @@ const initialState: LocationState = {
 export const locationStore = writable<LocationState>(initialState);
 
 export const locationActions = {
-  async detectLocation(): Promise<void> {
+  async detectLocation(): Promise<Location> {
     locationStore.update((state) => ({
       ...state,
       isDetecting: true,
@@ -35,6 +35,7 @@ export const locationActions = {
         isDetecting: false,
         error: null,
       }));
+      return result.location;
     } catch (error) {
       const errorMessage = error instanceof GeolocationError ? error.message : 'Failed to get location';
       locationStore.update((state) => ({
