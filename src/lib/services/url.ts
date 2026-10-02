@@ -3,7 +3,7 @@ import { defaultCellSelection, defaultDay, defaultLocation, defaultWeatherModel 
 import type { CellSelection, WeatherModel, Location } from '#lib/api/types.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
 
-export function readURLParams(params: URLSearchParams): PageParameters | null {
+export function readURLParams(params: Pick<URLSearchParams, 'get'>): PageParameters | null {
   const lat = params.get('lat');
   const lon = params.get('lon');
   const day = params.get('day');

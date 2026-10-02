@@ -1,4 +1,8 @@
-/// <reference lib="webworker" />
+import { dev, version } from '$app/env';
+import { assets, immutable, prerendered } from '$app/manifest';
+import { asset, resolve } from '$app/paths';
+import chartWorkerUrl from '#lib/workers/chartWorker.ts?worker&url';
+import hikeFlyWorkerUrl from '#lib/workers/hikeFlyWorker.ts?worker&url';
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { clientsClaim } from 'workbox-core';
@@ -20,7 +24,13 @@ import {
 declare const self: ServiceWorkerGlobalScope;
 
 cleanupOutdatedCaches();
-precacheAndRoute(self.__WB_MANIFEST);
+precacheAndRoute([
+  ...immutable.map(({ path }) => ({ url: new URL(path, self.location.href).pathname, revision: null })),
+  ...[chartWorkerUrl, hikeFlyWorkerUrl].map((url) => ({ url, revision: null })),
+  ...assets.map(({ path }) => ({ url: asset(path), revision: version })),
+  ...prerendered.map(({ path }) => ({ url: resolve(path), revision: version })),
+  ...(dev ? [{ url: resolve(''), revision: version }] : []),
+]);
 
 clientsClaim();
 
@@ -41,7 +51,7 @@ self.addEventListener('message', (event) => {
   }
 });
 
-registerRoute(new NavigationRoute(createHandlerBoundToURL('/')));
+registerRoute(new NavigationRoute(createHandlerBoundToURL(resolve(''))));
 
 const cacheableMapResponse = () => new CacheableResponsePlugin({ statuses: [0, 200] });
 const expireMapCache = (policy: { maxEntries: number; maxAgeSeconds: number }) =>

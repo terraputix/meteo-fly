@@ -3,7 +3,6 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 
 export default defineConfig({
   plugins: [
@@ -12,51 +11,6 @@ export default defineConfig({
       preprocess: vitePreprocess(),
       adapter: adapter({ fallback: '404.html' }),
       serviceWorker: { register: false },
-    }),
-
-    SvelteKitPWA({
-      strategies: 'injectManifest',
-      srcDir: 'src',
-      filename: 'service-worker.ts',
-      registerType: 'prompt',
-      injectRegister: false,
-      manifest: {
-        name: 'Meteo-Fly',
-        short_name: 'Meteo-Fly',
-        description: 'Weather visualization with wind and cloud data',
-        id: '/',
-        start_url: '/',
-        scope: '/',
-        display: 'standalone',
-        display_override: ['window-controls-overlay', 'standalone'],
-        orientation: 'portrait-primary',
-        background_color: '#ffffff',
-        theme_color: '#4f46e5',
-        lang: 'en',
-        dir: 'ltr',
-        categories: ['weather', 'paragliding', 'hang gliding', 'utilities'],
-        icons: [
-          {
-            src: '/icons/icon-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: '/icons/icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any',
-          },
-        ],
-      },
-      injectManifest: {
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-      },
-      devOptions: {
-        enabled: true,
-      },
     }),
   ],
   environments: {

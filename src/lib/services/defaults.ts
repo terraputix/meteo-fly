@@ -9,7 +9,7 @@ export const defaultDay = 1;
 
 /// Initial parameters will be first read from the URL, then from local storage.
 /// If neither are present, defaults will be used.
-export function getInitialParameters(urlParams: URLSearchParams): PageParameters {
+export function getInitialParameters(urlParams: Pick<URLSearchParams, 'get'>): PageParameters {
   const parsedUrlParams = readURLParams(urlParams);
   if (parsedUrlParams) {
     return parsedUrlParams;

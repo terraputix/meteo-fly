@@ -22,6 +22,7 @@
     getInitialParameters(browser ? page.url.searchParams : new URLSearchParams())
   );
   let showChart = $state(false);
+  let routerReady = $state(false);
   let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
   let selectedHour = $state(parameters.hour ?? 0);
   let windChartData = $state.raw<WindChartData | null>(null);
@@ -100,7 +101,7 @@
     saveLastVisitedURL(buildVisitedURL(window.location));
   }
 
-  function syncURL() {
+  async function syncURL() {
     const search = urlSearch;
     const currentSearch = window.location.search;
     const newURL = buildVisitedURL({
@@ -110,19 +111,20 @@
     });
     saveLastVisitedURL(newURL);
     if (currentSearch === search) return;
-    // eslint-disable-next-line svelte/no-navigation-without-resolve
-    goto(newURL, { shallow: true, replace: true, state: window.history.state });
+    try {
+      await goto(newURL, { shallow: true, replace: true, state: page.state });
+    } catch (error) {
+      console.error('Failed to synchronize forecast URL', error);
+    }
   }
 
-  afterNavigate(syncURL);
+  afterNavigate(() => {
+    routerReady = true;
+    void syncURL();
+  });
 
   $effect(() => {
-    void urlSearch;
-    try {
-      syncURL();
-    } catch {
-      // Router not ready yet on initial mount; afterNavigate handles it
-    }
+    if (routerReady) void syncURL();
   });
 
   function clearPanelTransitionTimer() {

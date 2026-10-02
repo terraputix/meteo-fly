@@ -1,10 +1,11 @@
 {
   "extends": "$app/tsconfig",
   "compilerOptions": {
-    "types": ["vite-plugin-pwa/svelte", "vite-plugin-pwa/info", "vite-plugin-pwa/client", "$app/types"],
+    "types": ["$app/types"],
     "sourceMap": true,
     "strict": true,
     "lib": ["dom", "esnext"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/service-worker"]
 }

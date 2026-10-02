@@ -35,6 +35,7 @@ Before submitting changes:
 npm run check
 npm run lint
 npm test
+npm run build
 ```
 
 The application is built with SvelteKit, statically prerendered, and hydrated in the browser for interactive use.
