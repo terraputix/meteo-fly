@@ -1,22 +1,13 @@
 <script lang="ts">
-  import { init, use, type EChartsType } from 'echarts/core';
-  import { CustomChart, LineChart } from 'echarts/charts';
+  import { buildTooltipStore, formatTooltip, snapToNearest, type TooltipStore } from '#lib/charts/tooltipFormatter.js';
   import {
-    GridComponent,
-    MarkAreaComponent,
-    MarkLineComponent,
-    MarkPointComponent,
-    TooltipComponent,
-  } from 'echarts/components';
-  import { CanvasRenderer } from 'echarts/renderers';
-  import { buildTooltipStore, createActiveState, type ActiveState } from '#lib/charts/tooltipFormatter.js';
-  import {
-    buildWindChartOption,
     DAYLIGHT_CONTEXT_TOP,
-    getChartHeight,
-    getWindChartHeight,
     WIND_TOP,
-  } from '#lib/charts/buildWindChartOption.js';
+    buildWindChartLayout,
+    type PreparedWindChart,
+    type WindChartLayout,
+  } from '#lib/charts/windChartLayout.js';
+  import { renderWindChart, renderWindChartOverlay, type WindAxisUnit } from '#lib/charts/windChartRenderer.js';
   import { getWindChartSize } from '#lib/charts/chartSizing.js';
   import type { WindChartData } from '#lib/api/types.js';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '#lib/workers/chartWorker.types.js';
@@ -26,17 +17,6 @@
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
   import FoldHorizontalIcon from '@lucide/svelte/icons/fold-horizontal';
   import UnfoldHorizontalIcon from '@lucide/svelte/icons/unfold-horizontal';
-
-  use([
-    LineChart,
-    CustomChart,
-    GridComponent,
-    TooltipComponent,
-    MarkAreaComponent,
-    MarkLineComponent,
-    MarkPointComponent,
-    CanvasRenderer,
-  ]);
 
   let {
     windChartData = null,
@@ -53,228 +33,270 @@
   } = $props();
 
   let isRendering = $state(false);
+  let renderError = $state('');
+  let axisUnit = $state<WindAxisUnit>('m');
 
   let isBusy = $derived(isLoading || isRendering);
 
-  let windHeight = $derived(getWindChartHeight(maxAltitude));
   let availableWidth = $state(600);
   let availableHeight = $state(0);
   let chartSize = $derived(getWindChartSize(availableWidth, availableHeight, maxAltitude));
 
-  // ─── Svelte action ────────────────────────────────────────────────────────
-
   type RenderChartParams = {
     data: WindChartData | null;
-    windHeight: number;
     maxAltitude: MaxAltitude;
     model: WeatherModel;
     daylightOnly: boolean;
+    loading: boolean;
+    axisUnit: WindAxisUnit;
   };
 
   function renderChart(node: HTMLElement, params: RenderChartParams) {
-    let chart: EChartsType | null = init(node);
+    const canvas = node.querySelector<HTMLCanvasElement>('canvas')!;
+    const overlay = node.querySelector<HTMLCanvasElement>('canvas[data-overlay]')!;
+    const tooltip = node.querySelector<HTMLDivElement>('[role="tooltip"]')!;
     let worker: Worker | null = null;
     let workerBusy = false;
     let requestId = 0;
     let destroyed = false;
-    let pendingRender: { requestId: number; params: RenderChartParams } | null = null;
-    let prevData = params.data;
-    let prevDaylightOnly = params.daylightOnly;
-    const activeState: ActiveState = createActiveState();
+    let prepared: PreparedWindChart | null = null;
+    let cloudImage: HTMLCanvasElement | null = null;
+    let layout: WindChartLayout | null = null;
+    let store: TooltipStore | null = null;
+    let baseFrame = 0;
+    let pointerFrame = 0;
+    let dpr = window.devicePixelRatio || 1;
+    let resolutionQuery: MediaQueryList;
 
-    function handleAxisPointer(event: unknown) {
-      const e = event as { axesInfo?: Array<{ axisDim: string; axisIndex: number; value: number }> };
-      const axes = e?.axesInfo;
-      if (!axes?.length) {
-        activeState.gridIndex = -1;
-        activeState.hoveredWindPressure = null;
-        return;
-      }
-      const yInfo = axes.find((axis) => axis.axisDim === 'y');
-      if (!yInfo) {
-        activeState.gridIndex = -1;
-        activeState.hoveredWindPressure = null;
-        return;
-      }
-      if (yInfo.axisIndex <= 1) {
-        activeState.gridIndex = 0;
-        activeState.hoveredWindPressure = null;
-      } else if (yInfo.axisIndex === 2) {
-        activeState.gridIndex = 1;
-        activeState.hoveredWindPressure = null;
-      } else {
-        activeState.gridIndex = 2;
-        activeState.hoveredWindPressure = yInfo.value;
-      }
+    function clearSelection() {
+      cancelAnimationFrame(pointerFrame);
+      pointerFrame = 0;
+      tooltip.hidden = true;
+      overlay.getContext('2d')?.clearRect(0, 0, node.clientWidth, node.clientHeight);
     }
 
-    chart.on('updateaxispointer', handleAxisPointer);
-
-    function resizeChart() {
-      if (!chart) return;
-      chart.resize();
-      if (chart.getOption()?.grid) {
-        chart.setOption({
-          grid: [{}, {}, { height: Math.max(params.windHeight, node.clientHeight - getChartHeight(0)) }],
-        });
+    function paint() {
+      baseFrame = 0;
+      if (destroyed) return;
+      clearSelection();
+      layout = null;
+      dpr = window.devicePixelRatio || 1;
+      for (const target of [canvas, overlay]) {
+        target.width = Math.round(node.clientWidth * dpr);
+        target.height = Math.round(node.clientHeight * dpr);
+        target.getContext('2d')?.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
-    }
-
-    const resizeObserver = new ResizeObserver(resizeChart);
-    resizeObserver.observe(node);
-
-    function terminateWorker(target: Worker) {
-      target.onmessage = null;
-      target.onerror = null;
-      target.onmessageerror = null;
-      target.terminate();
-      if (worker === target) {
-        worker = null;
-        workerBusy = false;
-      }
-    }
-
-    function terminateCurrentWorker() {
-      if (!worker) return;
-      terminateWorker(worker);
-    }
-
-    function handleWorkerMessage(source: Worker, event: MessageEvent<ChartWorkerOutput>) {
-      if (worker !== source) return;
-      workerBusy = false;
-
-      const response = event.data;
-      const render = pendingRender;
-      if (destroyed || response.requestId !== requestId || render?.requestId !== response.requestId || !chart) {
-        return;
-      }
-      pendingRender = null;
-
+      if (!prepared) return;
       try {
-        if (!response.success) {
-          console.error('Chart worker error:', response.error);
-          return;
-        }
-
-        const {
-          cloudData,
-          windData,
-          lcl,
-          elevation,
-          modelGridElevation,
-          timezone,
-          timezoneAbbr,
-          temperatureChartData,
-          rainCloudChartData,
-          xDomain,
-        } = response.data;
-
-        activeState.gridIndex = -1;
-        activeState.hoveredWindPressure = null;
-
-        const store = buildTooltipStore(temperatureChartData, rainCloudChartData, windData, lcl);
-        chart.setOption(
-          buildWindChartOption(
-            temperatureChartData,
-            rainCloudChartData,
-            windData,
-            cloudData,
-            lcl,
-            elevation,
-            timezone,
-            timezoneAbbr,
-            xDomain,
-            store,
-            activeState,
-            Math.max(render.params.windHeight, node.clientHeight - getChartHeight(0)),
-            render.params.maxAltitude,
-            render.params.model,
-            modelGridElevation
-          ),
-          { notMerge: true }
-        );
-      } catch (err) {
-        console.error('Error updating EChart:', err);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas 2D is unavailable');
+        layout = buildWindChartLayout(prepared, node.clientWidth, node.clientHeight, params.maxAltitude, params.model);
+        renderWindChart(ctx, prepared, layout, params.axisUnit, cloudImage);
+      } catch (error) {
+        layout = null;
+        renderError = 'Unable to draw the weather chart.';
+        console.error('Chart render error:', error);
       } finally {
-        if (!destroyed && response.requestId === requestId) isRendering = false;
-      }
-    }
-
-    function handleWorkerError(source: Worker, error: unknown) {
-      if (worker !== source) return;
-      terminateWorker(source);
-      pendingRender = null;
-      if (!destroyed) {
-        console.error('Chart worker error:', error);
         isRendering = false;
       }
     }
 
-    function createWorker() {
-      const nextWorker = new Worker(new URL('#lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
-      nextWorker.onmessage = (event: MessageEvent<ChartWorkerOutput>) => handleWorkerMessage(nextWorker, event);
-      nextWorker.onerror = (error) => handleWorkerError(nextWorker, error);
-      nextWorker.onmessageerror = (error) => handleWorkerError(nextWorker, error);
-      return nextWorker;
+    function schedulePaint() {
+      if (!baseFrame) baseFrame = requestAnimationFrame(paint);
     }
 
-    function draw(currentParams: RenderChartParams) {
-      if (!currentParams.data) return;
+    function watchResolution() {
+      resolutionQuery?.removeEventListener('change', resolutionChanged);
+      resolutionQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      resolutionQuery.addEventListener('change', resolutionChanged);
+    }
+    function resolutionChanged() {
+      watchResolution();
+      schedulePaint();
+    }
+    watchResolution();
+    const resizeObserver = new ResizeObserver(schedulePaint);
+    resizeObserver.observe(node);
 
-      const currentRequestId = ++requestId;
-      if (workerBusy) terminateCurrentWorker();
-      worker ??= createWorker();
-      workerBusy = true;
-      pendingRender = { requestId: currentRequestId, params: currentParams };
+    function terminateWorker() {
+      if (!worker) return;
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.onmessageerror = null;
+      worker.terminate();
+      worker = null;
+      workerBusy = false;
+    }
+
+    function fail(source: Worker | null, error: unknown) {
+      if (destroyed || source !== worker) return;
+      terminateWorker();
+      prepared = null;
+      cloudImage = null;
+      store = null;
+      isRendering = false;
+      renderError = 'Unable to prepare the weather chart.';
+      console.error('Chart worker error:', error);
+      schedulePaint();
+    }
+
+    function prepare() {
+      requestId++;
+      clearSelection();
+      prepared = null;
+      cloudImage = null;
+      store = null;
+      layout = null;
+      renderError = '';
+      if (workerBusy || !params.data) terminateWorker();
+      if (!params.data) {
+        isRendering = false;
+        schedulePaint();
+        return;
+      }
       isRendering = true;
-
-      const request: ChartWorkerRequest = {
-        requestId: currentRequestId,
-        input: {
-          windChartData: currentParams.data,
-          maxAltitude: currentParams.maxAltitude,
-          model: currentParams.model,
-          daylightOnly: currentParams.daylightOnly,
-        },
-      };
-
       try {
+        if (!worker) {
+          const source = new Worker(new URL('#lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
+          worker = source;
+          source.onmessage = (event: MessageEvent<ChartWorkerOutput>) => {
+            const response = event.data;
+            if (destroyed || worker !== source || response.requestId !== requestId) return;
+            workerBusy = false;
+            if (!response.success) {
+              fail(source, response.error);
+              return;
+            }
+            try {
+              prepared = response.data;
+              const raster = prepared.cloudRaster;
+              if (raster) {
+                cloudImage = document.createElement('canvas');
+                cloudImage.width = raster.width;
+                cloudImage.height = raster.height;
+                cloudImage
+                  .getContext('2d')
+                  ?.putImageData(new ImageData(raster.pixels, raster.width, raster.height), 0, 0);
+              }
+              store = buildTooltipStore(
+                prepared.temperatureChartData,
+                prepared.rainCloudChartData,
+                prepared.windData,
+                prepared.lcl
+              );
+              schedulePaint();
+            } catch (error) {
+              fail(source, error);
+            }
+          };
+          source.onerror = (error) => fail(source, error);
+          source.onmessageerror = (error) => fail(source, error);
+        }
+        workerBusy = true;
+        const request: ChartWorkerRequest = {
+          requestId,
+          input: {
+            windChartData: params.data,
+            maxAltitude: params.maxAltitude,
+            model: params.model,
+            daylightOnly: params.daylightOnly,
+          },
+        };
         worker.postMessage(request);
-      } catch (err) {
-        handleWorkerError(worker, err);
+      } catch (error) {
+        fail(worker, error);
       }
     }
 
-    if (params.data) draw({ ...params });
+    function showSelection(clientX: number, clientY: number) {
+      if (!prepared || !layout || !store || params.loading || isRendering) return;
+      const rect = node.getBoundingClientRect();
+      const px = ((clientX - rect.left) * node.clientWidth) / rect.width;
+      const py = ((clientY - rect.top) * node.clientHeight) / rect.height;
+      const hit = layout.hitTest(px, py);
+      const ctx = overlay.getContext('2d');
+      if (!hit || !ctx) {
+        clearSelection();
+        return;
+      }
+      const time = snapToNearest(store.sortedTimes, hit.time);
+      if (time == null) {
+        clearSelection();
+        return;
+      }
+      const pressure =
+        hit.hoveredWindPressure == null ? null : snapToNearest(store.sortedWindPressures, hit.hoveredWindPressure);
+      renderWindChartOverlay(ctx, layout, time, hit.gridIndex, pressure == null ? py : layout.pressureY(pressure));
+      const lclY = layout.lclYAt(px);
+      const windPanel = layout.panels[2];
+      const showLcl =
+        hit.gridIndex === 2 &&
+        lclY != null &&
+        lclY >= windPanel.top &&
+        lclY <= windPanel.top + windPanel.height &&
+        Math.abs(py - lclY) <= 10;
+      tooltip.innerHTML = formatTooltip(store, { ...hit, showLcl }, prepared.timezone, time);
+      tooltip.hidden = false;
+      const tooltipWidth = tooltip.offsetWidth;
+      const tooltipHeight = tooltip.offsetHeight;
+      const preferredX = px + 14 + tooltipWidth <= node.clientWidth ? px + 14 : px - tooltipWidth - 14;
+      const visibleTop = Math.max(0, -rect.top);
+      const visibleBottom = Math.min(node.clientHeight, window.innerHeight - rect.top);
+      const preferredY = py + 14 + tooltipHeight <= visibleBottom ? py + 14 : py - tooltipHeight - 14;
+      tooltip.style.left = `${Math.max(0, Math.min(node.clientWidth - tooltipWidth, preferredX))}px`;
+      tooltip.style.top = `${Math.max(visibleTop, Math.min(visibleBottom - tooltipHeight, preferredY))}px`;
+    }
+
+    function pointerMove(event: PointerEvent) {
+      if (event.pointerType === 'touch') return;
+      cancelAnimationFrame(pointerFrame);
+      pointerFrame = requestAnimationFrame(() => {
+        pointerFrame = 0;
+        showSelection(event.clientX, event.clientY);
+      });
+    }
+    function click(event: PointerEvent) {
+      if (event.pointerType === 'touch') showSelection(event.clientX, event.clientY);
+    }
+    function pointerLeave(event: PointerEvent) {
+      if (event.pointerType !== 'touch') clearSelection();
+    }
+    function outsidePointer(event: PointerEvent) {
+      if (event.target instanceof Node && !node.contains(event.target)) clearSelection();
+    }
+    canvas.addEventListener('pointermove', pointerMove);
+    canvas.addEventListener('click', click);
+    canvas.addEventListener('pointerleave', pointerLeave);
+    canvas.addEventListener('pointercancel', clearSelection);
+    document.addEventListener('pointerdown', outsidePointer);
+    prepare();
 
     return {
-      update(newParams: RenderChartParams) {
-        params = newParams;
-        if (newParams.data !== prevData || newParams.daylightOnly !== prevDaylightOnly) {
-          prevData = newParams.data;
-          prevDaylightOnly = newParams.daylightOnly;
-          if (newParams.data) {
-            draw({ ...newParams });
-          } else {
-            requestId++;
-            terminateCurrentWorker();
-            pendingRender = null;
-            activeState.gridIndex = -1;
-            activeState.hoveredWindPressure = null;
-            chart?.clear();
-            isRendering = false;
-          }
-        }
+      update(next: RenderChartParams) {
+        const axisChanged = next.axisUnit !== params.axisUnit;
+        const changed =
+          next.data !== params.data ||
+          next.daylightOnly !== params.daylightOnly ||
+          next.maxAltitude !== params.maxAltitude ||
+          next.model !== params.model;
+        params = next;
+        if (params.loading) clearSelection();
+        if (changed) prepare();
+        else if (axisChanged) schedulePaint();
       },
       destroy() {
         destroyed = true;
         requestId++;
-        terminateCurrentWorker();
-        pendingRender = null;
+        terminateWorker();
+        cancelAnimationFrame(baseFrame);
+        clearSelection();
         resizeObserver.disconnect();
-        chart?.off('updateaxispointer', handleAxisPointer);
-        chart?.dispose();
-        chart = null;
+        resolutionQuery.removeEventListener('change', resolutionChanged);
+        canvas.removeEventListener('pointermove', pointerMove);
+        canvas.removeEventListener('click', click);
+        canvas.removeEventListener('pointerleave', pointerLeave);
+        canvas.removeEventListener('pointercancel', clearSelection);
+        document.removeEventListener('pointerdown', outsidePointer);
         isRendering = false;
       },
     };
@@ -292,7 +314,7 @@
 
     <label
       class="group absolute left-0 z-[5] flex h-5 w-[54px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
-      style="top: {WIND_TOP - 10}px;"
+      style="top: {WIND_TOP - 20}px;"
     >
       <select
         bind:value={maxAltitude}
@@ -326,11 +348,40 @@
       {/if}
     </button>
 
+    <button
+      type="button"
+      aria-pressed={axisUnit === 'hPa'}
+      aria-label="Use pressure scale instead of metres"
+      title={axisUnit === 'm' ? 'Switch scale to pressure (hPa)' : 'Switch scale to altitude (m)'}
+      class="absolute bottom-1 left-0 z-[5] flex h-6 w-[54px] items-center justify-center gap-1 rounded text-[10px] text-slate-500 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
+      onclick={() => (axisUnit = axisUnit === 'm' ? 'hPa' : 'm')}
+    >
+      <span class:font-semibold={axisUnit === 'm'} class:text-slate-800={axisUnit === 'm'}>m</span>
+      <span aria-hidden="true">/</span>
+      <span class:font-semibold={axisUnit === 'hPa'} class:text-slate-800={axisUnit === 'hPa'}>hPa</span>
+    </button>
+
     <div
-      use:renderChart={{ data: windChartData, windHeight, maxAltitude, model, daylightOnly }}
+      use:renderChart={{ data: windChartData, maxAltitude, model, daylightOnly, loading: isLoading, axisUnit }}
       class="chart-content"
       style="opacity: {isBusy ? 0 : 1};"
-    ></div>
+    >
+      <canvas
+        class="h-full w-full touch-pan-y touch-pinch-zoom cursor-crosshair"
+        aria-label="Weather meteogram: temperature, humidity, rain, clouds and wind by altitude"
+      ></canvas>
+      <canvas data-overlay class="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true"></canvas>
+      <div
+        role="tooltip"
+        hidden
+        class="pointer-events-none absolute z-10 w-max max-w-full max-h-[80vh] overflow-y-auto rounded-md border border-slate-200/80 bg-white/95 px-2 py-1.5 text-[11px] leading-snug text-slate-700 shadow-lg shadow-slate-900/10 tabular-nums"
+      ></div>
+    </div>
+    {#if renderError}
+      <p role="status" class="absolute inset-x-0 top-4 z-10 bg-white p-3 text-center text-sm text-red-700">
+        {renderError}
+      </p>
+    {/if}
   </div>
 </div>
 
