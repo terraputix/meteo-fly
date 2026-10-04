@@ -37,6 +37,10 @@
   let chartPane: PaneAPI | undefined;
   let renderChartPanel = $state(false);
   let isChartPaneDragging = $state(false);
+  let viewportHeight = $state(0);
+  let chartContentHeight = $state(0);
+  let cacheNoticeHeight = $state(0);
+  let fitMobileChart = $state(true);
   const windRequest = createLatestRequest();
   const skewTRequest = createLatestRequest();
   const PANEL_TRANSITION_MS = 300;
@@ -146,15 +150,25 @@
     clearPanelTransitionTimer();
     renderChartPanel = true;
     if (showChart) return;
+    fitMobileChart = true;
 
     await tick();
     showChart = true;
     await tick();
-    chartPane?.resize(chartPaneSizes[paneDirection]);
+    resizeChartPanel();
+  }
+
+  function resizeChartPanel() {
+    let size = chartPaneSizes[paneDirection];
+    if ($isMobile && fitMobileChart && windChartData && chartContentHeight > 0 && viewportHeight > 0) {
+      const noticeHeight = outdatedCachedAt !== null ? cacheNoticeHeight : 0;
+      size = Math.min(size, ((chartContentHeight + noticeHeight + 1) / viewportHeight) * 100);
+    }
+    chartPane?.resize(size);
   }
 
   function closeChartPanel() {
-    if (chartPane?.isExpanded()) {
+    if (chartPane?.isExpanded() && !($isMobile && fitMobileChart)) {
       chartPaneSizes[paneDirection] = chartPane.getSize();
     }
     showChart = false;
@@ -248,12 +262,13 @@
   }
 
   function handleChartPaneResize(size: number) {
-    if (showChart && size > 0) {
+    if (showChart && size > 0 && isChartPaneDragging) {
       chartPaneSizes[paneDirection] = size;
     }
   }
 
   function handleChartPaneDraggingChange(dragging: boolean) {
+    if (dragging) fitMobileChart = false;
     isChartPaneDragging = dragging;
   }
 
@@ -286,7 +301,7 @@
 
   $effect(() => {
     if (showChart && chartPane && !isChartPaneDragging) {
-      chartPane.resize(chartPaneSizes[paneDirection]);
+      resizeChartPanel();
     }
   });
 
@@ -426,6 +441,7 @@
 </svelte:head>
 
 <div
+  bind:clientHeight={viewportHeight}
   class="relative h-dvh w-full overflow-hidden bg-slate-100"
   style="--map-controls-top-offset: {mapControlsTopOffset};"
 >
@@ -512,12 +528,15 @@
         >
           {#if windChartData}
             {#if outdatedCachedAt !== null}
-              <div class="mx-3 mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
-                Showing cached weather data last fetched {outdatedCachedAtLabel}. The latest forecast could not be
-                loaded.
+              <div bind:offsetHeight={cacheNoticeHeight} class="shrink-0 px-3 pt-3">
+                <div class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
+                  Showing cached weather data last fetched {outdatedCachedAtLabel}. The latest forecast could not be
+                  loaded.
+                </div>
               </div>
             {/if}
             <ChartContainer
+              onContentHeightChange={(height) => (chartContentHeight = height)}
               {windChartData}
               {skewTWeatherData}
               startDate={windChartData.hourly.time[0] ?? startDate}

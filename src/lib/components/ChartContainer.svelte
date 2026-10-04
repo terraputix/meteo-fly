@@ -24,6 +24,7 @@
     hour = $bindable(0),
     daylightOnly = $bindable(false),
     keyboardNavigationEnabled = false,
+    onContentHeightChange,
     onRetrySkewT,
     onClose,
   }: {
@@ -40,6 +41,7 @@
     hour?: number;
     daylightOnly?: boolean;
     keyboardNavigationEnabled?: boolean;
+    onContentHeightChange?: (height: number) => void;
     onRetrySkewT?: () => void;
     onClose?: () => void;
   } = $props();
@@ -58,6 +60,12 @@
   });
 
   let legendOpen = $state(false);
+  let bodyHeight = $state(0);
+  let controlsHeight = $state(0);
+
+  $effect(() => {
+    onContentHeightChange?.(bodyHeight + controlsHeight + 2);
+  });
 
   const cloudGradient =
     'linear-gradient(to right, rgba(100,120,145,0), rgba(100,120,145,0.45) 50%, rgba(100,120,145,0.85))';
@@ -82,7 +90,7 @@
   class="relative mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
 >
   <div class="min-h-0 flex-1 overflow-y-auto bg-white">
-    <div class="flex min-h-full flex-col px-2 pt-3 pb-1 sm:px-4 sm:pt-4 sm:pb-0">
+    <div bind:offsetHeight={bodyHeight} class="flex flex-col px-2 pt-3 pb-1 sm:min-h-full sm:px-4 sm:pt-4 sm:pb-0">
       <div class="mb-2 flex shrink-0 items-center justify-center">
         <div class="inline-flex rounded-xl bg-slate-100 p-1">
           <button
@@ -193,7 +201,10 @@
     </div>
   </div>
 
-  <div class="shrink-0 border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:px-5">
+  <div
+    bind:offsetHeight={controlsHeight}
+    class="shrink-0 border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:px-5"
+  >
     <BottomControls
       bind:selectedDay
       {startDate}
