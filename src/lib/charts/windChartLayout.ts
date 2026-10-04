@@ -1,4 +1,5 @@
 import type { MaxAltitude } from '#lib/meteo/types.js';
+import { strokeWidthScale } from '#lib/charts/scales.js';
 import type { WeatherModel } from '#lib/api/types.js';
 import type { ChartWorkerSuccessOutput } from '#lib/workers/chartWorker.types.js';
 import { getNativeLevelsForFetch, getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLevels.js';
@@ -16,6 +17,13 @@ export const RAIN_TOP = TEMP_BOTTOM_PX + RAIN_GAP;
 const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
 const WIND_GAP = 20;
 export const WIND_TOP = RAIN_BOTTOM_PX + WIND_GAP;
+export const WIND_ARROW_POINTS: ReadonlyArray<readonly [number, number]> = [
+  [0, 7],
+  [0, -7],
+  [3.15, -1.54],
+  [0, -7],
+  [-3.15, -1.54],
+];
 
 const SEA_LEVEL_PRESSURE_HPA = metersToHPaExact(0);
 export const WIND_REFERENCE_ALTITUDE = 4000;
@@ -70,17 +78,33 @@ export function buildWindChartLayout(
   ];
   const [tMin, tMax] = data.xDomain.map(Number);
   const duration = Math.max(1, tMax - tMin);
-  const pressureTop = metersToHPaExact(maxAltitude);
+  let pressureTop = metersToHPaExact(maxAltitude);
   const pressureBottom = SEA_LEVEL_PRESSURE_HPA;
   const [tempMin, tempMax] = temperatureRange(
     [...data.temperatureChartData.temperatureData, ...data.temperatureChartData.dewpointData].map((d) => d.value)
   );
   const x = (time: number) => left + ((time - tMin) / duration) * plotWidth;
   const timeAt = (px: number) => tMin + ((px - left) / Math.max(1, plotWidth)) * duration;
+  for (const wind of data.windData) {
+    if (![+wind.time, wind.pressure, wind.speed, wind.direction].every(Number.isFinite)) continue;
+    if (+wind.time < tMin || +wind.time > tMax || wind.pressure > pressureBottom) continue;
+    const rotation = windRotation(wind.direction);
+    const topExtent =
+      -Math.min(...WIND_ARROW_POINTS.map(([ax, ay]) => ax * Math.sin(rotation) + ay * Math.cos(rotation))) +
+      strokeWidthScale(wind.speed) / 2 +
+      0.5;
+    const plotHeight = panels[2].height;
+    if (topExtent >= plotHeight) continue;
+    // Solve pressureY(level) >= topExtent, including the rescaled pressure range.
+    pressureTop = Math.min(
+      pressureTop,
+      (plotHeight * wind.pressure - topExtent * pressureBottom) / (plotHeight - topExtent)
+    );
+  }
   const pressureY = (pressure: number) =>
-    WIND_TOP + ((pressure - pressureTop) / (pressureBottom - pressureTop)) * panels[2].height;
+    panels[2].top + ((pressure - pressureTop) / (pressureBottom - pressureTop)) * panels[2].height;
   const pressureAt = (py: number) =>
-    pressureTop + ((py - WIND_TOP) / panels[2].height) * (pressureBottom - pressureTop);
+    pressureTop + ((py - panels[2].top) / panels[2].height) * (pressureBottom - pressureTop);
   const temperatureY = (value: number) => TEMP_TOP + ((tempMax - value) / (tempMax - tempMin)) * TEMP_HEIGHT_PX;
   const humidityY = (value: number) => TEMP_TOP + (1 - value / 100) * TEMP_HEIGHT_PX;
   const lclPoints: ChartPoint[] = data.lcl.map((point) => [

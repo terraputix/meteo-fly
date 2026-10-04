@@ -11,6 +11,7 @@ import {
   RAIN_HEIGHT_PX,
   TEMP_TOP,
   TEMP_HEIGHT_PX,
+  WIND_ARROW_POINTS,
   type ChartPoint,
   type PreparedWindChart,
   type WindChartLayout,
@@ -249,18 +250,17 @@ export function renderWindChart(
     ctx.lineJoin = 'round';
     for (const wind of data.windData) {
       if (![+wind.time, wind.pressure, wind.speed, wind.direction].every(Number.isFinite)) continue;
+      const arrowX = x(+wind.time);
+      const arrowY = pressureY(wind.pressure);
       ctx.save();
-      ctx.translate(x(+wind.time), pressureY(wind.pressure));
+      ctx.translate(arrowX, arrowY);
       ctx.rotate(windRotation(wind.direction));
       ctx.strokeStyle = windColorScale(wind.speed);
       ctx.lineWidth = strokeWidthScale(wind.speed);
       ctx.globalAlpha = wind.source === 'interpolated' ? 0.4 : 1;
       ctx.beginPath();
-      ctx.moveTo(0, 7);
-      ctx.lineTo(0, -7);
-      ctx.lineTo(3.15, -1.54);
-      ctx.moveTo(0, -7);
-      ctx.lineTo(-3.15, -1.54);
+      ctx.moveTo(...WIND_ARROW_POINTS[0]);
+      for (let i = 1; i < WIND_ARROW_POINTS.length; i++) ctx.lineTo(...WIND_ARROW_POINTS[i]);
       ctx.stroke();
       ctx.restore();
     }
@@ -334,16 +334,19 @@ export function renderWindChart(
       text(ctx, `${level.hPa}hPa`, left - 8, pressureY(level.hPa), 'right', '#666', 9);
   }
   const wind = layout.panels[2];
-  line(ctx, left, wind.top, left, wind.top + wind.height, colors.axisLine);
-  line(ctx, right, wind.top, right, wind.top + wind.height, colors.axisLine);
-  for (const panel of layout.panels)
-    line(ctx, left, panel.top + panel.height, right, panel.top + panel.height, colors.axisLine);
+  const windBottom = wind.top + wind.height;
+  line(ctx, left, wind.top - WIND_ARROW_POINTS, left, windBottom, colors.axisLine);
+  line(ctx, right, wind.top - WIND_ARROW_POINTS, right, windBottom, colors.axisLine);
+  for (const [index, panel] of layout.panels.entries()) {
+    const bottom = index === 2 ? windBottom : panel.top + panel.height;
+    line(ctx, left, bottom, right, bottom, colors.axisLine);
+  }
   for (const time of layout.timeTicks) {
-    const y = wind.top + wind.height;
+    const y = windBottom;
     line(ctx, x(time), y, x(time), y + 5, colors.axisLine);
     text(ctx, fmtTime(new Date(time), data.timezone), x(time), y + 14, 'center');
   }
-  text(ctx, `Time [${data.timezoneAbbr}]`, (left + right) / 2, wind.top + wind.height + 32, 'center');
+  text(ctx, `Time [${data.timezoneAbbr}]`, (left + right) / 2, windBottom + 32, 'center');
   ctx.restore();
 }
 

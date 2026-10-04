@@ -8,9 +8,11 @@ import {
   TEMP_TOP,
   RAIN_TOP,
   WIND_TOP,
+  WIND_ARROW_POINTS,
   type PreparedWindChart,
 } from '#lib/charts/windChartLayout.js';
 import { metersToHPaExact } from '#lib/meteo/pressureLevels.js';
+import { strokeWidthScale } from '#lib/charts/scales.js';
 
 const time = new Date('2026-07-16T10:00:00Z');
 const data: PreparedWindChart = {
@@ -33,12 +35,38 @@ const data: PreparedWindChart = {
 };
 
 describe('wind chart layout', () => {
+  it.each([0, 45, 90, 180, 270])('extends the pressure domain just enough for a top arrow at %i°', (direction) => {
+    const pressure = metersToHPaExact(4000);
+    const fixture = {
+      ...data,
+      windData: [{ time, pressure, height: 4000, speed: 80, direction, source: 'model' as const }],
+    };
+    const layout = buildWindChartLayout(fixture, 960, 700, 4000, 'icon_seamless');
+    const rotation = windRotation(direction);
+    const tip = Math.min(...WIND_ARROW_POINTS.map(([x, y]) => x * Math.sin(rotation) + y * Math.cos(rotation)));
+    expect(layout.pressureY(pressure) + tip - strokeWidthScale(80) / 2).toBeCloseTo(WIND_TOP + 0.5);
+    expect(layout.pressureAt(layout.pressureY(pressure))).toBeCloseTo(pressure);
+    expect(layout.panels[2].top).toBe(WIND_TOP);
+    expect(layout.x(+data.xDomain[0])).toBe(layout.left);
+  });
+
+  it('keeps the requested ceiling when the arrows already fit', () => {
+    const fixture = {
+      ...data,
+      windData: [{ time, pressure: 850, height: 1500, speed: 80, direction: 0, source: 'model' as const }],
+    };
+    const layout = buildWindChartLayout(fixture, 960, 700, 4000, 'icon_seamless');
+    expect(layout.pressureAt(WIND_TOP)).toBeCloseTo(metersToHPaExact(4000));
+  });
+
   it('maps time and pressure reversibly with low pressure at the top', () => {
     const l = buildWindChartLayout(data, 960, 700, 4000, 'icon_seamless');
     expect(l.timeAt(l.x(+time))).toBe(+time);
     expect(l.pressureAt(l.pressureY(850))).toBeCloseTo(850);
     expect(l.pressureY(metersToHPaExact(4000))).toBe(WIND_TOP);
     expect(l.pressureY(metersToHPaExact(0))).toBe(658);
+    expect(l.x(+data.xDomain[0])).toBe(l.left);
+    expect(l.x(+data.xDomain[1])).toBe(l.right);
     expect(l.hitTest(l.x(+time), TEMP_TOP + 5)?.gridIndex).toBe(0);
     expect(l.hitTest(l.x(+time), RAIN_TOP + 5)?.gridIndex).toBe(1);
     expect(l.hitTest(l.x(+time), l.pressureY(850))).toMatchObject({
