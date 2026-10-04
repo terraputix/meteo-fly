@@ -59,8 +59,15 @@ function text(
   ctx.fillText(value, x, y);
 }
 
-function traceSmoothSegment(ctx: CanvasRenderingContext2D, points: ChartPoint[], start = 0, end = points.length) {
-  ctx.moveTo(...points[start]);
+function traceSmoothSegment(
+  ctx: CanvasRenderingContext2D,
+  points: ChartPoint[],
+  start = 0,
+  end = points.length,
+  connect = false
+) {
+  if (connect) ctx.lineTo(...points[start]);
+  else ctx.moveTo(...points[start]);
   for (let i = start; i < end - 1; i++) {
     const [a, b] = curveControls(
       points[Math.max(start, i - 1)],
@@ -224,29 +231,30 @@ export function renderWindChart(
         const from = +first.x1;
         const to = +last.x2;
         if (to > from) {
-          const baseline = RAIN_TOP + (1 - first.y2) * RAIN_HEIGHT_PX;
           const bandHeight = (first.y2 - first.y1) * RAIN_HEIGHT_PX;
+          const center = RAIN_TOP + (1 - (first.y1 + first.y2) / 2) * RAIN_HEIGHT_PX;
           const points: ChartPoint[] = [];
           const fill = ctx.createLinearGradient(x(from), 0, x(to), 0);
           for (let i = start; i < end; i++) {
             const sample = samples[i];
             const time = (+sample.x1 + +sample.x2) / 2;
             const cover = Math.max(0, Math.min(100, sample.cloudCover));
-            points.push([x(time), baseline + (cover / 100) * bandHeight]);
+            points.push([x(time), center - ((cover / 100) * bandHeight) / 2]);
             fill.addColorStop((time - from) / (to - from), `${colors.cloudRect}${cover / 100})`);
           }
           points.unshift([x(from), points[0][1]]);
           points.push([x(to), points[points.length - 1][1]]);
+          const lowerPoints: ChartPoint[] = points.map(([px, py]) => [px, 2 * center - py]).reverse();
           ctx.beginPath();
           traceSmoothSegment(ctx, points);
-          ctx.lineTo(x(to), baseline);
-          ctx.lineTo(x(from), baseline);
+          traceSmoothSegment(ctx, lowerPoints, 0, lowerPoints.length, true);
           ctx.closePath();
           ctx.fillStyle = fill;
           ctx.fill();
           ctx.beginPath();
           traceSmoothSegment(ctx, points);
-          ctx.strokeStyle = `${colors.cloudRect}0.8)`;
+          traceSmoothSegment(ctx, lowerPoints);
+          ctx.strokeStyle = fill;
           ctx.lineWidth = 1;
           ctx.setLineDash([]);
           ctx.stroke();
