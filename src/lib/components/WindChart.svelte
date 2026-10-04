@@ -7,7 +7,7 @@
     type PreparedWindChart,
     type WindChartLayout,
   } from '#lib/charts/windChartLayout.js';
-  import { renderWindChart, renderWindChartOverlay } from '#lib/charts/windChartRenderer.js';
+  import { renderWindChart, renderWindChartOverlay, type WindAxisUnit } from '#lib/charts/windChartRenderer.js';
   import { getWindChartSize } from '#lib/charts/chartSizing.js';
   import type { WindChartData } from '#lib/api/types.js';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '#lib/workers/chartWorker.types.js';
@@ -34,6 +34,7 @@
 
   let isRendering = $state(false);
   let renderError = $state('');
+  let axisUnit = $state<WindAxisUnit>('m');
 
   let isBusy = $derived(isLoading || isRendering);
 
@@ -47,6 +48,7 @@
     model: WeatherModel;
     daylightOnly: boolean;
     loading: boolean;
+    axisUnit: WindAxisUnit;
   };
 
   function renderChart(node: HTMLElement, params: RenderChartParams) {
@@ -88,7 +90,7 @@
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Canvas 2D is unavailable');
         layout = buildWindChartLayout(prepared, node.clientWidth, node.clientHeight, params.maxAltitude, params.model);
-        renderWindChart(ctx, prepared, layout);
+        renderWindChart(ctx, prepared, layout, params.axisUnit);
       } catch (error) {
         layout = null;
         renderError = 'Unable to draw the weather chart.';
@@ -213,13 +215,24 @@
       const pressure =
         hit.hoveredWindPressure == null ? null : snapToNearest(store.sortedWindPressures, hit.hoveredWindPressure);
       renderWindChartOverlay(ctx, layout, time, hit.gridIndex, pressure == null ? py : layout.pressureY(pressure));
-      tooltip.innerHTML = formatTooltip(store, hit, prepared.timezone, time);
+      const lclY = layout.lclYAt(px);
+      const windPanel = layout.panels[2];
+      const showLcl =
+        hit.gridIndex === 2 &&
+        lclY != null &&
+        lclY >= windPanel.top &&
+        lclY <= windPanel.top + windPanel.height &&
+        Math.abs(py - lclY) <= 10;
+      tooltip.innerHTML = formatTooltip(store, { ...hit, showLcl }, prepared.timezone, time);
       tooltip.hidden = false;
       const tooltipWidth = tooltip.offsetWidth;
       const tooltipHeight = tooltip.offsetHeight;
-      const preferredX = px + 14 + tooltipWidth <= rect.width ? px + 14 : px - tooltipWidth - 14;
+      const preferredX = px + 14 + tooltipWidth <= node.clientWidth ? px + 14 : px - tooltipWidth - 14;
+      const visibleTop = Math.max(0, -rect.top);
+      const visibleBottom = Math.min(node.clientHeight, window.innerHeight - rect.top);
+      const preferredY = py + 14 + tooltipHeight <= visibleBottom ? py + 14 : py - tooltipHeight - 14;
       tooltip.style.left = `${Math.max(0, Math.min(node.clientWidth - tooltipWidth, preferredX))}px`;
-      tooltip.style.top = `${Math.max(0, Math.min(node.clientHeight - tooltipHeight, py + 14))}px`;
+      tooltip.style.top = `${Math.max(visibleTop, Math.min(visibleBottom - tooltipHeight, preferredY))}px`;
     }
 
     function pointerMove(event: PointerEvent) {
@@ -248,6 +261,7 @@
 
     return {
       update(next: RenderChartParams) {
+        const axisChanged = next.axisUnit !== params.axisUnit;
         const changed =
           next.data !== params.data ||
           next.daylightOnly !== params.daylightOnly ||
@@ -256,6 +270,7 @@
         params = next;
         if (params.loading) clearSelection();
         if (changed) prepare();
+        else if (axisChanged) schedulePaint();
       },
       destroy() {
         destroyed = true;
@@ -287,7 +302,7 @@
 
     <label
       class="group absolute left-0 z-[5] flex h-5 w-[54px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
-      style="top: {WIND_TOP - 10}px;"
+      style="top: {WIND_TOP - 20}px;"
     >
       <select
         bind:value={maxAltitude}
@@ -321,8 +336,21 @@
       {/if}
     </button>
 
+    <button
+      type="button"
+      aria-pressed={axisUnit === 'hPa'}
+      aria-label="Use pressure scale instead of metres"
+      title={axisUnit === 'm' ? 'Switch scale to pressure (hPa)' : 'Switch scale to altitude (m)'}
+      class="absolute bottom-1 left-0 z-[5] flex h-6 w-[54px] items-center justify-center gap-1 rounded text-[10px] text-slate-500 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
+      onclick={() => (axisUnit = axisUnit === 'm' ? 'hPa' : 'm')}
+    >
+      <span class:font-semibold={axisUnit === 'm'} class:text-slate-800={axisUnit === 'm'}>m</span>
+      <span aria-hidden="true">/</span>
+      <span class:font-semibold={axisUnit === 'hPa'} class:text-slate-800={axisUnit === 'hPa'}>hPa</span>
+    </button>
+
     <div
-      use:renderChart={{ data: windChartData, maxAltitude, model, daylightOnly, loading: isLoading }}
+      use:renderChart={{ data: windChartData, maxAltitude, model, daylightOnly, loading: isLoading, axisUnit }}
       class="chart-content"
       style="opacity: {isBusy ? 0 : 1};"
     >
@@ -334,7 +362,7 @@
       <div
         role="tooltip"
         hidden
-        class="pointer-events-none absolute z-10 max-h-[80vh] max-w-[min(260px,100%)] overflow-y-auto rounded border border-[#ddd] bg-white/95 p-2 text-xs text-[#333] shadow-lg"
+        class="pointer-events-none absolute z-10 w-max max-w-full max-h-[80vh] overflow-y-auto rounded-md border border-slate-200/80 bg-white/95 px-2 py-1.5 text-[11px] leading-snug text-slate-700 shadow-lg shadow-slate-900/10 tabular-nums"
       ></div>
     </div>
     {#if renderError}

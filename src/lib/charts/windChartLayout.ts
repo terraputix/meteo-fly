@@ -83,6 +83,10 @@ export function buildWindChartLayout(
     pressureTop + ((py - WIND_TOP) / panels[2].height) * (pressureBottom - pressureTop);
   const temperatureY = (value: number) => TEMP_TOP + ((tempMax - value) / (tempMax - tempMin)) * TEMP_HEIGHT_PX;
   const humidityY = (value: number) => TEMP_TOP + (1 - value / 100) * TEMP_HEIGHT_PX;
+  const lclPoints: ChartPoint[] = data.lcl.map((point) => [
+    x(+point.time),
+    point.value == null ? NaN : pressureY(metersToHPaExact(point.value)),
+  ]);
   const nativeLevels = getNativeLevelsForModel(model, maxAltitude);
   const fetched = getNativeLevelsForFetch(model, maxAltitude);
   const bands = new Map(
@@ -131,12 +135,35 @@ export function buildWindChartLayout(
     pressureAt,
     temperatureY,
     humidityY,
+    lclPoints,
+    lclYAt: (px: number) => smoothLineYAt(lclPoints, px),
     hitTest,
   };
 }
 export type WindChartLayout = ReturnType<typeof buildWindChartLayout>;
 
 export type ChartPoint = [number, number];
+export function smoothLineYAt(points: ChartPoint[], x: number): number | null {
+  for (let i = 0; i < points.length - 1; i++) {
+    const start = points[i];
+    const end = points[i + 1];
+    if (!start.every(Number.isFinite) || !end.every(Number.isFinite) || x < start[0] || x > end[0]) continue;
+    if (end[0] <= start[0]) continue;
+    const previous = points[i - 1];
+    const next = points[i + 2];
+    const [a, b] = curveControls(
+      previous?.every(Number.isFinite) ? previous : start,
+      start,
+      end,
+      next?.every(Number.isFinite) ? next : end
+    );
+    const t = (x - start[0]) / (end[0] - start[0]);
+    const u = 1 - t;
+    return u ** 3 * start[1] + 3 * u ** 2 * t * a[1] + 3 * u * t ** 2 * b[1] + t ** 3 * end[1];
+  }
+  return null;
+}
+
 export function curveControls(
   previous: ChartPoint,
   start: ChartPoint,

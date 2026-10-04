@@ -81,6 +81,7 @@ export function buildTooltipStore(
 export interface ActiveState {
   gridIndex: number; // 0 | 1 | 2 | -1
   hoveredWindPressure: number | null;
+  showLcl?: boolean;
 }
 
 export function createActiveState(): ActiveState {
@@ -109,126 +110,87 @@ export function snapToNearest(sorted: number[], value: number): number | null {
   return sorted[lo];
 }
 
-/** Tiny helper to build an inline colour swatch for the tooltip. */
 function swatch(color: string, dashed = false): string {
-  if (dashed) {
-    return (
-      `<span style="display:inline-block;width:12px;height:0;` +
-      `border-top:2px dashed ${color};vertical-align:middle;margin-right:3px"></span>`
-    );
-  }
-  return (
-    `<span style="display:inline-block;width:12px;height:2px;` +
-    `background:${color};vertical-align:middle;margin-right:3px"></span>`
-  );
+  return `<span aria-hidden="true" class="inline-block w-3 shrink-0 border-t-2" style="border-color:${color};border-style:${dashed ? 'dashed' : 'solid'}"></span>`;
 }
 
-// ─── Formatter factory ──────────────────────────────────────────────────────
+function measurement(value: number | undefined, unit: string, decimals?: number): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `${decimals == null ? value : value.toFixed(decimals)}&nbsp;${unit}`;
+}
+
+function metricRow(label: string, value: string, color?: string, dashed = false): string {
+  return `<div class="flex items-center justify-between gap-3 py-0.5">
+    <span class="flex items-center gap-1.5 text-slate-500">${color ? swatch(color, dashed) : ''}${label}</span>
+    <span class="whitespace-nowrap font-medium text-slate-800">${value}</span>
+  </div>`;
+}
 
 export function formatTooltip(store: TooltipStore, active: ActiveState, timezone: string, hoveredTime: number): string {
   const snap = snapToNearest(store.sortedTimes, hoveredTime);
   if (snap == null) return '';
   const timeStr = fmtTime(new Date(snap), timezone);
-
   const { gridIndex, hoveredWindPressure } = active;
+  const panelLabel =
+    gridIndex === 0 ? 'Surface' : gridIndex === 1 ? 'Clouds & rain' : gridIndex === 2 ? 'Wind' : 'Forecast';
+  let html = `<div class="mb-1 flex items-center justify-between gap-3 border-b border-slate-100 pb-1">
+    <span class="font-semibold text-slate-900">${timeStr}</span>
+    <span class="text-[10px] font-medium text-slate-500">${panelLabel}</span>
+  </div>`;
 
-  let html =
-    `<div style="font-weight:600;margin-bottom:4px;padding-bottom:3px;` +
-    `border-bottom:1px solid #ddd;font-size:13px">🕐 ${timeStr}</div>`;
-
-  // ── Grid 0 – Temperature / Dewpoint / Humidity ──────────────────────────
   if (gridIndex === 0 || gridIndex === -1) {
     const td = store.tempByTime.get(snap);
     if (td) {
-      html += `<table style="border-collapse:collapse;width:100%;margin-bottom:4px">`;
-      html +=
-        `<tr><td style="padding:1px 4px 1px 0">` +
-        swatch(CHART_COLORS.temperature) +
-        `Temp</td><td style="text-align:right;font-weight:600">${td.temp.toFixed(1)}&nbsp;°C</td></tr>`;
-      html +=
-        `<tr><td style="padding:1px 4px 1px 0">` +
-        swatch(CHART_COLORS.dewpoint) +
-        `Dew</td><td style="text-align:right;font-weight:600">${td.dew.toFixed(1)}&nbsp;°C</td></tr>`;
-      html +=
-        `<tr><td style="padding:1px 4px 1px 0">` +
-        swatch(CHART_COLORS.humidity, true) +
-        `Humidity</td><td style="text-align:right;font-weight:600">${td.hum.toFixed(0)}&nbsp;%</td></tr>`;
-      html += `</table>`;
+      html += metricRow('Temperature', measurement(td.temp, '°C', 1), CHART_COLORS.temperature);
+      html += metricRow('Dewpoint', measurement(td.dew, '°C', 1), CHART_COLORS.dewpoint);
+      html += metricRow('Humidity', measurement(td.hum, '%', 0), CHART_COLORS.humidity, true);
     }
   }
 
-  // ── Grid 1 – Rain / Cloud cover bands ──────────────────────────────────
   if (gridIndex === 1 || gridIndex === -1) {
-    const low = store.cloudLowByTime.get(snap);
-    const mid = store.cloudMidByTime.get(snap);
-    const high = store.cloudHighByTime.get(snap);
-    if (low != null || mid != null || high != null) {
-      html += `<table style="border-collapse:collapse;width:100%;margin-bottom:4px">`;
-      if (high != null)
-        html += `<tr><td style="padding:1px 4px 1px 0">☁️ High cloud</td><td style="text-align:right;font-weight:600">${high}&nbsp;%</td></tr>`;
-      if (mid != null)
-        html += `<tr><td style="padding:1px 4px 1px 0">☁️ Mid cloud</td><td style="text-align:right;font-weight:600">${mid}&nbsp;%</td></tr>`;
-      if (low != null)
-        html += `<tr><td style="padding:1px 4px 1px 0">☁️ Low cloud</td><td style="text-align:right;font-weight:600">${low}&nbsp;%</td></tr>`;
-
-      html += `</table>`;
+    for (const [label, values] of [
+      ['High cloud', store.cloudHighByTime],
+      ['Mid cloud', store.cloudMidByTime],
+      ['Low cloud', store.cloudLowByTime],
+    ] as const) {
+      const cover = values.get(snap);
+      if (cover != null) html += metricRow(label, measurement(cover, '%', 0));
     }
     const rain = store.rainByTime.get(snap);
-    if (rain != null && rain !== 0) {
-      html += `<div style="margin-bottom:3px">💧 Rain:&nbsp;<b>${rain.toFixed(1)}&nbsp;mm/h</b></div>`;
+    if (rain != null) {
+      html += `<div class="mt-1 border-t border-slate-100 pt-1">${metricRow('Rain', measurement(rain, 'mm/h', 1), CHART_COLORS.rain)}</div>`;
     }
   }
 
-  // ── Grid 2 – Wind field ─────────────────────────────────────────────────
   if (gridIndex === 2 || gridIndex === -1) {
-    // LCL line lives in the wind grid.
-    const cb = store.lclByTime.get(snap);
-    if (cb != null) {
-      html +=
-        `<div style="margin-bottom:3px">` +
-        swatch(CHART_COLORS.lcl) +
-        `LCL:&nbsp;<b>${Math.round(cb)}&nbsp;m</b></div>`;
+    const nearestPressure =
+      hoveredWindPressure == null ? null : snapToNearest(store.sortedWindPressures, hoveredWindPressure);
+    const pressures =
+      gridIndex === 2 && hoveredWindPressure != null
+        ? nearestPressure == null
+          ? []
+          : [nearestPressure]
+        : [...store.sortedWindPressures].reverse();
+    for (const pressure of pressures) {
+      const wind = store.windByTimePressure.get(`${snap}_${pressure}`);
+      if (!wind) continue;
+      html += `<div class="py-0.5">
+        <div class="flex items-center gap-1.5 text-[10px] text-slate-500">
+          <span>${pressure}&nbsp;hPa</span>
+          <span aria-hidden="true" class="text-slate-300">·</span>
+          <span>≈${measurement(wind.height, 'm')}</span>
+        </div>
+        <div class="flex items-center justify-between gap-3 py-0.5">
+          <span class="flex items-center gap-1.5 font-semibold text-slate-900">
+            ${swatch(windColorScale(wind.speed))}${measurement(wind.speed, 'km/h')}
+          </span>
+          <span class="text-slate-600">from ${wind.direction}°</span>
+        </div>
+      </div>`;
     }
-
-    if (gridIndex === 2 && hoveredWindPressure != null) {
-      const nearestPressure = snapToNearest(store.sortedWindPressures, hoveredWindPressure);
-      if (nearestPressure != null) {
-        const w = store.windByTimePressure.get(`${snap}_${nearestPressure}`);
-        if (w) {
-          const col = windColorScale(w.speed);
-          html += `<div style="margin-top:4px;padding-top:3px;border-top:1px solid #eee">`;
-          html += `<table style="border-collapse:collapse;width:100%">`;
-          html +=
-            `<tr>` +
-            `<td style="padding:0 4px 0 0;color:#666">${w.height}&nbsp;m</td>` +
-            `<td style="color:${col};font-weight:600;text-align:right">${w.speed}&nbsp;km/h</td>` +
-            `<td style="color:#555;text-align:right;padding-left:6px">${w.direction}°</td>` +
-            `</tr>`;
-          html += `</table></div>`;
-        }
-      }
-    } else {
-      // Fallback (unknown grid): show all levels in a compact table.
-      const entries: { height: number; speed: number; direction: number }[] = [];
-      for (const pressure of [...store.sortedWindPressures].reverse()) {
-        const w = store.windByTimePressure.get(`${snap}_${pressure}`);
-        if (w) entries.push(w);
-      }
-      if (entries.length) {
-        html += `<div style="margin-top:4px;padding-top:3px;border-top:1px solid #eee;font-size:11px">`;
-        html += `<b>Wind at ${timeStr}</b>`;
-        html += `<table style="border-collapse:collapse;width:100%;margin-top:2px">`;
-        for (const e of entries) {
-          const col = windColorScale(e.speed);
-          html +=
-            `<tr>` +
-            `<td style="padding:0 4px 0 0;color:#666">${e.height}&nbsp;m</td>` +
-            `<td style="color:${col};font-weight:600;text-align:right">${e.speed}&nbsp;km/h</td>` +
-            `<td style="color:#555;text-align:right;padding-left:6px">${e.direction}°</td>` +
-            `</tr>`;
-        }
-        html += `</table></div>`;
-      }
+    const cb = store.lclByTime.get(snap);
+    if (cb != null && gridIndex === 2 && active.showLcl) {
+      html += `<div class="mt-1 border-t border-slate-100 pt-1">${metricRow('LCL', measurement(cb, 'm', 0), CHART_COLORS.lcl)}</div>`;
     }
   }
 

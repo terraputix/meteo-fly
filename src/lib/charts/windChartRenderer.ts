@@ -124,7 +124,14 @@ function daylightMarker(ctx: CanvasRenderingContext2D, x: number, y: number, sun
   ctx.restore();
 }
 
-export function renderWindChart(ctx: CanvasRenderingContext2D, data: PreparedWindChart, layout: WindChartLayout) {
+export type WindAxisUnit = 'm' | 'hPa';
+
+export function renderWindChart(
+  ctx: CanvasRenderingContext2D,
+  data: PreparedWindChart,
+  layout: WindChartLayout,
+  axisUnit: WindAxisUnit = 'm'
+) {
   const { left, right, x, pressureY, temperatureY, humidityY } = layout;
   ctx.save();
   ctx.clearRect(0, 0, layout.width, layout.height);
@@ -217,9 +224,11 @@ export function renderWindChart(ctx: CanvasRenderingContext2D, data: PreparedWin
   );
 
   clipPanel(ctx, layout, 2, () => {
-    for (let altitude = 0; altitude <= layout.maxAltitude; altitude += 500) {
-      const y = pressureY(metersToHPaExact(altitude));
-      line(ctx, left, y, right, y, colors.gridLine);
+    if (axisUnit === 'm') {
+      for (let altitude = 0; altitude <= layout.maxAltitude; altitude += 500) {
+        const y = pressureY(metersToHPaExact(altitude));
+        line(ctx, left, y, right, y, colors.gridLine);
+      }
     }
     for (const cloud of data.cloudData) {
       const band = layout.bands.get(cloud.pressure);
@@ -229,10 +238,11 @@ export function renderWindChart(ctx: CanvasRenderingContext2D, data: PreparedWin
       const x2 = x(+cloud.time + 1_800_000);
       ctx.fillRect(x1 - 0.5, pressureY(band.top), x2 - x1 + 1, pressureY(band.bottom) - pressureY(band.top));
     }
-    for (const level of layout.nativeLevels) {
-      const y = pressureY(level.hPa);
-      line(ctx, left, y, right, y, 'rgba(160,160,160,0.35)', 0.8, [4, 3]);
-      text(ctx, `${level.hPa}hPa`, right - 3, y - 6, 'right', '#888', 9);
+    if (axisUnit === 'hPa') {
+      for (const level of layout.nativeLevels) {
+        const y = pressureY(level.hPa);
+        line(ctx, left, y, right, y, 'rgba(160,160,160,0.35)', 0.8, [4, 3]);
+      }
     }
     ctx.setLineDash([]);
     ctx.lineCap = 'round';
@@ -254,11 +264,7 @@ export function renderWindChart(ctx: CanvasRenderingContext2D, data: PreparedWin
       ctx.stroke();
       ctx.restore();
     }
-    drawSmoothLine(
-      ctx,
-      data.lcl.map((d) => [x(+d.time), d.value == null ? NaN : pressureY(metersToHPaExact(d.value))]),
-      colors.lcl
-    );
+    drawSmoothLine(ctx, layout.lclPoints, colors.lcl);
     const windPanel = layout.panels[2];
     const labelHeight = 12;
     const labelGap = 2;
@@ -320,8 +326,13 @@ export function renderWindChart(ctx: CanvasRenderingContext2D, data: PreparedWin
       text(ctx, annotation.label, annotation.x, annotation.labelY, 'left', annotation.color, 9);
     }
   });
-  for (let altitude = 0; altitude < layout.maxAltitude; altitude += 500)
-    text(ctx, `${altitude}m`, left - 8, pressureY(metersToHPaExact(altitude)), 'right', '#666', 10);
+  if (axisUnit === 'm') {
+    for (let altitude = 0; altitude < layout.maxAltitude; altitude += 500)
+      text(ctx, `${altitude}m`, left - 8, pressureY(metersToHPaExact(altitude)), 'right', '#666', 10);
+  } else {
+    for (const level of layout.nativeLevels)
+      text(ctx, `${level.hPa}hPa`, left - 8, pressureY(level.hPa), 'right', '#666', 9);
+  }
   const wind = layout.panels[2];
   line(ctx, left, wind.top, left, wind.top + wind.height, colors.axisLine);
   line(ctx, right, wind.top, right, wind.top + wind.height, colors.axisLine);

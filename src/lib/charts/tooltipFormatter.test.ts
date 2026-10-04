@@ -90,10 +90,11 @@ describe('canvas tooltip selection', () => {
     expect(rain).toContain('35&nbsp;%');
     expect(rain).toContain('2.0');
     expect(rain).not.toContain('Temp');
-    const wind = formatTooltip(store, { gridIndex: 2, hoveredWindPressure: 910 }, 'UTC', +time);
+    const wind = formatTooltip(store, { gridIndex: 2, hoveredWindPressure: 910, showLcl: true }, 'UTC', +time);
     expect(wind).toContain('1800');
     expect(wind).toContain('988');
     expect(wind).not.toContain('Humidity');
+    expect(formatTooltip(store, { gridIndex: 2, hoveredWindPressure: 910 }, 'UTC', +time)).not.toContain('LCL');
   });
 
   it('returns no tooltip when the hourly timeline is empty', () => {
