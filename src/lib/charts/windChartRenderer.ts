@@ -244,7 +244,7 @@ export function renderWindChart(
           }
           points.unshift([x(from), points[0][1]]);
           points.push([x(to), points[points.length - 1][1]]);
-          const lowerPoints: ChartPoint[] = points.map(([px, py]) => [px, 2 * center - py]).reverse();
+          const lowerPoints = points.map<ChartPoint>(([px, py]) => [px, 2 * center - py]).reverse();
           ctx.beginPath();
           traceSmoothSegment(ctx, points);
           traceSmoothSegment(ctx, lowerPoints, 0, lowerPoints.length, true);
@@ -414,8 +414,8 @@ export function renderWindChart(
   }
   const wind = layout.panels[2];
   const windBottom = wind.top + wind.height;
-  line(ctx, left, wind.top - WIND_ARROW_POINTS, left, windBottom, colors.axisLine);
-  line(ctx, right, wind.top - WIND_ARROW_POINTS, right, windBottom, colors.axisLine);
+  line(ctx, left, wind.top, left, windBottom, colors.axisLine);
+  line(ctx, right, wind.top, right, windBottom, colors.axisLine);
   for (const [index, panel] of layout.panels.entries()) {
     const bottom = index === 2 ? windBottom : panel.top + panel.height;
     line(ctx, left, bottom, right, bottom, colors.axisLine);
