@@ -95,7 +95,7 @@
 </script>
 
 <div
-  class="relative mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
+  class="relative mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
 >
   <div class="min-h-0 flex-1 overflow-y-auto bg-white">
     <div
