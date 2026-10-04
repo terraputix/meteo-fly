@@ -182,7 +182,8 @@
                 prepared.temperatureChartData,
                 prepared.rainCloudChartData,
                 prepared.windData,
-                prepared.lcl
+                prepared.lcl,
+                prepared.cloudData
               );
               schedulePaint();
             } catch (error) {

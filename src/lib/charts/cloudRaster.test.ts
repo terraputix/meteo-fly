@@ -42,7 +42,14 @@ function strongestAlpha(raster: CloudRaster, fixed: { time: number } | { pressur
 describe('cloud raster', () => {
   it.each([
     [0, 0],
-    [24, 0],
+    [0.1, 26],
+    [1, 26],
+    [4, 26],
+    [5, 26],
+    [5.1, 26],
+    [9, 26],
+    [10, 26],
+    [24, 26],
     [25, 51],
     [49, 51],
     [50, 102],
@@ -71,7 +78,9 @@ describe('cloud raster', () => {
     expect(strongestAlpha(raster, { pressure: level + gap * 0.1 })).toBe(179);
     expect(strongestAlpha(raster, { pressure: level + gap * 0.4 })).toBe(102);
     expect(strongestAlpha(raster, { pressure: level + gap * 0.65 })).toBe(51);
-    expect(strongestAlpha(raster, { pressure: level + gap * 0.9 })).toBe(0);
+    expect(strongestAlpha(raster, { pressure: level + gap * 0.85 })).toBe(26);
+    expect(strongestAlpha(raster, { pressure: level + gap * 0.97 })).toBe(26);
+    expect(strongestAlpha(raster, { pressure: level + gap * 1.1 })).toBe(0);
   });
 
   it('uses stable large holes with coverage matching cover and solid fill at 100 percent', () => {

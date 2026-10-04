@@ -1,5 +1,30 @@
 import type { PressureLevel, WindData } from './types';
 
+const COMPASS_DIRECTIONS = [
+  'N',
+  'NNE',
+  'NE',
+  'ENE',
+  'E',
+  'ESE',
+  'SE',
+  'SSE',
+  'S',
+  'SSW',
+  'SW',
+  'WSW',
+  'W',
+  'WNW',
+  'NW',
+  'NNW',
+] as const;
+
+export function windDirectionLabel(direction: number): string {
+  if (!Number.isFinite(direction)) return '—';
+  const degrees = ((direction % 360) + 360) % 360;
+  return COMPASS_DIRECTIONS[Math.round(degrees / 22.5) % COMPASS_DIRECTIONS.length];
+}
+
 export function interpolateWind(
   height: number,
   lower: PressureLevel,

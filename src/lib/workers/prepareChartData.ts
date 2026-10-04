@@ -116,6 +116,7 @@ export function prepareChartData(input: ChartWorkerInput): ChartWorkerSuccessOut
   const xDomain = calculateDomains(data.hourly.time);
 
   return {
+    cloudData,
     cloudRaster: buildCloudRaster(cloudData, data.hourly.time, xDomain, model, maxAltitude),
     windData: getWindFieldAllLevels(data, model, maxAltitude),
     lcl: calculateLclWeather(data),

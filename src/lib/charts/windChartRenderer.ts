@@ -278,13 +278,29 @@ export function renderWindChart(
   );
 
   clipPanel(ctx, layout, 2, () => {
+    const windPanel = layout.panels[2];
+    const cutoffPressure = metersToHPaExact(
+      data.modelGridElevation != null && Number.isFinite(data.modelGridElevation)
+        ? data.modelGridElevation
+        : data.elevation
+    );
     const raster = data.cloudRaster;
     if (cloudImage && raster) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(
+        left,
+        windPanel.top,
+        layout.plotWidth,
+        Math.max(0, Math.min(windPanel.height, pressureY(cutoffPressure) - windPanel.top))
+      );
+      ctx.clip();
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       const top = pressureY(raster.pressureTop);
       const start = x(+data.xDomain[0]);
       ctx.drawImage(cloudImage, start, top, x(+data.xDomain[1]) - start, pressureY(raster.pressureBottom) - top);
+      ctx.restore();
     }
     if (axisUnit === 'm') {
       for (let altitude = 0; altitude <= layout.maxAltitude; altitude += 500) {
@@ -301,11 +317,6 @@ export function renderWindChart(
     ctx.setLineDash([]);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    const cutoffPressure = metersToHPaExact(
-      data.modelGridElevation != null && Number.isFinite(data.modelGridElevation)
-        ? data.modelGridElevation
-        : data.elevation
-    );
     for (const wind of data.windData) {
       if (![+wind.time, wind.pressure, wind.speed, wind.direction].every(Number.isFinite)) continue;
       const arrowX = x(+wind.time);
@@ -337,7 +348,6 @@ export function renderWindChart(
       ctx.restore();
     }
     drawSmoothLine(ctx, layout.lclPoints, colors.lcl);
-    const windPanel = layout.panels[2];
     const labelHeight = 12;
     const labelGap = 2;
     const labelOffset = labelHeight / 2 + labelGap;

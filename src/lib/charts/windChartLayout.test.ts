@@ -16,6 +16,7 @@ import { windMarkerStrokeWidth, WIND_MARKER_OUTLINE_WIDTH, CALM_WIND_RADIUS } fr
 
 const time = new Date('2026-07-16T10:00:00Z');
 const data: PreparedWindChart = {
+  cloudData: [],
   cloudRaster: null,
   temperatureChartData: {
     temperatureData: [{ time, value: 20 }],

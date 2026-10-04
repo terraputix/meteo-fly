@@ -5,6 +5,7 @@ import { getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLe
 import { CHART_COLORS } from '#lib/charts/chartColors.js';
 
 const CONTOUR_BANDS = [
+  { minimum: 0, alpha: 26 },
   { minimum: 25, alpha: 51 },
   { minimum: 50, alpha: 102 },
   { minimum: 75, alpha: 179 },
@@ -114,7 +115,7 @@ export function buildCloudRaster(
       const offset = (y * width + x) * 4;
       pixels.set(CHART_COLORS.windCloudRgb, offset);
       const cloudCover = cover / weight;
-      if (cloudCover + 1e-6 < CONTOUR_BANDS[0].minimum) continue;
+      if (cloudCover <= 0) continue;
       const holeOpacity = cloudHoleOpacity(x, y, cloudCover);
       for (const band of CONTOUR_BANDS) {
         if (cloudCover + 1e-6 < band.minimum) break;

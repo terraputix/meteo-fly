@@ -1,9 +1,10 @@
 import type { TemperatureChartData, RainCloudChartData } from '#lib/workers/chartWorker.types.js';
 import type { WindFieldLevel } from '#lib/charts/wind.js';
-import { windColorScale } from '#lib/charts/scales.js';
+import { windDirectionLabel } from '#lib/meteo/wind.js';
 import { CHART_COLORS } from '#lib/charts/chartColors.js';
 import { fmtTime } from '#lib/helpers.js';
 import type { LclPoint } from '#lib/meteo/lcl.js';
+import type { CloudCoverData } from '#lib/charts/clouds.js';
 
 // ─── Tooltip store ──────────────────────────────────────────────────────────
 // Pre-built look-up maps keyed by timestamp so the formatter is O(1).
@@ -18,13 +19,16 @@ export interface TooltipStore {
   lclByTime: Map<number, number>;
   windByTimePressure: Map<string, { height: number; speed: number; direction: number }>;
   sortedWindPressures: number[];
+  cloudByTimePressure: Map<string, number>;
+  sortedCloudPressures: number[];
 }
 
 export function buildTooltipStore(
   tempData: TemperatureChartData,
   rainData: RainCloudChartData,
   windData: WindFieldLevel[],
-  cloudBase: LclPoint[]
+  cloudBase: LclPoint[],
+  cloudData: CloudCoverData[] = []
 ): TooltipStore {
   const tempByTime = new Map<number, { temp: number; dew: number; hum: number }>();
   tempData.temperatureData.forEach((d, i) => {
@@ -65,6 +69,9 @@ export function buildTooltipStore(
     windPressuresSet.add(w.pressure);
   });
 
+  const cloudByTimePressure = new Map(cloudData.map((cloud) => [`${+cloud.time}_${cloud.pressure}`, cloud.value]));
+  const sortedCloudPressures = [...new Set(cloudData.map((cloud) => cloud.pressure))].sort((a, b) => a - b);
+
   return {
     sortedTimes: Array.from(tempByTime.keys()).sort((a, b) => a - b),
     tempByTime,
@@ -75,6 +82,8 @@ export function buildTooltipStore(
     lclByTime,
     windByTimePressure,
     sortedWindPressures: Array.from(windPressuresSet).sort((a, b) => a - b),
+    cloudByTimePressure,
+    sortedCloudPressures,
   };
 }
 
@@ -181,12 +190,17 @@ export function formatTooltip(store: TooltipStore, active: ActiveState, timezone
           <span>≈${measurement(wind.height, 'm')}</span>
         </div>
         <div class="flex items-center justify-between gap-3 py-0.5">
-          <span class="flex items-center gap-1.5 font-semibold text-slate-900">
-            ${swatch(windColorScale(wind.speed))}${measurement(wind.speed, 'km/h')}
+          <span class="font-semibold text-slate-900">
+            ${measurement(wind.speed, 'km/h')}
           </span>
-          <span class="text-slate-600">from ${wind.direction}°</span>
+          <span class="text-slate-600">${windDirectionLabel(wind.direction)} (${wind.direction}°)</span>
         </div>
       </div>`;
+      const cloudPressure = snapToNearest(store.sortedCloudPressures, pressure);
+      const cloudCover = cloudPressure == null ? undefined : store.cloudByTimePressure.get(`${snap}_${cloudPressure}`);
+      const cloudLabel =
+        cloudPressure != null && cloudPressure !== pressure ? `Cloud (${cloudPressure} hPa)` : 'Cloud cover';
+      html += metricRow(cloudLabel, measurement(cloudCover, '%', 0));
     }
     const cb = store.lclByTime.get(snap);
     if (cb != null && gridIndex === 2 && active.showLcl) {
