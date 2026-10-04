@@ -21,13 +21,13 @@
   let parameters: PageParameters = $state(
     getInitialParameters(browser ? page.url.searchParams : new URLSearchParams())
   );
-  let showChart = $state(false);
+  let showChart = $state(true);
   let routerReady = $state(false);
   let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
   let selectedHour = $state(parameters.hour ?? 0);
   let windChartData = $state.raw<WindChartData | null>(null);
   let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
-  let isWindChartLoading = $state(false);
+  let isWindChartLoading = $state(true);
   let isSkewTLoading = $state(false);
   let windOutdatedCachedAt: number | null = $state(null);
   let skewTOutdatedCachedAt: number | null = $state(null);
@@ -35,7 +35,10 @@
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
   let panelTransitionTimer: ReturnType<typeof setTimeout> | null = null;
   let chartPane: PaneAPI | undefined;
-  let renderChartPanel = $state(false);
+  let renderChartPanel = $state(true);
+  let chartPanelReady = $state(false);
+  let chartContainer = $state<ChartContainer>();
+  let pageElement: HTMLDivElement;
   let isChartPaneDragging = $state(false);
   let viewportHeight = $state(0);
   let chartContentHeight = $state(0);
@@ -151,16 +154,19 @@
     renderChartPanel = true;
     if (showChart) return;
     fitMobileChart = true;
+    chartPanelReady = false;
 
     await tick();
-    showChart = true;
-    await tick();
+    chartContentHeight = chartContainer?.measureContentHeight() ?? 0;
     resizeChartPanel();
+    await tick();
+    showChart = true;
+    chartPanelReady = true;
   }
 
   function resizeChartPanel() {
     let size = chartPaneSizes[paneDirection];
-    if ($isMobile && fitMobileChart && windChartData && chartContentHeight > 0 && viewportHeight > 0) {
+    if ($isMobile && fitMobileChart && chartContentHeight > 0 && viewportHeight > 0) {
       const noticeHeight = outdatedCachedAt !== null ? cacheNoticeHeight : 0;
       size = Math.min(size, ((chartContentHeight + noticeHeight + 1) / viewportHeight) * 100);
     }
@@ -300,7 +306,7 @@
   });
 
   $effect(() => {
-    if (showChart && chartPane && !isChartPaneDragging) {
+    if (showChart && chartPanelReady && chartPane && !isChartPaneDragging) {
       resizeChartPanel();
     }
   });
@@ -392,6 +398,11 @@
   }
 
   onMount(() => {
+    viewportHeight = pageElement.clientHeight;
+    chartContentHeight = chartContainer?.measureContentHeight() ?? 0;
+    resizeChartPanel();
+    chartPanelReady = true;
+
     if (!('serviceWorker' in navigator)) return;
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
@@ -441,6 +452,7 @@
 </svelte:head>
 
 <div
+  bind:this={pageElement}
   bind:clientHeight={viewportHeight}
   class="relative h-dvh w-full overflow-hidden bg-slate-100"
   style="--map-controls-top-offset: {mapControlsTopOffset};"
@@ -476,7 +488,7 @@
 
   <ResizablePaneGroup direction={paneDirection}>
     <ResizablePane
-      defaultSize={100}
+      defaultSize={50}
       minSize={$isMobile ? 10 : 30}
       class={isChartPaneDragging ? '' : 'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'}
     >
@@ -508,7 +520,7 @@
     />
     <ResizablePane
       bind:this={chartPane}
-      defaultSize={0}
+      defaultSize={50}
       minSize={$isMobile ? 10 : 30}
       collapsedSize={0}
       collapsible
@@ -520,61 +532,44 @@
     >
       {#if renderChartPanel}
         <div
-          class="flex h-full min-h-0 flex-col overflow-hidden bg-white p-0 transition-opacity duration-200 motion-reduce:transition-none sm:p-0 {showChart
+          class="relative flex h-full min-h-0 flex-col overflow-hidden bg-white p-0 transition-opacity duration-200 motion-reduce:transition-none sm:p-0 {showChart &&
+          chartPanelReady
             ? 'opacity-100'
             : 'pointer-events-none opacity-0'}"
           aria-hidden={!showChart}
           inert={!showChart}
         >
-          {#if windChartData}
-            {#if outdatedCachedAt !== null}
-              <div bind:offsetHeight={cacheNoticeHeight} class="shrink-0 px-3 pt-3">
-                <div class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
-                  Showing cached weather data last fetched {outdatedCachedAtLabel}. The latest forecast could not be
-                  loaded.
-                </div>
+          {#if outdatedCachedAt !== null}
+            <div bind:offsetHeight={cacheNoticeHeight} class="shrink-0 px-3 pt-3">
+              <div class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
+                Showing cached weather data last fetched {outdatedCachedAtLabel}. The latest forecast could not be
+                loaded.
               </div>
-            {/if}
-            <ChartContainer
-              onContentHeightChange={(height) => (chartContentHeight = height)}
-              {windChartData}
-              {skewTWeatherData}
-              startDate={windChartData.hourly.time[0] ?? startDate}
-              {isWindChartLoading}
-              {isSkewTLoading}
-              skewTError={skewTFailure?.message ?? null}
-              onRetrySkewT={retrySkewT}
-              bind:selectedDay={parameters.selectedDay}
-              bind:maxAltitude={parameters.maxAltitude}
-              bind:model={parameters.selectedModel}
-              bind:chartView
-              bind:hour={selectedHour}
-              bind:daylightOnly={parameters.daylightOnly}
-              keyboardNavigationEnabled={showChart}
-              onClose={closeChartPanel}
-            />
-          {:else if isWindChartLoading}
-            <div class="relative flex h-full min-h-64 items-center justify-center">
-              <button
-                type="button"
-                class="absolute top-3 right-3 rounded-md px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                onclick={closeChartPanel}
-              >
-                Close
-              </button>
-              <div class="text-sm text-slate-500" role="status">Loading weather data…</div>
             </div>
-          {:else if windFailure}
-            <div class="relative flex h-full min-h-64 items-center justify-center px-4">
-              <button
-                type="button"
-                class="absolute top-3 right-3 rounded-md px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                onclick={closeChartPanel}
-              >
-                Close
-              </button>
+          {/if}
+          <ChartContainer
+            bind:this={chartContainer}
+            onContentHeightChange={(height) => (chartContentHeight = height)}
+            {windChartData}
+            {skewTWeatherData}
+            startDate={windChartData?.hourly.time[0] ?? startDate}
+            {isWindChartLoading}
+            {isSkewTLoading}
+            skewTError={skewTFailure?.message ?? null}
+            onRetrySkewT={retrySkewT}
+            bind:selectedDay={parameters.selectedDay}
+            bind:maxAltitude={parameters.maxAltitude}
+            bind:model={parameters.selectedModel}
+            bind:chartView
+            bind:hour={selectedHour}
+            bind:daylightOnly={parameters.daylightOnly}
+            keyboardNavigationEnabled={showChart}
+            onClose={closeChartPanel}
+          />
+          {#if windFailure}
+            <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
               <div
-                class="flex max-w-md flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
+                class="pointer-events-auto flex max-w-md flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
                 role="alert"
               >
                 <span>{windFailure.message}</span>
