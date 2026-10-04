@@ -11,7 +11,8 @@ self.onmessage = function (e: MessageEvent<ChartWorkerRequest>) {
       data: prepareChartData(input),
     };
 
-    self.postMessage(successResponse);
+    const raster = successResponse.data.cloudRaster;
+    self.postMessage(successResponse, { transfer: raster ? [raster.pixels.buffer] : [] });
   } catch (error) {
     const errorResponse: ChartWorkerErrorOutput = {
       requestId,

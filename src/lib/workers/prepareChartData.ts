@@ -1,4 +1,5 @@
 import { getCloudCoverData } from '#lib/charts/clouds.js';
+import { buildCloudRaster } from '#lib/charts/cloudRaster.js';
 import { getWindFieldAllLevels } from '#lib/charts/wind.js';
 import { calculateLclWeather } from '#lib/meteo/lcl.js';
 import { addSeconds } from '#lib/utils/dateExtensions.js';
@@ -111,9 +112,11 @@ function calculateDomains(times: Date[]): [Date, Date] {
 export function prepareChartData(input: ChartWorkerInput): ChartWorkerSuccessOutput['data'] {
   const { windChartData, maxAltitude, model, daylightOnly } = input;
   const data = daylightOnly ? filterDaylightHours(windChartData) : windChartData;
+  const cloudData = getCloudCoverData(data, model, maxAltitude);
+  const xDomain = calculateDomains(data.hourly.time);
 
   return {
-    cloudData: getCloudCoverData(data, model, maxAltitude),
+    cloudRaster: buildCloudRaster(cloudData, data.hourly.time, xDomain, model, maxAltitude),
     windData: getWindFieldAllLevels(data, model, maxAltitude),
     lcl: calculateLclWeather(data),
     elevation: windChartData.elevation,
@@ -122,6 +125,6 @@ export function prepareChartData(input: ChartWorkerInput): ChartWorkerSuccessOut
     timezoneAbbr: windChartData.timezoneAbbr,
     temperatureChartData: prepareTemperatureData(data),
     rainCloudChartData: prepareRainAndCloudData(data),
-    xDomain: calculateDomains(data.hourly.time),
+    xDomain,
   };
 }

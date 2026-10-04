@@ -1,3 +1,5 @@
+const CLOUD_RGB = [100, 120, 145] as const;
+
 /**
  * Shared color constants.
  */
@@ -9,8 +11,8 @@ export const CHART_COLORS = {
   elevation: '#8B4513',
   modelGridElevation: '#556B2F',
   rain: 'rgba(30,100,220,0.80)',
-  cloudRect: 'rgba(100,120,145,',
-  windCloud: 'rgba(90,110,140,',
+  cloudRect: `rgba(${CLOUD_RGB.join(',')},`,
+  windCloudRgb: CLOUD_RGB,
   skewtElevation: '#A0785C',
   dryAdiabat: '#9f6628',
   moistAdiabat: '#2c9dfa',

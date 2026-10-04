@@ -1,8 +1,8 @@
 import type { WindChartData, WeatherModel } from '#lib/api/types.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
-import type { CloudCoverData } from '#lib/charts/clouds.js';
 import type { WindFieldLevel } from '#lib/charts/wind.js';
 import type { LclPoint } from '#lib/meteo/lcl.js';
+import type { CloudRaster } from '#lib/charts/cloudRaster.js';
 
 export interface ChartWorkerInput {
   windChartData: WindChartData;
@@ -42,7 +42,7 @@ export interface ChartWorkerSuccessOutput {
   requestId: number;
   success: true;
   data: {
-    cloudData: CloudCoverData[];
+    cloudRaster: CloudRaster | null;
     windData: WindFieldLevel[];
     lcl: LclPoint[];
     elevation: number;

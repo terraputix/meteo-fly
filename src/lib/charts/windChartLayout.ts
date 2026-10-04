@@ -2,7 +2,7 @@ import type { MaxAltitude } from '#lib/meteo/types.js';
 import { strokeWidthScale } from '#lib/charts/scales.js';
 import type { WeatherModel } from '#lib/api/types.js';
 import type { ChartWorkerSuccessOutput } from '#lib/workers/chartWorker.types.js';
-import { getNativeLevelsForFetch, getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLevels.js';
+import { getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLevels.js';
 
 export const MARGIN_LEFT = 56;
 export const MARGIN_RIGHT = 25;
@@ -112,24 +112,6 @@ export function buildWindChartLayout(
     point.value == null ? NaN : pressureY(metersToHPaExact(point.value)),
   ]);
   const nativeLevels = getNativeLevelsForModel(model, maxAltitude);
-  const fetched = getNativeLevelsForFetch(model, maxAltitude);
-  const bands = new Map(
-    nativeLevels.map((level) => {
-      const i = fetched.findIndex((item) => item.hPa === level.hPa);
-      const prev = fetched[i - 1];
-      const next = fetched[i + 1];
-      return [
-        level.hPa,
-        {
-          bottom: Math.min(
-            pressureBottom,
-            prev ? (prev.hPa + level.hPa) / 2 : next ? level.hPa + (level.hPa - next.hPa) / 2 : pressureBottom
-          ),
-          top: Math.max(pressureTop, next ? (level.hPa + next.hPa) / 2 : pressureTop),
-        },
-      ];
-    })
-  );
   const times = data.temperatureChartData.temperatureData.map((d) => +d.time).filter(Number.isFinite);
   const labelStep = Math.max(1, Math.ceil(times.length / Math.max(1, Math.floor(plotWidth / 65))));
   const timeTicks = times.filter((_, i) => i % labelStep === 0);
@@ -151,7 +133,6 @@ export function buildWindChartLayout(
     tempMax,
     maxAltitude,
     nativeLevels,
-    bands,
     timeTicks,
     x,
     timeAt,

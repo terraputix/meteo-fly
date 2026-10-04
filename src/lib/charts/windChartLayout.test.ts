@@ -16,6 +16,7 @@ import { strokeWidthScale } from '#lib/charts/scales.js';
 
 const time = new Date('2026-07-16T10:00:00Z');
 const data: PreparedWindChart = {
+  cloudRaster: null,
   temperatureChartData: {
     temperatureData: [{ time, value: 20 }],
     dewpointData: [{ time, value: 10 }],
@@ -25,7 +26,6 @@ const data: PreparedWindChart = {
   },
   rainCloudChartData: { cloudRects: [], rainDots: [] },
   windData: [],
-  cloudData: [],
   lcl: [],
   elevation: 500,
   modelGridElevation: undefined,
@@ -79,16 +79,6 @@ describe('wind chart layout', () => {
     expect(l.hitTest(l.left, RAIN_TOP - 1)).toBeNull();
     expect(l.hitTest(l.left, 699)).toBeNull();
     expect(buildWindChartLayout(data, 0, 700, 4000, 'icon_seamless').hitTest(56, WIND_TOP)).toBeNull();
-  });
-
-  it('retains cloud midpoint boundaries and clips them to the displayed pressure domain', () => {
-    const l = buildWindChartLayout(data, 960, 700, 4000, 'icon_seamless');
-    expect(l.bands.get(925)).toEqual({ top: 912.5, bottom: 937.5 });
-    for (const band of l.bands.values()) {
-      expect(band.top).toBeGreaterThanOrEqual(metersToHPaExact(4000));
-      expect(band.bottom).toBeLessThanOrEqual(metersToHPaExact(0));
-      expect(band.top).toBeLessThan(band.bottom);
-    }
   });
 
   it('provides finite temperature ranges for missing, negative and constant data', () => {

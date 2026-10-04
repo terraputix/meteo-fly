@@ -53,6 +53,19 @@ function text(
   ctx.fillText(value, x, y);
 }
 
+function traceSmoothSegment(ctx: CanvasRenderingContext2D, points: ChartPoint[], start = 0, end = points.length) {
+  ctx.moveTo(...points[start]);
+  for (let i = start; i < end - 1; i++) {
+    const [a, b] = curveControls(
+      points[Math.max(start, i - 1)],
+      points[i],
+      points[i + 1],
+      points[Math.min(end - 1, i + 2)]
+    );
+    ctx.bezierCurveTo(...a, ...b, ...points[i + 1]);
+  }
+}
+
 export function drawSmoothLine(
   ctx: CanvasRenderingContext2D,
   points: ChartPoint[],
@@ -71,16 +84,7 @@ export function drawSmoothLine(
     }
     let end = start + 1;
     while (end < points.length && points[end].every(Number.isFinite)) end++;
-    ctx.moveTo(...points[start]);
-    for (let i = start; i < end - 1; i++) {
-      const [a, b] = curveControls(
-        points[Math.max(start, i - 1)],
-        points[i],
-        points[i + 1],
-        points[Math.min(end - 1, i + 2)]
-      );
-      ctx.bezierCurveTo(...a, ...b, ...points[i + 1]);
-    }
+    traceSmoothSegment(ctx, points, start, end);
     start = end;
   }
   ctx.stroke();
@@ -131,7 +135,8 @@ export function renderWindChart(
   ctx: CanvasRenderingContext2D,
   data: PreparedWindChart,
   layout: WindChartLayout,
-  axisUnit: WindAxisUnit = 'm'
+  axisUnit: WindAxisUnit = 'm',
+  cloudImage: CanvasImageSource | null = null
 ) {
   const { left, right, x, pressureY, temperatureY, humidityY } = layout;
   ctx.save();
@@ -192,15 +197,56 @@ export function renderWindChart(
   }
 
   clipPanel(ctx, layout, 1, () => {
-    for (const rect of data.rainCloudChartData.cloudRects) {
-      if (!Number.isFinite(rect.cloudCover)) continue;
-      ctx.fillStyle = `${colors.cloudRect}${Math.max(0, Math.min(1, rect.cloudCover / 100))})`;
-      ctx.fillRect(
-        x(+rect.x1),
-        RAIN_TOP + (1 - rect.y2) * RAIN_HEIGHT_PX,
-        x(+rect.x2) - x(+rect.x1),
-        (rect.y2 - rect.y1) * RAIN_HEIGHT_PX
-      );
+    const cloudRects = data.rainCloudChartData.cloudRects;
+    for (const band of new Set(cloudRects.map((rect) => rect.y1))) {
+      const samples = cloudRects.filter((rect) => rect.y1 === band).sort((a, b) => +a.x1 - +b.x1);
+      let start = 0;
+      while (start < samples.length) {
+        if (!Number.isFinite(samples[start].cloudCover)) {
+          start++;
+          continue;
+        }
+        let end = start + 1;
+        while (
+          end < samples.length &&
+          Number.isFinite(samples[end].cloudCover) &&
+          +samples[end].x1 <= +samples[end - 1].x2
+        )
+          end++;
+        const first = samples[start];
+        const last = samples[end - 1];
+        const from = +first.x1;
+        const to = +last.x2;
+        if (to > from) {
+          const baseline = RAIN_TOP + (1 - first.y2) * RAIN_HEIGHT_PX;
+          const bandHeight = (first.y2 - first.y1) * RAIN_HEIGHT_PX;
+          const points: ChartPoint[] = [];
+          const fill = ctx.createLinearGradient(x(from), 0, x(to), 0);
+          for (let i = start; i < end; i++) {
+            const sample = samples[i];
+            const time = (+sample.x1 + +sample.x2) / 2;
+            const cover = Math.max(0, Math.min(100, sample.cloudCover));
+            points.push([x(time), baseline + (cover / 100) * bandHeight]);
+            fill.addColorStop((time - from) / (to - from), `${colors.cloudRect}${cover / 100})`);
+          }
+          points.unshift([x(from), points[0][1]]);
+          points.push([x(to), points[points.length - 1][1]]);
+          ctx.beginPath();
+          traceSmoothSegment(ctx, points);
+          ctx.lineTo(x(to), baseline);
+          ctx.lineTo(x(from), baseline);
+          ctx.closePath();
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.beginPath();
+          traceSmoothSegment(ctx, points);
+          ctx.strokeStyle = `${colors.cloudRect}0.8)`;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([]);
+          ctx.stroke();
+        }
+        start = end;
+      }
     }
     for (let i = 0; i < 3; i++)
       line(ctx, left, RAIN_TOP + (i * RAIN_HEIGHT_PX) / 3, right, RAIN_TOP + (i * RAIN_HEIGHT_PX) / 3, colors.gridLine);
@@ -225,19 +271,19 @@ export function renderWindChart(
   );
 
   clipPanel(ctx, layout, 2, () => {
+    const raster = data.cloudRaster;
+    if (cloudImage && raster) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      const top = pressureY(raster.pressureTop);
+      const start = x(+data.xDomain[0]);
+      ctx.drawImage(cloudImage, start, top, x(+data.xDomain[1]) - start, pressureY(raster.pressureBottom) - top);
+    }
     if (axisUnit === 'm') {
       for (let altitude = 0; altitude <= layout.maxAltitude; altitude += 500) {
         const y = pressureY(metersToHPaExact(altitude));
         line(ctx, left, y, right, y, colors.gridLine);
       }
-    }
-    for (const cloud of data.cloudData) {
-      const band = layout.bands.get(cloud.pressure);
-      if (!band || !Number.isFinite(cloud.value) || cloud.value <= 0) continue;
-      ctx.fillStyle = `${colors.windCloud}${(0.85 * Math.min(100, cloud.value)) / 100})`;
-      const x1 = x(+cloud.time - 1_800_000);
-      const x2 = x(+cloud.time + 1_800_000);
-      ctx.fillRect(x1 - 0.5, pressureY(band.top), x2 - x1 + 1, pressureY(band.bottom) - pressureY(band.top));
     }
     if (axisUnit === 'hPa') {
       for (const level of layout.nativeLevels) {

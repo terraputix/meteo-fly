@@ -60,6 +60,7 @@
     let requestId = 0;
     let destroyed = false;
     let prepared: PreparedWindChart | null = null;
+    let cloudImage: HTMLCanvasElement | null = null;
     let layout: WindChartLayout | null = null;
     let store: TooltipStore | null = null;
     let baseFrame = 0;
@@ -90,7 +91,7 @@
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Canvas 2D is unavailable');
         layout = buildWindChartLayout(prepared, node.clientWidth, node.clientHeight, params.maxAltitude, params.model);
-        renderWindChart(ctx, prepared, layout, params.axisUnit);
+        renderWindChart(ctx, prepared, layout, params.axisUnit, cloudImage);
       } catch (error) {
         layout = null;
         renderError = 'Unable to draw the weather chart.';
@@ -131,6 +132,7 @@
       if (destroyed || source !== worker) return;
       terminateWorker();
       prepared = null;
+      cloudImage = null;
       store = null;
       isRendering = false;
       renderError = 'Unable to prepare the weather chart.';
@@ -142,6 +144,7 @@
       requestId++;
       clearSelection();
       prepared = null;
+      cloudImage = null;
       store = null;
       layout = null;
       renderError = '';
@@ -166,6 +169,15 @@
             }
             try {
               prepared = response.data;
+              const raster = prepared.cloudRaster;
+              if (raster) {
+                cloudImage = document.createElement('canvas');
+                cloudImage.width = raster.width;
+                cloudImage.height = raster.height;
+                cloudImage
+                  .getContext('2d')
+                  ?.putImageData(new ImageData(raster.pixels, raster.width, raster.height), 0, 0);
+              }
               store = buildTooltipStore(
                 prepared.temperatureChartData,
                 prepared.rainCloudChartData,
