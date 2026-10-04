@@ -18,25 +18,23 @@ describe('wind chart sizing', () => {
     expect(getWindChartSize(2500, 2000, 4000).width).toBe(960);
   });
 
-  it('adds 10% height at high elevations on wide panels', () => {
+  it.each([6000, 8000, 10000] as const)('compresses the %im chart on wide panels', (altitude) => {
     const low = getWindChartSize(960, 2000, 4000);
-    const high = getWindChartSize(960, 2000, 8000);
-    expect(high.height - getChartHeight(0)).toBeCloseTo(2.2 * (low.height - getChartHeight(0)));
+    const high = getWindChartSize(960, 2000, altitude);
+    expect(high.height).toBeGreaterThan(low.height);
+    expect(high.height - getChartHeight(0)).toBeLessThan((altitude / 4000) * (low.height - getChartHeight(0)));
   });
 
-  it('preserves the extra high-elevation height in short wide panels', () => {
+  it('preserves the compact high-elevation minimum in short wide panels', () => {
     const size = getWindChartSize(960, 500, 10000);
-    expect(size.height).toBe(getChartHeight(Math.ceil(getWindChartHeight(10000) * 1.1)));
+    expect(size.height).toBe(getChartHeight(getWindChartHeight(10000)));
     expect(getWindChartSize(960, 0, 10000).height).toBe(size.height);
   });
 
-  it('increases height smoothly as panels widen', () => {
-    const narrow = getWindChartSize(720, 500, 8000);
-    const medium = getWindChartSize(840, 500, 8000);
-    const wide = getWindChartSize(960, 500, 8000);
-    expect(narrow.height).toBe(getChartHeight(getWindChartHeight(8000)));
-    expect(medium.height).toBeGreaterThan(narrow.height);
-    expect(medium.height).toBeLessThan(wide.height);
+  it('keeps the same minimum height across widths when the panel is short', () => {
+    for (const width of [720, 840, 960]) {
+      expect(getWindChartSize(width, 500, 8000).height).toBe(getChartHeight(getWindChartHeight(8000)));
+    }
   });
 
   it('grows at every top elevation even when the panel is short', () => {
@@ -44,7 +42,6 @@ describe('wind chart sizing', () => {
     for (let i = 1; i < heights.length; i++) {
       expect(heights[i]).toBeGreaterThan(heights[i - 1]);
     }
-    expect(getWindChartHeight(10000)).toBeGreaterThanOrEqual(getWindChartHeight(4000) * 2.5);
   });
 
   it('limits growth by available height', () => {

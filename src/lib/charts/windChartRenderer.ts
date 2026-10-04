@@ -210,6 +210,8 @@ export function renderWindChart(
   }
 
   clipPanel(ctx, layout, 1, () => {
+    for (let i = 0; i < 3; i++)
+      line(ctx, left, RAIN_TOP + (i * RAIN_HEIGHT_PX) / 3, right, RAIN_TOP + (i * RAIN_HEIGHT_PX) / 3, colors.gridLine);
     const cloudRects = data.rainCloudChartData.cloudRects;
     for (const band of new Set(cloudRects.map((rect) => rect.y1))) {
       const samples = cloudRects.filter((rect) => rect.y1 === band).sort((a, b) => +a.x1 - +b.x1);
@@ -251,19 +253,10 @@ export function renderWindChart(
           ctx.closePath();
           ctx.fillStyle = fill;
           ctx.fill();
-          ctx.beginPath();
-          traceSmoothSegment(ctx, points);
-          traceSmoothSegment(ctx, lowerPoints);
-          ctx.strokeStyle = fill;
-          ctx.lineWidth = 1;
-          ctx.setLineDash([]);
-          ctx.stroke();
         }
         start = end;
       }
     }
-    for (let i = 0; i < 3; i++)
-      line(ctx, left, RAIN_TOP + (i * RAIN_HEIGHT_PX) / 3, right, RAIN_TOP + (i * RAIN_HEIGHT_PX) / 3, colors.gridLine);
     ctx.fillStyle = colors.rain;
     for (const dot of data.rainCloudChartData.rainDots) {
       for (let i = 0; i < rainDropCount(dot.rain); i++) {

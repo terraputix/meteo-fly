@@ -12,15 +12,14 @@ export const SKEWT_MIN_HEIGHT = 520;
 
 export function getWindChartSize(availableWidth: number, availableHeight: number, maxAltitude: MaxAltitude) {
   const width = Math.max(0, Math.min(availableWidth, 960));
-  const widePanelFactor = Math.max(0, Math.min(1, (width - 720) / 240));
-  const highAltitudeFactor = Math.max(0, Math.min(1, (maxAltitude - WIND_REFERENCE_ALTITUDE) / 4000));
-  const heightScale = 1 + 0.1 * widePanelFactor * highAltitudeFactor;
+  const minimumWindHeight = getWindChartHeight(maxAltitude);
+  const heightScale =
+    maxAltitude <= WIND_REFERENCE_ALTITUDE
+      ? maxAltitude / WIND_REFERENCE_ALTITUDE
+      : minimumWindHeight / getWindChartHeight(WIND_REFERENCE_ALTITUDE);
   const windHeight = Math.max(
-    Math.ceil(getWindChartHeight(maxAltitude) * heightScale),
-    Math.min(
-      ((width - MARGIN_LEFT - MARGIN_RIGHT) / 2) * (maxAltitude / WIND_REFERENCE_ALTITUDE) * heightScale,
-      availableHeight - getChartHeight(0)
-    )
+    minimumWindHeight,
+    Math.min(((width - MARGIN_LEFT - MARGIN_RIGHT) / 2) * heightScale, availableHeight - getChartHeight(0))
   );
   return { width, height: getChartHeight(windHeight) };
 }

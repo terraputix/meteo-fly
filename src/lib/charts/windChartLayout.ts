@@ -35,6 +35,9 @@ export const WIND_REFERENCE_ALTITUDE = 4000;
 const WIND_REFERENCE_HEIGHT = Math.ceil(SEA_LEVEL_PRESSURE_HPA - metersToHPaExact(WIND_REFERENCE_ALTITUDE));
 
 export function getWindChartHeight(maxAltitude: MaxAltitude = 4000): number {
+  if (maxAltitude > WIND_REFERENCE_ALTITUDE) {
+    return Math.ceil(SEA_LEVEL_PRESSURE_HPA - metersToHPaExact(maxAltitude));
+  }
   return Math.ceil((WIND_REFERENCE_HEIGHT * maxAltitude) / WIND_REFERENCE_ALTITUDE);
 }
 
