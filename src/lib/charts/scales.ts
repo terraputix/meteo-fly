@@ -1,4 +1,7 @@
 export const windMaxSpeed = 80;
+export const CALM_WIND_THRESHOLD = 3;
+export const CALM_WIND_RADIUS = 2.5;
+export const WIND_MARKER_OUTLINE_WIDTH = 1.5;
 
 /**
  * A 16-color wind speed scale.
@@ -37,4 +40,8 @@ export function windColorScale(speed: number): string {
 /** Maps wind speed linearly to a stroke width in [0.75, 8]. */
 export function strokeWidthScale(speed: number): number {
   return 0.75 + (Math.min(Math.max(speed, 0), windMaxSpeed) / windMaxSpeed) * (8 - 0.75);
+}
+
+export function windMarkerStrokeWidth(speed: number): number {
+  return Math.max(1.5, strokeWidthScale(speed));
 }

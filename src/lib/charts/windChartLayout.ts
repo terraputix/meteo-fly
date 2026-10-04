@@ -1,5 +1,10 @@
 import type { MaxAltitude } from '#lib/meteo/types.js';
-import { strokeWidthScale } from '#lib/charts/scales.js';
+import {
+  CALM_WIND_THRESHOLD,
+  CALM_WIND_RADIUS,
+  WIND_MARKER_OUTLINE_WIDTH,
+  windMarkerStrokeWidth,
+} from '#lib/charts/scales.js';
 import type { WeatherModel } from '#lib/api/types.js';
 import type { ChartWorkerSuccessOutput } from '#lib/workers/chartWorker.types.js';
 import { getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLevels.js';
@@ -18,11 +23,11 @@ const RAIN_BOTTOM_PX = RAIN_TOP + RAIN_HEIGHT_PX;
 const WIND_GAP = 20;
 export const WIND_TOP = RAIN_BOTTOM_PX + WIND_GAP;
 export const WIND_ARROW_POINTS: ReadonlyArray<readonly [number, number]> = [
-  [0, 7],
-  [0, -7],
-  [3.15, -1.54],
-  [0, -7],
-  [-3.15, -1.54],
+  [0, 8],
+  [0, -8],
+  [3.8, -2],
+  [0, -8],
+  [-3.8, -2],
 ];
 
 const SEA_LEVEL_PRESSURE_HPA = metersToHPaExact(0);
@@ -89,10 +94,12 @@ export function buildWindChartLayout(
     if (![+wind.time, wind.pressure, wind.speed, wind.direction].every(Number.isFinite)) continue;
     if (+wind.time < tMin || +wind.time > tMax || wind.pressure > pressureBottom) continue;
     const rotation = windRotation(wind.direction);
-    const topExtent =
-      -Math.min(...WIND_ARROW_POINTS.map(([ax, ay]) => ax * Math.sin(rotation) + ay * Math.cos(rotation))) +
-      strokeWidthScale(wind.speed) / 2 +
-      0.5;
+    const markerExtent =
+      wind.speed < CALM_WIND_THRESHOLD
+        ? CALM_WIND_RADIUS
+        : -Math.min(...WIND_ARROW_POINTS.map(([ax, ay]) => ax * Math.sin(rotation) + ay * Math.cos(rotation))) +
+          windMarkerStrokeWidth(wind.speed) / 2;
+    const topExtent = markerExtent + WIND_MARKER_OUTLINE_WIDTH / 2 + 0.5;
     const plotHeight = panels[2].height;
     if (topExtent >= plotHeight) continue;
     // Solve pressureY(level) >= topExtent, including the rescaled pressure range.

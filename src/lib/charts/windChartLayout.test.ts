@@ -12,7 +12,7 @@ import {
   type PreparedWindChart,
 } from '#lib/charts/windChartLayout.js';
 import { metersToHPaExact } from '#lib/meteo/pressureLevels.js';
-import { strokeWidthScale } from '#lib/charts/scales.js';
+import { windMarkerStrokeWidth, WIND_MARKER_OUTLINE_WIDTH, CALM_WIND_RADIUS } from '#lib/charts/scales.js';
 
 const time = new Date('2026-07-16T10:00:00Z');
 const data: PreparedWindChart = {
@@ -44,7 +44,9 @@ describe('wind chart layout', () => {
     const layout = buildWindChartLayout(fixture, 960, 700, 4000, 'icon_seamless');
     const rotation = windRotation(direction);
     const tip = Math.min(...WIND_ARROW_POINTS.map(([x, y]) => x * Math.sin(rotation) + y * Math.cos(rotation)));
-    expect(layout.pressureY(pressure) + tip - strokeWidthScale(80) / 2).toBeCloseTo(WIND_TOP + 0.5);
+    expect(layout.pressureY(pressure) + tip - (windMarkerStrokeWidth(80) + WIND_MARKER_OUTLINE_WIDTH) / 2).toBeCloseTo(
+      WIND_TOP + 0.5
+    );
     expect(layout.pressureAt(layout.pressureY(pressure))).toBeCloseTo(pressure);
     expect(layout.panels[2].top).toBe(WIND_TOP);
     expect(layout.x(+data.xDomain[0])).toBe(layout.left);
@@ -57,6 +59,16 @@ describe('wind chart layout', () => {
     };
     const layout = buildWindChartLayout(fixture, 960, 700, 4000, 'icon_seamless');
     expect(layout.pressureAt(WIND_TOP)).toBeCloseTo(metersToHPaExact(4000));
+  });
+
+  it('uses the smaller calm dot bounds when extending the ceiling', () => {
+    const pressure = metersToHPaExact(4000);
+    const fixture = {
+      ...data,
+      windData: [{ time, pressure, height: 4000, speed: 2, direction: 0, source: 'model' as const }],
+    };
+    const layout = buildWindChartLayout(fixture, 960, 700, 4000, 'icon_seamless');
+    expect(layout.pressureY(pressure) - CALM_WIND_RADIUS - WIND_MARKER_OUTLINE_WIDTH / 2).toBeCloseTo(WIND_TOP + 0.5);
   });
 
   it('maps time and pressure reversibly with low pressure at the top', () => {

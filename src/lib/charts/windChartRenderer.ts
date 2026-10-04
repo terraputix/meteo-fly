@@ -1,5 +1,11 @@
 import { CHART_COLORS as colors } from '#lib/charts/chartColors.js';
-import { windColorScale, strokeWidthScale } from '#lib/charts/scales.js';
+import {
+  windColorScale,
+  windMarkerStrokeWidth,
+  CALM_WIND_THRESHOLD,
+  CALM_WIND_RADIUS,
+  WIND_MARKER_OUTLINE_WIDTH,
+} from '#lib/charts/scales.js';
 import { metersToHPaExact } from '#lib/meteo/pressureLevels.js';
 import { fmtTime } from '#lib/helpers.js';
 import {
@@ -294,6 +300,11 @@ export function renderWindChart(
     ctx.setLineDash([]);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    const cutoffPressure = metersToHPaExact(
+      data.modelGridElevation != null && Number.isFinite(data.modelGridElevation)
+        ? data.modelGridElevation
+        : data.elevation
+    );
     for (const wind of data.windData) {
       if (![+wind.time, wind.pressure, wind.speed, wind.direction].every(Number.isFinite)) continue;
       const arrowX = x(+wind.time);
@@ -301,13 +312,27 @@ export function renderWindChart(
       ctx.save();
       ctx.translate(arrowX, arrowY);
       ctx.rotate(windRotation(wind.direction));
-      ctx.strokeStyle = windColorScale(wind.speed);
-      ctx.lineWidth = strokeWidthScale(wind.speed);
-      ctx.globalAlpha = wind.source === 'interpolated' ? 0.4 : 1;
+      const color = windColorScale(wind.speed);
+      const strokeWidth = windMarkerStrokeWidth(wind.speed);
+      ctx.globalAlpha = (wind.source === 'interpolated' ? 0.65 : 1) * (wind.pressure > cutoffPressure ? 0.2 : 1);
       ctx.beginPath();
-      ctx.moveTo(...WIND_ARROW_POINTS[0]);
-      for (let i = 1; i < WIND_ARROW_POINTS.length; i++) ctx.lineTo(...WIND_ARROW_POINTS[i]);
-      ctx.stroke();
+      if (wind.speed < CALM_WIND_THRESHOLD) {
+        ctx.arc(0, 0, CALM_WIND_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(30,41,59,0.35)';
+        ctx.lineWidth = WIND_MARKER_OUTLINE_WIDTH;
+        ctx.stroke();
+      } else {
+        ctx.moveTo(...WIND_ARROW_POINTS[0]);
+        for (let i = 1; i < WIND_ARROW_POINTS.length; i++) ctx.lineTo(...WIND_ARROW_POINTS[i]);
+        ctx.strokeStyle = 'rgba(30,41,59,0.35)';
+        ctx.lineWidth = strokeWidth + WIND_MARKER_OUTLINE_WIDTH;
+        ctx.stroke();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = strokeWidth;
+        ctx.stroke();
+      }
       ctx.restore();
     }
     drawSmoothLine(ctx, layout.lclPoints, colors.lcl);
