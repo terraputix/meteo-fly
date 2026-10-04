@@ -4,7 +4,7 @@ import {
   MARGIN_LEFT,
   MARGIN_RIGHT,
   WIND_REFERENCE_ALTITUDE,
-} from '#lib/charts/buildWindChartOption.js';
+} from '#lib/charts/windChartLayout.js';
 import { SKEWT_MARGIN } from '#lib/charts/skewTRenderer.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
 

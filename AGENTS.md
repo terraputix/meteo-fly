@@ -7,7 +7,7 @@
 - **Framework**: SvelteKit 3 with Svelte 5 and TypeScript
 - **Styling**: Tailwind CSS v4
 - **UI primitives**: `shadcn-svelte` for some more complex UI components built on reusable primitives
-- **Charts**: ECharts rendered from pure chart-preparation helpers
+- **Charts**: Canvas 2D renderers with pure chart-preparation and layout helpers
 - **Map**: MapLibre GL 6 with a bundled ES module worker (requires WebGL 2)
 - **PWA**: SvelteKit-built Workbox service worker, static web manifest, and browser service-worker registration
 - **Data**: Open-Meteo REST API via the `openmeteo` npm package
@@ -23,7 +23,7 @@
 - `src/routes/+page.svelte`: main page state, URL sync, and weather fetch lifecycle
 - `src/lib/api/`: Open-Meteo API integration, request config, and response types
 - `src/lib/meteo/`: pure meteorological calculations and altitude/pressure helpers
-- `src/lib/charts/`: pure chart data preparation and ECharts option building
+- `src/lib/charts/`: pure chart data preparation/layout and Canvas 2D drawing
 - `src/lib/workers/`: Web Workers and pure preparation helpers for off-main-thread chart and Hike & Fly processing
 - `src/lib/components/`: UI components including map, chart, legend, footer, and layout pieces
 - `src/lib/components/ui/`: shared `shadcn-svelte`-style UI primitives such as `switch` and `resizable`
@@ -64,8 +64,8 @@
 - **TypeScript**: No `any`. Reuse existing domain types from `src/lib/api/types.ts`, `src/lib/meteo/types.ts`, and service types.
 - **Styling**: Prefer Tailwind utility classes. For more complex UI building blocks, prefer existing `shadcn-svelte` components in `src/lib/components/ui/` before creating custom primitives. Avoid adding `<style>` blocks unless an existing component already uses one and a utility-only approach is impractical.
 - **Imports**: Use `#lib/` subpath imports with file extensions for project imports. Avoid relative parent imports.
-- **Worker-safe purity**: Anything in `src/lib/meteo/` and `src/lib/charts/` should stay free of browser globals and side effects.
-- **Charts**: Extend existing ECharts option/data factories instead of introducing a second charting system.
+- **Worker-safe purity**: Meteorological and chart-preparation/layout helpers stay deterministic and worker-safe. Canvas renderers draw only to explicitly supplied contexts; DOM access and scheduling belong in components.
+- **Charts**: Reuse existing Canvas 2D renderers, shared colors, sizing, and meteorological helpers.
 
 ### Testing & Quality
 
@@ -93,7 +93,9 @@
 ### Charting
 
 - UI container: `src/lib/components/ChartContainer.svelte`
-- Rendering and worker orchestration: `src/lib/components/WindChart.svelte`
+- Canvas lifecycle, interaction, and worker orchestration: `src/lib/components/WindChart.svelte`
+- Wind layout/hit testing: `src/lib/charts/windChartLayout.ts`; drawing: `src/lib/charts/windChartRenderer.ts`
+- Wind chart uses a base canvas plus a separate crosshair canvas; resize reuses prepared data.
 - Worker entrypoint: `src/lib/workers/chartWorker.ts`
 - Pure chart builders/helpers: `src/lib/charts/`
 
@@ -132,8 +134,8 @@ npm test
 ## What to Avoid
 
 - **No server runtime**: Do not add `+server.ts`, `+page.server.ts`, or server-only dependencies.
-- **No charting bloat**: Keep charting within the existing ECharts-based chart helpers and option builders.
-- **No side effects in pure modules**: Keep meteo/chart helpers deterministic and worker-friendly.
+- **No charting bloat**: Use focused Canvas 2D renderers; avoid generic chart frameworks or scene graphs.
+- **No side effects in pure modules**: Keep meteo/chart preparation and layout deterministic and worker-friendly; isolate drawing in renderers.
 - **No new state libraries**: Stick to Svelte state/stores and existing service modules.
 - **No unnecessary dependencies**: Add packages only when clearly justified.
 - **No hardcoded duplicated domain data**: Reuse canonical model lists, pressure/altitude definitions, and shared colors/helpers.

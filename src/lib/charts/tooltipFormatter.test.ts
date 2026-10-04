@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTooltipStore, createActiveState, createTooltipFormatter } from './tooltipFormatter';
+import { buildTooltipStore, createActiveState, formatTooltip } from '#lib/charts/tooltipFormatter.js';
 
 describe('wind tooltip pressure coordinate', () => {
   it('snaps the hovered pressure to the nearest wind level', () => {
@@ -20,7 +20,7 @@ describe('wind tooltip pressure coordinate', () => {
     active.gridIndex = 2;
     active.hoveredWindPressure = 910;
 
-    const html = createTooltipFormatter(store, active, 'UTC')({ value: [time.getTime(), 910] });
+    const html = formatTooltip(store, active, 'UTC', time.getTime());
 
     expect(html).toContain('988&nbsp;m');
     expect(html).toContain('20&nbsp;km/h');
@@ -54,17 +54,55 @@ describe('wind tooltip pressure coordinate', () => {
       []
     );
 
-    const html = createTooltipFormatter(
-      store,
-      createActiveState(),
-      'Asia/Kolkata'
-    )({
-      value: [time.getTime() + 5 * 60_000, 20],
-    });
+    const html = formatTooltip(store, createActiveState(), 'Asia/Kolkata', time.getTime() + 5 * 60_000);
 
     expect(html).toContain('16:00');
     expect(html).toContain('20.0&nbsp;°C');
     expect(html).toContain('35&nbsp;%');
     expect(html).toContain('1.5&nbsp;mm/h');
+  });
+});
+
+describe('canvas tooltip selection', () => {
+  const time = new Date('2026-07-16T12:00:00Z');
+  const temperature = {
+    temperatureData: [{ time, value: 22 }],
+    dewpointData: [{ time, value: 12 }],
+    humidityData: [{ time, value: 60 }],
+    sunrise: time,
+    sunset: time,
+  };
+  const store = buildTooltipStore(
+    temperature,
+    {
+      cloudRects: [{ x1: new Date(+time - 1800000), x2: new Date(+time + 1800000), y1: 0, y2: 1 / 3, cloudCover: 35 }],
+      rainDots: [{ time, rain: 2 }],
+    },
+    [{ time, height: 988, pressure: 900, speed: 20, direction: 270, source: 'model' }],
+    [{ time, value: 1800 }]
+  );
+
+  it('shows only the selected panel while retaining the same time lookup', () => {
+    const temp = formatTooltip(store, { gridIndex: 0, hoveredWindPressure: null }, 'UTC', +time + 1000);
+    expect(temp).toContain('22.0');
+    expect(temp).not.toContain('Rain');
+    const rain = formatTooltip(store, { gridIndex: 1, hoveredWindPressure: null }, 'UTC', +time);
+    expect(rain).toContain('35&nbsp;%');
+    expect(rain).toContain('2.0');
+    expect(rain).not.toContain('Temp');
+    const wind = formatTooltip(store, { gridIndex: 2, hoveredWindPressure: 910 }, 'UTC', +time);
+    expect(wind).toContain('1800');
+    expect(wind).toContain('988');
+    expect(wind).not.toContain('Humidity');
+  });
+
+  it('returns no tooltip when the hourly timeline is empty', () => {
+    const empty = buildTooltipStore(
+      { ...temperature, temperatureData: [], dewpointData: [], humidityData: [] },
+      { cloudRects: [], rainDots: [] },
+      [],
+      []
+    );
+    expect(formatTooltip(empty, createActiveState(), 'UTC', +time)).toBe('');
   });
 });

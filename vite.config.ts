@@ -25,11 +25,6 @@ export default defineConfig({
                   test: /node_modules[\\/]maplibre-gl[\\/]/,
                   priority: 20,
                 },
-                {
-                  name: 'echarts-vendor',
-                  test: /node_modules[\\/](?:echarts|zrender)[\\/]/,
-                  priority: 20,
-                },
               ],
             },
           },
