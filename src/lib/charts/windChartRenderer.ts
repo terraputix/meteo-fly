@@ -259,14 +259,65 @@ export function renderWindChart(ctx: CanvasRenderingContext2D, data: PreparedWin
       data.lcl.map((d) => [x(+d.time), d.value == null ? NaN : pressureY(metersToHPaExact(d.value))]),
       colors.lcl
     );
-    for (const annotation of [
-      { value: data.elevation, label: 'DEM Elev.', color: colors.elevation, dash: [6, 4] },
-      { value: data.modelGridElevation, label: 'Model Grid Elev.', color: colors.modelGridElevation, dash: [2, 3] },
-    ]) {
-      if (annotation.value == null || !Number.isFinite(annotation.value)) continue;
+    const windPanel = layout.panels[2];
+    const labelHeight = 12;
+    const labelGap = 2;
+    const labelOffset = labelHeight / 2 + labelGap;
+    const labelSeparation = labelHeight + labelGap;
+    const minLabelY = windPanel.top + labelHeight / 2;
+    const maxLabelY = windPanel.top + windPanel.height - labelHeight / 2;
+    ctx.font = '9px sans-serif';
+    const annotations = [
+      { value: data.elevation, label: 'DEM', color: colors.elevation, dash: [6, 4], alignRight: false },
+      {
+        value: data.modelGridElevation,
+        label: 'Model grid',
+        color: colors.modelGridElevation,
+        dash: [2, 3],
+        alignRight: true,
+      },
+    ].flatMap((annotation) => {
+      if (annotation.value == null || !Number.isFinite(annotation.value)) return [];
       const y = pressureY(metersToHPaExact(annotation.value));
-      line(ctx, left, y, right, y, annotation.color, 2, annotation.dash);
-      text(ctx, `${annotation.label} (${annotation.value}m)`, left + 5, y - 9, 'left', annotation.color, 10, true);
+      if (y < windPanel.top || y > windPanel.top + windPanel.height) return [];
+      const label = `${annotation.label} ${annotation.value}m`;
+      const width = ctx.measureText(label).width;
+      return [
+        {
+          ...annotation,
+          label,
+          y,
+          labelY: Math.min(maxLabelY, y - labelOffset < minLabelY ? y + labelOffset : y - labelOffset),
+          x: annotation.alignRight ? right - 3 - width : left + 3,
+        },
+      ];
+    });
+    const [dem, modelGrid] = annotations;
+    if (
+      dem &&
+      modelGrid &&
+      (Math.abs(dem.y - modelGrid.y) < labelSeparation || Math.abs(dem.labelY - modelGrid.labelY) < labelSeparation)
+    ) {
+      const [upper, lower] = dem.y <= modelGrid.y ? [dem, modelGrid] : [modelGrid, dem];
+      upper.labelY = upper.y - labelOffset;
+      lower.labelY = lower.y + labelOffset;
+      if (upper.labelY < minLabelY) {
+        upper.labelY = lower.y + labelOffset;
+        lower.labelY = upper.labelY + labelSeparation;
+      } else if (lower.labelY > maxLabelY) {
+        lower.labelY = upper.y - labelOffset;
+        upper.labelY = lower.labelY - labelSeparation;
+      }
+    }
+    for (const annotation of annotations) {
+      line(ctx, left, annotation.y, right, annotation.y, annotation.color, 2, annotation.dash);
+    }
+    for (const annotation of annotations) {
+      if (annotation.labelY !== annotation.y - labelOffset) {
+        const anchorX = annotation.alignRight ? right - 1 : left + 1;
+        line(ctx, anchorX, annotation.y, anchorX, annotation.labelY, annotation.color);
+      }
+      text(ctx, annotation.label, annotation.x, annotation.labelY, 'left', annotation.color, 9);
     }
   });
   for (let altitude = 0; altitude < layout.maxAltitude; altitude += 500)
