@@ -105,7 +105,7 @@ describe('canvas tooltip selection', () => {
     expect(formatTooltip(store, { gridIndex: 2, hoveredWindPressure: 910 }, 'UTC', +time)).not.toContain('LCL');
   });
 
-  it.each([0, 4, 100])('shows %i percent cover even when it is below the drawing threshold', (cover) => {
+  it.each([0, 4, 100])('shows %i percent cloud cover', (cover) => {
     const cloudStore = buildTooltipStore(
       temperature,
       { cloudRects: [], rainDots: [] },
@@ -117,7 +117,7 @@ describe('canvas tooltip selection', () => {
     expect(html).toContain(`${cover}&nbsp;%`);
   });
 
-  it('labels the nearest cloud pressure when hovering an interpolated wind level', () => {
+  it('interpolates cloud cover at the hovered pressure rather than snapping to a cloud level', () => {
     const cloudStore = buildTooltipStore(
       temperature,
       { cloudRects: [], rainDots: [] },
@@ -129,8 +129,9 @@ describe('canvas tooltip selection', () => {
       ]
     );
     const html = formatTooltip(cloudStore, { gridIndex: 2, hoveredWindPressure: 910 }, 'UTC', +time);
-    expect(html).toContain('Cloud (850 hPa)');
-    expect(html).toContain('72&nbsp;%');
+    expect(html).toContain('Cloud cover');
+    expect(html).toContain('53&nbsp;%');
+    expect(html).not.toContain('Cloud (850 hPa)');
     expect(html).not.toContain('25&nbsp;%');
   });
 

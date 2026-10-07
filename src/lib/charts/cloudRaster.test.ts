@@ -29,12 +29,17 @@ function alphaAt(raster: CloudRaster, time: number, pressure: number) {
 describe('cloud raster', () => {
   it.each([
     [0, 0],
-    [0.1, 26],
-    [24, 26],
-    [25, 51],
-    [49, 51],
-    [50, 102],
-    [74, 102],
+    [0.1, 0],
+    [1, 3],
+    [4, 10],
+    [4.9, 13],
+    [5, 51],
+    [12.5, 51],
+    [24, 51],
+    [25, 89],
+    [49, 89],
+    [50, 128],
+    [74, 128],
     [75, 179],
     [100, 179],
   ])('assigns %i percent cloud to its contour band', (cover, alpha) => {
@@ -46,8 +51,8 @@ describe('cloud raster', () => {
 
   it('computes contours from interpolated cloud percentages rather than styled opacity', () => {
     const raster = build();
-    expect(alphaAt(raster, +times[0] + 0.7 * 3600000, 850)).toBe(51);
-    expect(alphaAt(raster, +times[1] + 0.2 * 3600000, 850)).toBe(102);
+    expect(alphaAt(raster, +times[0] + 0.7 * 3600000, 850)).toBe(89);
+    expect(alphaAt(raster, +times[1] + 0.2 * 3600000, 850)).toBe(128);
     expect(alphaAt(raster, +times[1] + 0.7 * 3600000, 850)).toBe(179);
   });
 
@@ -57,10 +62,10 @@ describe('cloud raster', () => {
     const gap = next - level;
     const raster = build(clouds.map((cloud) => ({ ...cloud, value: cloud.pressure === level ? 100 : 0 })));
     expect(alphaAt(raster, +times[1], level + gap * 0.1)).toBe(179);
-    expect(alphaAt(raster, +times[1], level + gap * 0.4)).toBe(102);
-    expect(alphaAt(raster, +times[1], level + gap * 0.65)).toBe(51);
-    expect(alphaAt(raster, +times[1], level + gap * 0.85)).toBe(26);
-    expect(alphaAt(raster, +times[1], level + gap * 0.97)).toBe(26);
+    expect(alphaAt(raster, +times[1], level + gap * 0.4)).toBe(128);
+    expect(alphaAt(raster, +times[1], level + gap * 0.65)).toBe(89);
+    expect(alphaAt(raster, +times[1], level + gap * 0.85)).toBe(51);
+    expect(alphaAt(raster, +times[1], level + gap * 0.97)).toBe(8);
     expect(alphaAt(raster, +times[1], level + gap * 1.1)).toBe(0);
   });
 
@@ -79,7 +84,7 @@ describe('cloud raster', () => {
       ((groundPressure - raster.pressureTop) / (raster.pressureBottom - raster.pressureTop)) * raster.height - 0.5
     );
     for (let x = 0; x < raster.width; x++) {
-      expect(raster.pixels[(bottomRow * raster.width + x) * 4 + 3]).toBe(102);
+      expect(raster.pixels[(bottomRow * raster.width + x) * 4 + 3]).toBe(128);
       expect(raster.pixels[((bottomRow + 1) * raster.width + x) * 4 + 3]).toBe(0);
     }
   });

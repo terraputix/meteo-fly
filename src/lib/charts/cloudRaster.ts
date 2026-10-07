@@ -1,15 +1,8 @@
-import type { CloudCoverData } from '#lib/charts/clouds.js';
+import { createCloudCoverSampler, type CloudCoverData } from '#lib/charts/clouds.js';
 import type { WeatherModel } from '#lib/api/types.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
 import { getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLevels.js';
-import { CHART_COLORS } from '#lib/charts/chartColors.js';
-
-const CONTOUR_BANDS = [
-  { minimum: 0, alpha: 26 },
-  { minimum: 25, alpha: 51 },
-  { minimum: 50, alpha: 102 },
-  { minimum: 75, alpha: 179 },
-] as const;
+import { CHART_COLORS, WIND_CLOUD_BANDS, WIND_CLOUD_EDGE_ALPHA } from '#lib/charts/chartColors.js';
 
 export interface CloudRaster {
   width: number;
@@ -17,14 +10,6 @@ export interface CloudRaster {
   pixels: Uint8ClampedArray<ArrayBuffer>;
   pressureTop: number;
   pressureBottom: number;
-}
-
-function bracket(values: number[], value: number) {
-  let upper = values.findIndex((candidate) => candidate >= value);
-  if (upper < 0) upper = values.length - 1;
-  const lower = upper === 0 || value >= values.at(-1)! ? upper : upper - 1;
-  const fraction = lower === upper ? 0 : (value - values[lower]) / (values[upper] - values[lower]);
-  return { lower, upper, fraction, nearest: fraction <= 0.5 ? lower : upper };
 }
 
 export function buildCloudRaster(
@@ -36,11 +21,10 @@ export function buildCloudRaster(
   groundElevation?: number
 ): CloudRaster | null {
   if (!clouds.length) return null;
-  const times = [...new Set(hourlyTimes.map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
   const pressures = getNativeLevelsForModel(model, maxAltitude)
     .map((level) => level.hPa)
     .sort((a, b) => a - b);
-  if (!times.length || !pressures.length) return null;
+  if (!hourlyTimes.some((time) => Number.isFinite(+time)) || !pressures.length) return null;
   const pressureTop = Math.min(metersToHPaExact(maxAltitude), pressures[0]);
   const last = pressures.length - 1;
   const pressureBottom = Math.min(
@@ -53,49 +37,18 @@ export function buildCloudRaster(
   const pixels = new Uint8ClampedArray(width * height * 4);
   const groundPressure =
     groundElevation != null && Number.isFinite(groundElevation) ? metersToHPaExact(groundElevation) : Infinity;
-  const values = new Float32Array(times.length * pressures.length).fill(NaN);
-  const timeIndices = new Map(times.map((time, index) => [time, index]));
-  const pressureIndices = new Map(pressures.map((pressure, index) => [pressure, index]));
-  for (const cloud of clouds) {
-    const column = timeIndices.get(+cloud.time);
-    const row = pressureIndices.get(cloud.pressure);
-    if (column != null && row != null && Number.isFinite(cloud.value)) {
-      values[row * times.length + column] = Math.max(0, Math.min(100, cloud.value));
-    }
-  }
-  const columns = Array.from({ length: width }, (_, x) =>
-    bracket(times, +xDomain[0] + ((x + 0.5) / width) * (+xDomain[1] - +xDomain[0]))
-  );
+  const cloudCoverAt = createCloudCoverSampler(clouds, hourlyTimes, pressures);
   for (let y = 0; y < height; y++) {
     const pressure = pressureTop + ((y + 0.5) / height) * (pressureBottom - pressureTop);
     if (pressure > groundPressure) continue;
-    const row = bracket(pressures, pressure);
     for (let x = 0; x < width; x++) {
-      const column = columns[x];
-      // Keep the nearest observation's missing-data cell transparent, including absent levels/hours.
-      if (!Number.isFinite(values[row.nearest * times.length + column.nearest])) continue;
-      let cover = 0;
-      let weight = 0;
-      for (const [r, wy] of [
-        [row.lower, 1 - row.fraction],
-        [row.upper, row.fraction],
-      ]) {
-        for (const [c, wx] of [
-          [column.lower, 1 - column.fraction],
-          [column.upper, column.fraction],
-        ]) {
-          const value = values[r * times.length + c];
-          if (!Number.isFinite(value)) continue;
-          cover += value * wx * wy;
-          weight += wx * wy;
-        }
-      }
-      if (!weight) continue;
+      const time = +xDomain[0] + ((x + 0.5) / width) * (+xDomain[1] - +xDomain[0]);
+      const cloudCover = cloudCoverAt(time, pressure);
+      if (cloudCover == null) continue;
       const offset = (y * width + x) * 4;
       pixels.set(CHART_COLORS.windCloudRgb, offset);
-      const cloudCover = cover / weight;
-      if (cloudCover <= 0) continue;
-      for (const band of CONTOUR_BANDS) {
+      pixels[offset + 3] = (WIND_CLOUD_EDGE_ALPHA * cloudCover) / WIND_CLOUD_BANDS[0].minimum;
+      for (const band of WIND_CLOUD_BANDS) {
         if (cloudCover + 1e-6 < band.minimum) break;
         pixels[offset + 3] = band.alpha;
       }

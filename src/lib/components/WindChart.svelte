@@ -10,6 +10,7 @@
     type WindChartLayout,
   } from '#lib/charts/windChartLayout.js';
   import { renderWindChart, renderWindChartOverlay, type WindAxisUnit } from '#lib/charts/windChartRenderer.js';
+  import { getNativeLevelsForModel } from '#lib/meteo/pressureLevels.js';
   import { getWindChartSize } from '#lib/charts/chartSizing.js';
   import type { WindChartData } from '#lib/api/types.js';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '#lib/workers/chartWorker.types.js';
@@ -186,7 +187,8 @@
                 prepared.rainCloudChartData,
                 prepared.windData,
                 prepared.lcl,
-                prepared.cloudData
+                prepared.cloudData,
+                getNativeLevelsForModel(params.model, params.maxAltitude).map((level) => level.hPa)
               );
               schedulePaint();
             } catch (error) {
@@ -241,7 +243,7 @@
         lclY >= windPanel.top &&
         lclY <= windPanel.top + windPanel.height &&
         Math.abs(py - lclY) <= 10;
-      tooltip.innerHTML = formatTooltip(store, { ...hit, showLcl }, prepared.timezone, time);
+      tooltip.innerHTML = formatTooltip(store, { ...hit, showLcl }, prepared.timezone, hit.time);
       tooltip.hidden = false;
       const visibleRect = scrollContainer?.getBoundingClientRect() ?? rect;
       const bounds = {

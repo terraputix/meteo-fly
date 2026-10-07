@@ -4,10 +4,10 @@ import { windDirectionLabel } from '#lib/meteo/wind.js';
 import { CHART_COLORS } from '#lib/charts/chartColors.js';
 import { fmtTime } from '#lib/helpers.js';
 import type { LclPoint } from '#lib/meteo/lcl.js';
-import type { CloudCoverData } from '#lib/charts/clouds.js';
+import { createCloudCoverSampler, type CloudCoverData } from '#lib/charts/clouds.js';
 
 // ─── Tooltip store ──────────────────────────────────────────────────────────
-// Pre-built look-up maps keyed by timestamp so the formatter is O(1).
+// Pre-built look-up maps and cloud sampler.
 
 export interface TooltipStore {
   sortedTimes: number[];
@@ -19,8 +19,7 @@ export interface TooltipStore {
   lclByTime: Map<number, number>;
   windByTimePressure: Map<string, { height: number; speed: number; direction: number }>;
   sortedWindPressures: number[];
-  cloudByTimePressure: Map<string, number>;
-  sortedCloudPressures: number[];
+  cloudCoverAt: ReturnType<typeof createCloudCoverSampler>;
 }
 
 export function buildTooltipStore(
@@ -28,7 +27,8 @@ export function buildTooltipStore(
   rainData: RainCloudChartData,
   windData: WindFieldLevel[],
   cloudBase: LclPoint[],
-  cloudData: CloudCoverData[] = []
+  cloudData: CloudCoverData[] = [],
+  cloudPressureLevels?: number[]
 ): TooltipStore {
   const tempByTime = new Map<number, { temp: number; dew: number; hum: number }>();
   tempData.temperatureData.forEach((d, i) => {
@@ -69,9 +69,6 @@ export function buildTooltipStore(
     windPressuresSet.add(w.pressure);
   });
 
-  const cloudByTimePressure = new Map(cloudData.map((cloud) => [`${+cloud.time}_${cloud.pressure}`, cloud.value]));
-  const sortedCloudPressures = [...new Set(cloudData.map((cloud) => cloud.pressure))].sort((a, b) => a - b);
-
   return {
     sortedTimes: Array.from(tempByTime.keys()).sort((a, b) => a - b),
     tempByTime,
@@ -82,8 +79,11 @@ export function buildTooltipStore(
     lclByTime,
     windByTimePressure,
     sortedWindPressures: Array.from(windPressuresSet).sort((a, b) => a - b),
-    cloudByTimePressure,
-    sortedCloudPressures,
+    cloudCoverAt: createCloudCoverSampler(
+      cloudData,
+      tempData.temperatureData.map((point) => point.time),
+      cloudPressureLevels
+    ),
   };
 }
 
@@ -196,11 +196,13 @@ export function formatTooltip(store: TooltipStore, active: ActiveState, timezone
           <span class="text-slate-600">${windDirectionLabel(wind.direction)} (${wind.direction}°)</span>
         </div>
       </div>`;
-      const cloudPressure = snapToNearest(store.sortedCloudPressures, pressure);
-      const cloudCover = cloudPressure == null ? undefined : store.cloudByTimePressure.get(`${snap}_${cloudPressure}`);
-      const cloudLabel =
-        cloudPressure != null && cloudPressure !== pressure ? `Cloud (${cloudPressure} hPa)` : 'Cloud cover';
-      html += metricRow(cloudLabel, measurement(cloudCover, '%', 0));
+      const cloudCover = store.cloudCoverAt(
+        hoveredTime,
+        gridIndex === 2 ? (hoveredWindPressure ?? pressure) : pressure
+      );
+      const cloudValue =
+        cloudCover != null && cloudCover > 0 && cloudCover < 1 ? '&lt;1&nbsp;%' : measurement(cloudCover, '%', 0);
+      html += metricRow('Cloud cover', cloudValue);
     }
     const cb = store.lclByTime.get(snap);
     if (cb != null && gridIndex === 2 && active.showLcl) {

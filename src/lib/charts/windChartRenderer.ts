@@ -284,6 +284,18 @@ export function renderWindChart(
         ? data.modelGridElevation
         : data.elevation
     );
+    if (axisUnit === 'm') {
+      for (let altitude = 0; altitude <= layout.maxAltitude; altitude += 500) {
+        const y = pressureY(metersToHPaExact(altitude));
+        line(ctx, left, y, right, y, colors.gridLine);
+      }
+    }
+    if (axisUnit === 'hPa') {
+      for (const level of layout.nativeLevels) {
+        const y = pressureY(level.hPa);
+        line(ctx, left, y, right, y, 'rgba(160,160,160,0.35)', 0.8, [4, 3]);
+      }
+    }
     const raster = data.cloudRaster;
     if (cloudImage && raster) {
       ctx.save();
@@ -303,18 +315,6 @@ export function renderWindChart(
       const cloudHeight = pressureY(raster.pressureBottom) - top;
       ctx.drawImage(cloudImage, start, top, cloudWidth, cloudHeight);
       ctx.restore();
-    }
-    if (axisUnit === 'm') {
-      for (let altitude = 0; altitude <= layout.maxAltitude; altitude += 500) {
-        const y = pressureY(metersToHPaExact(altitude));
-        line(ctx, left, y, right, y, colors.gridLine);
-      }
-    }
-    if (axisUnit === 'hPa') {
-      for (const level of layout.nativeLevels) {
-        const y = pressureY(level.hPa);
-        line(ctx, left, y, right, y, 'rgba(160,160,160,0.35)', 0.8, [4, 3]);
-      }
     }
     ctx.setLineDash([]);
     ctx.lineCap = 'round';

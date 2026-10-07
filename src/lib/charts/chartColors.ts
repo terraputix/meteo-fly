@@ -1,5 +1,13 @@
 const CLOUD_RGB = [100, 120, 145] as const;
 
+export const WIND_CLOUD_EDGE_ALPHA = 13;
+export const WIND_CLOUD_BANDS = [
+  { minimum: 5, alpha: 51 },
+  { minimum: 25, alpha: 89 },
+  { minimum: 50, alpha: 128 },
+  { minimum: 75, alpha: 179 },
+] as const;
+
 /**
  * Shared color constants.
  */

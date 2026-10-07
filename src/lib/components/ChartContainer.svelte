@@ -6,6 +6,7 @@
   import BottomControls from './BottomControls.svelte';
   import Footer from './Footer.svelte';
   import { windColors, windMaxSpeed } from '#lib/charts/scales.js';
+  import { CHART_COLORS, WIND_CLOUD_BANDS, WIND_CLOUD_EDGE_ALPHA } from '#lib/charts/chartColors.js';
   import { buildSkewTData } from '#lib/meteo/skewT.js';
   import type { MaxAltitude } from '#lib/meteo/types.js';
   import type { ChartView } from '#lib/services/types.js';
@@ -75,8 +76,14 @@
     }
   });
 
-  const cloudGradient =
-    'linear-gradient(to right, rgba(100,120,145,0), rgba(100,120,145,0.45) 50%, rgba(100,120,145,0.85))';
+  const cloudGradient = `linear-gradient(to right, ${[
+    `${CHART_COLORS.cloudRect}0) 0%`,
+    `${CHART_COLORS.cloudRect}${WIND_CLOUD_EDGE_ALPHA / 255}) ${WIND_CLOUD_BANDS[0].minimum}%`,
+    ...WIND_CLOUD_BANDS.flatMap((band, i) => {
+      const color = `${CHART_COLORS.cloudRect}${band.alpha / 255})`;
+      return [`${color} ${band.minimum}%`, `${color} ${WIND_CLOUD_BANDS[i + 1]?.minimum ?? 100}%`];
+    }),
+  ].join(', ')})`;
 
   const step = 100 / windColors.length;
   const windGradient = `linear-gradient(to right, ${windColors
@@ -162,8 +169,11 @@
                       class="h-1.25 w-full rounded-full border border-slate-200"
                       style="background: {cloudGradient};"
                     ></div>
-                    <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
-                      <span>0</span><span>100</span>
+                    <div class="relative h-3 font-mono text-[0.6rem] text-slate-400">
+                      {#each WIND_CLOUD_BANDS as band (band.minimum)}
+                        <span class="absolute -translate-x-1/2" style="left: {band.minimum}%;">{band.minimum}</span>
+                      {/each}
+                      <span class="absolute right-0">100</span>
                     </div>
                   </div>
                 </div>
