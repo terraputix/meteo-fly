@@ -52,6 +52,27 @@ export interface PanelBounds {
   height: number;
 }
 
+export const WIND_TOOLTIP_INSET = 8;
+
+export function windTooltipPosition(
+  pointer: { x: number; y: number },
+  tooltip: { width: number; height: number },
+  bounds: { left: number; top: number; right: number; bottom: number }
+) {
+  function position(coordinate: number, size: number, start: number, end: number) {
+    const min = start + WIND_TOOLTIP_INSET;
+    const max = Math.max(min, end - WIND_TOOLTIP_INSET - size);
+    const before = coordinate - size - 14;
+    const after = coordinate + 14;
+    const preferred = before >= min || coordinate - start >= end - coordinate ? before : after;
+    return Math.max(min, Math.min(max, preferred));
+  }
+  return {
+    left: position(pointer.x, tooltip.width, bounds.left, bounds.right),
+    top: position(pointer.y, tooltip.height, bounds.top, bounds.bottom),
+  };
+}
+
 export function temperatureRange(values: number[]): [number, number] {
   const finite = values.filter(Number.isFinite);
   if (!finite.length) return [0, 5];
