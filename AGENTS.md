@@ -96,6 +96,7 @@
 - Canvas lifecycle, interaction, and worker orchestration: `src/lib/components/WindChart.svelte`
 - Wind layout/hit testing: `src/lib/charts/windChartLayout.ts`; drawing: `src/lib/charts/windChartRenderer.ts`
 - Wind chart uses a base canvas plus a separate crosshair canvas; resize reuses prepared data.
+- Chart touch selections use `pointerup`, keeping scrolling and pinch zoom available. Wind tooltips appear next to the interaction point, preferring above and left, and flip or clamp to stay within the visible chart scroll area for all input types.
 - Wind cloud cover is interpolated in the chart worker and rendered with a faint base band for positive cover and stronger 25/50/75% contour bands in a cached RGBA raster. Missing observations, 0% cover, and areas below model ground (DEM fallback) remain transparent.
 - Worker entrypoint: `src/lib/workers/chartWorker.ts`
 - Pure chart builders/helpers: `src/lib/charts/`

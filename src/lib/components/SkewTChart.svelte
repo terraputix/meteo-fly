@@ -119,8 +119,8 @@
     if (e.pointerType !== 'touch') showSelection(e);
   }
 
-  function handleClick(e: MouseEvent) {
-    if ((e as PointerEvent).pointerType === 'touch') showSelection(e);
+  function handlePointerUp(e: PointerEvent) {
+    if (e.pointerType === 'touch' && e.isPrimary) showSelection(e);
   }
 
   function handlePointerCancel(e: PointerEvent) {
@@ -180,7 +180,7 @@
       <canvas
         bind:this={canvas}
         onpointermove={handlePointerMove}
-        onclick={handleClick}
+        onpointerup={handlePointerUp}
         onpointercancel={handlePointerCancel}
         onpointerleave={handlePointerLeave}
         class="chart-canvas"

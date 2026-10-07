@@ -5,6 +5,7 @@ import {
   rainDropCount,
   temperatureRange,
   windRotation,
+  windTooltipPosition,
   TEMP_TOP,
   RAIN_TOP,
   WIND_TOP,
@@ -34,6 +35,34 @@ const data: PreparedWindChart = {
   timezoneAbbr: 'UTC',
   xDomain: [new Date(+time - 1800000), new Date(+time + 1800000)],
 };
+
+describe('wind tooltip placement', () => {
+  const tooltip = { width: 150, height: 100 };
+  const bounds = { left: 0, top: 0, right: 360, bottom: 500 };
+
+  it.each([
+    [300, 400, 136, 286],
+    [50, 400, 64, 286],
+    [300, 50, 136, 64],
+    [50, 50, 64, 64],
+  ])('prefers above and left, flipping only axes that lack space at (%i, %i)', (x, y, left, top) => {
+    expect(windTooltipPosition({ x, y }, tooltip, bounds)).toEqual({ left, top });
+  });
+
+  it('uses the visible scroll bounds when deciding whether to flip', () => {
+    expect(windTooltipPosition({ x: 300, y: 250 }, tooltip, { ...bounds, top: 200 })).toEqual({
+      left: 136,
+      top: 264,
+    });
+  });
+
+  it('clamps to the visible area when neither side has enough room', () => {
+    expect(windTooltipPosition({ x: 200, y: 250 }, { width: 300, height: 300 }, bounds)).toEqual({
+      left: 8,
+      top: 8,
+    });
+  });
+});
 
 describe('wind chart layout', () => {
   it.each([0, 45, 90, 180, 270])('extends the pressure domain just enough for a top arrow at %i°', (direction) => {

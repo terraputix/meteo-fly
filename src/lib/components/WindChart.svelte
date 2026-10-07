@@ -4,6 +4,8 @@
     DAYLIGHT_CONTEXT_TOP,
     WIND_TOP,
     buildWindChartLayout,
+    windTooltipPosition,
+    WIND_TOOLTIP_INSET,
     type PreparedWindChart,
     type WindChartLayout,
   } from '#lib/charts/windChartLayout.js';
@@ -55,6 +57,7 @@
     const canvas = node.querySelector<HTMLCanvasElement>('canvas')!;
     const overlay = node.querySelector<HTMLCanvasElement>('canvas[data-overlay]')!;
     const tooltip = node.querySelector<HTMLDivElement>('[role="tooltip"]')!;
+    const scrollContainer = node.closest<HTMLElement>('[data-chart-scroll]');
     let worker: Worker | null = null;
     let workerBusy = false;
     let requestId = 0;
@@ -212,8 +215,10 @@
     function showSelection(clientX: number, clientY: number) {
       if (!prepared || !layout || !store || params.loading || isRendering) return;
       const rect = node.getBoundingClientRect();
-      const px = ((clientX - rect.left) * node.clientWidth) / rect.width;
-      const py = ((clientY - rect.top) * node.clientHeight) / rect.height;
+      const scaleX = node.clientWidth / rect.width;
+      const scaleY = node.clientHeight / rect.height;
+      const px = (clientX - rect.left) * scaleX;
+      const py = (clientY - rect.top) * scaleY;
       const hit = layout.hitTest(px, py);
       const ctx = overlay.getContext('2d');
       if (!hit || !ctx) {
@@ -238,14 +243,23 @@
         Math.abs(py - lclY) <= 10;
       tooltip.innerHTML = formatTooltip(store, { ...hit, showLcl }, prepared.timezone, time);
       tooltip.hidden = false;
-      const tooltipWidth = tooltip.offsetWidth;
-      const tooltipHeight = tooltip.offsetHeight;
-      const preferredX = px + 14 + tooltipWidth <= node.clientWidth ? px + 14 : px - tooltipWidth - 14;
-      const visibleTop = Math.max(0, -rect.top);
-      const visibleBottom = Math.min(node.clientHeight, window.innerHeight - rect.top);
-      const preferredY = py + 14 + tooltipHeight <= visibleBottom ? py + 14 : py - tooltipHeight - 14;
-      tooltip.style.left = `${Math.max(0, Math.min(node.clientWidth - tooltipWidth, preferredX))}px`;
-      tooltip.style.top = `${Math.max(visibleTop, Math.min(visibleBottom - tooltipHeight, preferredY))}px`;
+      const visibleRect = scrollContainer?.getBoundingClientRect() ?? rect;
+      const bounds = {
+        left: Math.max(0, (Math.max(0, visibleRect.left) - rect.left) * scaleX),
+        top: Math.max(0, (Math.max(0, visibleRect.top) - rect.top) * scaleY),
+        right: Math.min(node.clientWidth, (Math.min(window.innerWidth, visibleRect.right) - rect.left) * scaleX),
+        bottom: Math.min(node.clientHeight, (Math.min(window.innerHeight, visibleRect.bottom) - rect.top) * scaleY),
+      };
+      const inset = WIND_TOOLTIP_INSET;
+      tooltip.style.maxWidth = `${Math.max(0, bounds.right - bounds.left - 2 * inset)}px`;
+      tooltip.style.maxHeight = `${Math.max(0, bounds.bottom - bounds.top - 2 * inset)}px`;
+      const position = windTooltipPosition(
+        { x: px, y: py },
+        { width: tooltip.offsetWidth, height: tooltip.offsetHeight },
+        bounds
+      );
+      tooltip.style.left = `${position.left}px`;
+      tooltip.style.top = `${position.top}px`;
     }
 
     function pointerMove(event: PointerEvent) {
@@ -256,8 +270,8 @@
         showSelection(event.clientX, event.clientY);
       });
     }
-    function click(event: PointerEvent) {
-      if (event.pointerType === 'touch') showSelection(event.clientX, event.clientY);
+    function pointerUp(event: PointerEvent) {
+      if (event.pointerType === 'touch' && event.isPrimary) showSelection(event.clientX, event.clientY);
     }
     function pointerLeave(event: PointerEvent) {
       if (event.pointerType !== 'touch') clearSelection();
@@ -266,10 +280,11 @@
       if (event.target instanceof Node && !node.contains(event.target)) clearSelection();
     }
     canvas.addEventListener('pointermove', pointerMove);
-    canvas.addEventListener('click', click);
+    canvas.addEventListener('pointerup', pointerUp);
     canvas.addEventListener('pointerleave', pointerLeave);
     canvas.addEventListener('pointercancel', clearSelection);
     document.addEventListener('pointerdown', outsidePointer);
+    scrollContainer?.addEventListener('scroll', clearSelection);
     prepare();
 
     return {
@@ -294,10 +309,11 @@
         resizeObserver.disconnect();
         resolutionQuery.removeEventListener('change', resolutionChanged);
         canvas.removeEventListener('pointermove', pointerMove);
-        canvas.removeEventListener('click', click);
+        canvas.removeEventListener('pointerup', pointerUp);
         canvas.removeEventListener('pointerleave', pointerLeave);
         canvas.removeEventListener('pointercancel', clearSelection);
         document.removeEventListener('pointerdown', outsidePointer);
+        scrollContainer?.removeEventListener('scroll', clearSelection);
         isRendering = false;
       },
     };
