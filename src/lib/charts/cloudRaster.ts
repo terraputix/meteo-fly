@@ -27,38 +27,13 @@ function bracket(values: number[], value: number) {
   return { lower, upper, fraction, nearest: fraction <= 0.5 ? lower : upper };
 }
 
-function cellNoise(x: number, y: number): number {
-  let seed = Math.imul(x + 1, 374761393) ^ Math.imul(y + 1, 668265263);
-  seed = Math.imul(seed ^ (seed >>> 13), 1274126177);
-  return ((seed ^ (seed >>> 16)) >>> 0) / 4294967296;
-}
-
-function cloudHoleOpacity(x: number, y: number, cover: number): number {
-  if (cover >= 100 - 1e-6) return 1;
-  const spacing = 44;
-  const warpedX = x + 0.5 + spacing * 0.2 * Math.sin((y / spacing) * 2.1);
-  const warpedY = y + 0.5 + spacing * 0.2 * Math.sin((warpedX / spacing) * 1.7 + 1.3);
-  const cellX = Math.floor(warpedX / spacing);
-  const cellY = Math.floor(warpedY / spacing);
-  const radius = spacing * Math.sqrt((1 - cover / 100) / Math.PI);
-  let distanceSquared = Infinity;
-  for (let row = cellY - 1; row <= cellY + 1; row++) {
-    for (let column = cellX - 1; column <= cellX + 1; column++) {
-      const centerX = (column + 0.5 + (cellNoise(column, row) - 0.5) * 0.35) * spacing;
-      const centerY = (row + 0.5 + (cellNoise(column + 193, row - 71) - 0.5) * 0.35) * spacing;
-      const size = 0.85 + cellNoise(column - 53, row + 127) * 0.3;
-      distanceSquared = Math.min(distanceSquared, ((warpedX - centerX) ** 2 + (warpedY - centerY) ** 2) / size ** 2);
-    }
-  }
-  return Math.max(0, Math.min(1, Math.sqrt(distanceSquared) - radius + 0.5));
-}
-
 export function buildCloudRaster(
   clouds: CloudCoverData[],
   hourlyTimes: Date[],
   xDomain: [Date, Date],
   model: WeatherModel,
-  maxAltitude: MaxAltitude
+  maxAltitude: MaxAltitude,
+  groundElevation?: number
 ): CloudRaster | null {
   if (!clouds.length) return null;
   const times = [...new Set(hourlyTimes.map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
@@ -76,6 +51,8 @@ export function buildCloudRaster(
   const width = 512;
   const height = 512;
   const pixels = new Uint8ClampedArray(width * height * 4);
+  const groundPressure =
+    groundElevation != null && Number.isFinite(groundElevation) ? metersToHPaExact(groundElevation) : Infinity;
   const values = new Float32Array(times.length * pressures.length).fill(NaN);
   const timeIndices = new Map(times.map((time, index) => [time, index]));
   const pressureIndices = new Map(pressures.map((pressure, index) => [pressure, index]));
@@ -90,7 +67,9 @@ export function buildCloudRaster(
     bracket(times, +xDomain[0] + ((x + 0.5) / width) * (+xDomain[1] - +xDomain[0]))
   );
   for (let y = 0; y < height; y++) {
-    const row = bracket(pressures, pressureTop + ((y + 0.5) / height) * (pressureBottom - pressureTop));
+    const pressure = pressureTop + ((y + 0.5) / height) * (pressureBottom - pressureTop);
+    if (pressure > groundPressure) continue;
+    const row = bracket(pressures, pressure);
     for (let x = 0; x < width; x++) {
       const column = columns[x];
       // Keep the nearest observation's missing-data cell transparent, including absent levels/hours.
@@ -116,10 +95,9 @@ export function buildCloudRaster(
       pixels.set(CHART_COLORS.windCloudRgb, offset);
       const cloudCover = cover / weight;
       if (cloudCover <= 0) continue;
-      const holeOpacity = cloudHoleOpacity(x, y, cloudCover);
       for (const band of CONTOUR_BANDS) {
         if (cloudCover + 1e-6 < band.minimum) break;
-        pixels[offset + 3] = band.alpha * holeOpacity;
+        pixels[offset + 3] = band.alpha;
       }
     }
   }

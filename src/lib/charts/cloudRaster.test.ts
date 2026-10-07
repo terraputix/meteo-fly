@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCloudRaster, type CloudRaster } from '#lib/charts/cloudRaster.js';
-import { getNativeLevelsForModel } from '#lib/meteo/pressureLevels.js';
+import { getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLevels.js';
 import { CHART_COLORS } from '#lib/charts/chartColors.js';
 
 const times = [0, 1, 2].map((hour) => new Date(Date.UTC(2026, 6, 16, hour)));
@@ -83,17 +83,74 @@ describe('cloud raster', () => {
     expect(strongestAlpha(raster, { pressure: level + gap * 1.1 })).toBe(0);
   });
 
-  it('uses stable large holes with coverage matching cover and solid fill at 100 percent', () => {
-    const halfClouds = clouds.map((cloud) => ({ ...cloud, value: 50 }));
-    const half = build(halfClouds);
-    expect(build(halfClouds).pixels).toEqual(half.pixels);
-    let filled = 0;
-    for (let i = 3; i < half.pixels.length; i += 4) filled += half.pixels[i] / 102;
-    expect(filled / (half.width * half.height)).toBeGreaterThan(0.45);
-    expect(filled / (half.width * half.height)).toBeLessThan(0.55);
-    const full = build(clouds.map((cloud) => ({ ...cloud, value: 100 })));
-    for (let i = 3; i < full.pixels.length; i += 4) {
-      if (full.pixels[i] !== 179) throw new Error('Overcast cloud must have solid fill');
+  it('keeps cloud shading continuous throughout filled contours', () => {
+    const raster = build(clouds.map((cloud) => ({ ...cloud, value: 50 })));
+    const alphas = raster.pixels.filter((_, index) => index % 4 === 3);
+    expect(new Set(alphas)).toEqual(new Set([102]));
+  });
+
+  it('keeps a continuous lower edge on each contour', () => {
+    const raster = build(clouds.map((cloud) => ({ ...cloud, value: cloud.pressure <= 850 ? 50 : 0 })));
+    const clearPressure = pressures[pressures.indexOf(850) + 1];
+    for (const [cover, alpha] of [
+      [0, 26],
+      [25, 51],
+      [50, 102],
+    ]) {
+      const basePressure = clearPressure - (cover / 50) * (clearPressure - 850);
+      const baseRow =
+        Math.ceil(
+          ((basePressure - raster.pressureTop) / (raster.pressureBottom - raster.pressureTop)) * raster.height - 0.5
+        ) - 1;
+      for (let x = 0; x < raster.width; x++) {
+        for (let y = baseRow - 3; y <= baseRow; y++) {
+          expect(raster.pixels[(y * raster.width + x) * 4 + 3]).toBe(alpha);
+        }
+        const lowerAlpha = cover === 0 ? 0 : cover === 25 ? 26 : 51;
+        for (let y = baseRow + 1; y <= baseRow + 4; y++) {
+          expect(raster.pixels[(y * raster.width + x) * 4 + 3]).toBe(lowerAlpha);
+        }
+      }
+    }
+    const interior = raster.pixels.filter((_, i) => i % 4 === 3).slice(0, raster.width * 100);
+    expect(interior).not.toContain(0);
+    expect(interior).toContain(102);
+  });
+
+  it('protects the visible cloud base at model ground elevation and leaves lower pixels transparent', () => {
+    const groundElevation = 1200;
+    const groundPressure = metersToHPaExact(groundElevation);
+    const raster = buildCloudRaster(
+      clouds.map((cloud) => ({ ...cloud, value: 50 })),
+      times,
+      domain,
+      'icon_seamless',
+      4000,
+      groundElevation
+    )!;
+    const bottomRow = Math.floor(
+      ((groundPressure - raster.pressureTop) / (raster.pressureBottom - raster.pressureTop)) * raster.height - 0.5
+    );
+    for (let x = 0; x < raster.width; x++) {
+      expect(raster.pixels[(bottomRow * raster.width + x) * 4 + 3]).toBe(102);
+      expect(raster.pixels[((bottomRow + 1) * raster.width + x) * 4 + 3]).toBe(0);
+    }
+  });
+
+  it('keeps both sides of neighbouring shading contours intact across time', () => {
+    const raster = build();
+    for (const [hourOffset, leftAlpha, rightAlpha] of [
+      [0.5, 26, 51],
+      [1, 51, 102],
+      [1.5, 102, 179],
+    ]) {
+      const boundaryTime = +times[0] + hourOffset * 3600000;
+      const firstColumn = Math.ceil(((boundaryTime - +domain[0]) / (+domain[1] - +domain[0])) * raster.width - 0.5);
+      for (let y = 0; y < raster.height; y++) {
+        for (let x = firstColumn - 4; x < firstColumn + 4; x++) {
+          expect(raster.pixels[(y * raster.width + x) * 4 + 3]).toBe(x < firstColumn ? leftAlpha : rightAlpha);
+        }
+      }
     }
   });
 
