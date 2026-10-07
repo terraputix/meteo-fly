@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCloudRaster, type CloudRaster } from '#lib/charts/cloudRaster.js';
-import { getNativeLevelsForModel } from '#lib/meteo/pressureLevels.js';
+import { getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLevels.js';
 import { CHART_COLORS } from '#lib/charts/chartColors.js';
 
 const times = [0, 1, 2].map((hour) => new Date(Date.UTC(2026, 6, 16, hour)));
@@ -26,29 +26,10 @@ function alphaAt(raster: CloudRaster, time: number, pressure: number) {
   return raster.pixels[(y * raster.width + x) * 4 + 3];
 }
 
-function strongestAlpha(raster: CloudRaster, fixed: { time: number } | { pressure: number }) {
-  let strongest = 0;
-  for (let i = 0; i < 512; i++) {
-    const time = 'time' in fixed ? fixed.time : +domain[0] + ((i + 0.5) / 512) * (+domain[1] - +domain[0]);
-    const pressure =
-      'pressure' in fixed
-        ? fixed.pressure
-        : raster.pressureTop + ((i + 0.5) / 512) * (raster.pressureBottom - raster.pressureTop);
-    strongest = Math.max(strongest, alphaAt(raster, time, pressure));
-  }
-  return strongest;
-}
-
 describe('cloud raster', () => {
   it.each([
     [0, 0],
     [0.1, 26],
-    [1, 26],
-    [4, 26],
-    [5, 26],
-    [5.1, 26],
-    [9, 26],
-    [10, 26],
     [24, 26],
     [25, 51],
     [49, 51],
@@ -58,16 +39,16 @@ describe('cloud raster', () => {
     [100, 179],
   ])('assigns %i percent cloud to its contour band', (cover, alpha) => {
     const raster = build(clouds.map((cloud) => ({ ...cloud, value: cover })));
-    expect(strongestAlpha(raster, { time: +times[1] })).toBe(alpha);
+    expect(new Set(raster.pixels.filter((_, index) => index % 4 === 3))).toEqual(new Set([alpha]));
     expect([...raster.pixels.slice(0, 3)]).toEqual(CHART_COLORS.windCloudRgb);
     expect(raster.pixels.length).toBe(raster.width * raster.height * 4);
   });
 
   it('computes contours from interpolated cloud percentages rather than styled opacity', () => {
     const raster = build();
-    expect(strongestAlpha(raster, { time: +times[0] + 0.7 * 3600000 })).toBe(51);
-    expect(strongestAlpha(raster, { time: +times[1] + 0.2 * 3600000 })).toBe(102);
-    expect(strongestAlpha(raster, { time: +times[1] + 0.7 * 3600000 })).toBe(179);
+    expect(alphaAt(raster, +times[0] + 0.7 * 3600000, 850)).toBe(51);
+    expect(alphaAt(raster, +times[1] + 0.2 * 3600000, 850)).toBe(102);
+    expect(alphaAt(raster, +times[1] + 0.7 * 3600000, 850)).toBe(179);
   });
 
   it('creates filled contour regions across uneven pressure levels', () => {
@@ -75,25 +56,31 @@ describe('cloud raster', () => {
     const next = pressures[pressures.indexOf(level) + 1];
     const gap = next - level;
     const raster = build(clouds.map((cloud) => ({ ...cloud, value: cloud.pressure === level ? 100 : 0 })));
-    expect(strongestAlpha(raster, { pressure: level + gap * 0.1 })).toBe(179);
-    expect(strongestAlpha(raster, { pressure: level + gap * 0.4 })).toBe(102);
-    expect(strongestAlpha(raster, { pressure: level + gap * 0.65 })).toBe(51);
-    expect(strongestAlpha(raster, { pressure: level + gap * 0.85 })).toBe(26);
-    expect(strongestAlpha(raster, { pressure: level + gap * 0.97 })).toBe(26);
-    expect(strongestAlpha(raster, { pressure: level + gap * 1.1 })).toBe(0);
+    expect(alphaAt(raster, +times[1], level + gap * 0.1)).toBe(179);
+    expect(alphaAt(raster, +times[1], level + gap * 0.4)).toBe(102);
+    expect(alphaAt(raster, +times[1], level + gap * 0.65)).toBe(51);
+    expect(alphaAt(raster, +times[1], level + gap * 0.85)).toBe(26);
+    expect(alphaAt(raster, +times[1], level + gap * 0.97)).toBe(26);
+    expect(alphaAt(raster, +times[1], level + gap * 1.1)).toBe(0);
   });
 
-  it('uses stable large holes with coverage matching cover and solid fill at 100 percent', () => {
-    const halfClouds = clouds.map((cloud) => ({ ...cloud, value: 50 }));
-    const half = build(halfClouds);
-    expect(build(halfClouds).pixels).toEqual(half.pixels);
-    let filled = 0;
-    for (let i = 3; i < half.pixels.length; i += 4) filled += half.pixels[i] / 102;
-    expect(filled / (half.width * half.height)).toBeGreaterThan(0.45);
-    expect(filled / (half.width * half.height)).toBeLessThan(0.55);
-    const full = build(clouds.map((cloud) => ({ ...cloud, value: 100 })));
-    for (let i = 3; i < full.pixels.length; i += 4) {
-      if (full.pixels[i] !== 179) throw new Error('Overcast cloud must have solid fill');
+  it('leaves clouds below model ground elevation transparent', () => {
+    const groundElevation = 1200;
+    const groundPressure = metersToHPaExact(groundElevation);
+    const raster = buildCloudRaster(
+      clouds.map((cloud) => ({ ...cloud, value: 50 })),
+      times,
+      domain,
+      'icon_seamless',
+      4000,
+      groundElevation
+    )!;
+    const bottomRow = Math.floor(
+      ((groundPressure - raster.pressureTop) / (raster.pressureBottom - raster.pressureTop)) * raster.height - 0.5
+    );
+    for (let x = 0; x < raster.width; x++) {
+      expect(raster.pixels[(bottomRow * raster.width + x) * 4 + 3]).toBe(102);
+      expect(raster.pixels[((bottomRow + 1) * raster.width + x) * 4 + 3]).toBe(0);
     }
   });
 

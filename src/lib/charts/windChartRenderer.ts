@@ -299,7 +299,9 @@ export function renderWindChart(
       ctx.imageSmoothingQuality = 'high';
       const top = pressureY(raster.pressureTop);
       const start = x(+data.xDomain[0]);
-      ctx.drawImage(cloudImage, start, top, x(+data.xDomain[1]) - start, pressureY(raster.pressureBottom) - top);
+      const cloudWidth = x(+data.xDomain[1]) - start;
+      const cloudHeight = pressureY(raster.pressureBottom) - top;
+      ctx.drawImage(cloudImage, start, top, cloudWidth, cloudHeight);
       ctx.restore();
     }
     if (axisUnit === 'm') {
