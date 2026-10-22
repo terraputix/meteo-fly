@@ -42,6 +42,7 @@
 - **Data flow**: `+page.svelte` fetches weather data, passes it into `ChartContainer.svelte`, then `WindChart.svelte` offloads heavy chart preparation to `src/lib/workers/chartWorker.ts`.
 - **Worker split**: Expensive chart shaping and Hike & Fly terrain/raster processing belong in pure helpers or workers, not in UI components.
 - **Chart stack**: Reuse existing chart builders and tooltip/state helpers before adding new rendering abstractions.
+- **Forecast time ranges**: Cache location timezone metadata and request hourly data using explicit UTC bounds for the selected local calendar days. Select sunrise/sunset by local date. Preserve 23- and 25-hour DST days.
 - **Forecast models**: Supported models are defined canonically in `src/lib/api/types.ts`; UI selectors must stay aligned with that union.
 - **PWA**: Registration and update UI live in `+layout.svelte`; precache inputs come from `$app/manifest`; navigation
   fallback and runtime caching live in `src/service-worker/index.ts`. The worker has its own TypeScript project.
@@ -96,6 +97,7 @@
 - Canvas lifecycle, interaction, and worker orchestration: `src/lib/components/WindChart.svelte`
 - Wind layout/hit testing: `src/lib/charts/windChartLayout.ts`; drawing: `src/lib/charts/windChartRenderer.ts`
 - Wind chart uses a base canvas plus a separate crosshair canvas; resize reuses prepared data.
+- Daylight shading and filtering share local-day intervals from `src/lib/meteo/daylight.ts`, including midnight-spanning daylight and 23/25-hour DST days. Preserve polar day/night status separately from absent sunrise/sunset annotations; daylight-only mode keeps the full forecast when there is no daylight.
 - Chart touch selections use `pointerup`, keeping scrolling and pinch zoom available. Wind tooltips appear next to the interaction point, preferring above and left, and flip or clamp to stay within the visible chart scroll area for all input types.
 - Wind cloud cover is interpolated in the chart worker and rendered with 5/25/50/75% contour bands in a cached RGBA raster, with a faint fade below the 5% step. Band thresholds and opacity live in `chartColors.ts` and also drive the cloud legend. The wind hover shares the cloud interpolation at the interaction time and pressure. Missing observations, 0% cover, and areas below model ground (DEM fallback) remain transparent.
 - Worker entrypoint: `src/lib/workers/chartWorker.ts`

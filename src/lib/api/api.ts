@@ -1,4 +1,5 @@
 import { fetchWeatherApi } from 'openmeteo';
+import { fromDate, toCalendarDate, toZoned } from '@internationalized/date';
 import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
 import type { WeatherApiResponse } from '@openmeteo/sdk/weather-api-response';
 import {
@@ -15,6 +16,7 @@ import {
   type SkewTWeatherData,
 } from './types';
 import { getVariablesForModel, makeProfileVar } from './variables';
+import { FORECAST_URL, resolveLocationTimezone } from '#lib/api/timezone.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
 
 export interface HourlyParams {
@@ -126,51 +128,42 @@ function createHourlyTimes(hourly: VariablesWithTime, requestName: string): Date
   return range(start, end, interval).map((t) => new Date(t * 1000));
 }
 
-function getDailyTime(daily: VariablesWithTime, position: number, name: string): Date {
-  const secondsValue = daily.variables(position)?.valuesInt64(0);
-  if (secondsValue == null) {
-    throw new Error(`Open-Meteo wind chart response is missing ${name} data`);
+function getDailyTime(
+  daily: VariablesWithTime,
+  position: number,
+  name: string,
+  date: string,
+  timezone: string
+): { time: Date | null; polarDaylight?: WindChartData['polarDaylight'] } {
+  const values = daily.variables(position);
+  let absentEvent = false;
+  let polarDaylight: WindChartData['polarDaylight'];
+  for (let i = 0; i < (values?.valuesInt64Length() ?? 0); i++) {
+    const seconds = values?.valuesInt64(i);
+    if (seconds == null) continue;
+    const sunrise = daily.variables(0)?.valuesInt64(i);
+    const sunset = daily.variables(1)?.valuesInt64(i);
+    // Polar responses also use equal midnights or a full UTC day as placeholders.
+    const polarDay = sunrise != null && sunset != null && sunset - sunrise === 86400n;
+    if (seconds === 0n || sunrise === sunset || polarDay) {
+      absentEvent = true;
+      if (polarDay) polarDaylight = 'day';
+      else if (seconds !== 0n && sunrise === sunset) polarDaylight = 'night';
+      continue;
+    }
+    const time = new Date(Number(seconds) * 1000);
+    if (Number.isFinite(+time) && formatDateToYYYYMMDD(time, timezone) === date) return { time };
   }
-  const seconds = Number(secondsValue);
-  if (!Number.isFinite(seconds)) {
-    throw new Error(`Open-Meteo wind chart response has invalid ${name} data`);
-  }
-  return new Date(seconds * 1000);
+  if (absentEvent) return { time: null, polarDaylight };
+  throw new Error(`Open-Meteo wind chart response is missing ${name} data for ${date}`);
 }
-
-const url = 'https://api.open-meteo.com/v1/forecast';
-const REQUEST_TIMEZONE = 'auto';
 
 // Helper function to form time ranges
 const range = (start: number, stop: number, step: number) =>
   Array.from({ length: (stop - start) / step }, (_, i) => start + i * step);
 
-function formatDateToYYYYMMDD(date: Date, timeZone?: string): string {
-  if (timeZone) {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(date);
-    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
-    return `${part('year')}-${part('month')}-${part('day')}`;
-  }
-
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function addDaysToDate(date: string, days: number): string {
-  const [year, month, day] = date.split('-').map(Number);
-  const result = new Date(Date.UTC(year, month - 1, day + days));
-  return result.toISOString().slice(0, 10);
-}
-
-function getResponseTimezone(response: WeatherApiResponse): string {
-  return response.timezone() ?? 'UTC';
+function formatDateToYYYYMMDD(date: Date, timeZone: string): string {
+  return toCalendarDate(fromDate(date, timeZone)).toString();
 }
 
 export function createQueryParams(
@@ -180,22 +173,37 @@ export function createQueryParams(
   cellSelection: CellSelection,
   referenceDate: Date,
   numberOfDays: number,
-  dateTimezone?: string,
+  timezone: string,
   dayOffset: number = 0
 ) {
-  const startDate = addDaysToDate(formatDateToYYYYMMDD(referenceDate, dateTimezone), dayOffset);
+  const date = toCalendarDate(fromDate(referenceDate, timezone)).add({ days: dayOffset });
+  const start = toZoned(date, timezone).toDate();
+  const end = new Date(+toZoned(date.add({ days: numberOfDays }), timezone).toDate() - 3600000);
 
   return {
     ...hourlyParams,
     daily: ['sunrise', 'sunset'],
     latitude: location.latitude,
     longitude: location.longitude,
-    start_date: startDate,
-    end_date: addDaysToDate(startDate, numberOfDays - 1),
+    start_date: start.toISOString().slice(0, 10),
+    end_date: end.toISOString().slice(0, 10),
+    start_hour: start.toISOString().slice(0, 16),
+    end_hour: end.toISOString().slice(0, 16),
     models: model,
     cell_selection: cellSelection,
-    timezone: REQUEST_TIMEZONE,
+    timezone: 'GMT',
   };
+}
+
+async function fetchResponse(
+  params: Parameters<typeof fetchWeatherApi>[1],
+  requestName: string,
+  signal?: AbortSignal
+): Promise<WeatherApiResponse> {
+  return getFirstResponse(
+    await fetchWeatherApi(FORECAST_URL, params, undefined, undefined, undefined, signal ? { signal } : undefined),
+    requestName
+  );
 }
 
 export async function fetchModelGridElevation(
@@ -210,12 +218,12 @@ export async function fetchModelGridElevation(
     models: model,
     cell_selection: cellSelection,
     forecast_days: 1,
-    timezone: REQUEST_TIMEZONE,
+    timezone: 'auto',
     elevation: 'nan',
   };
 
   const responses = await fetchWeatherApi(
-    url,
+    FORECAST_URL,
     params,
     undefined,
     undefined,
@@ -238,26 +246,8 @@ export async function fetchWindChartData(
 ): Promise<WindChartData> {
   const modelVariables = getVariablesForModel(model, maxAltitude);
   const hourlyParams = createHourlyParams(modelVariables);
-  let params = createQueryParams(
-    location,
-    hourlyParams,
-    model,
-    cellSelection,
-    referenceDate,
-    numberOfDays,
-    undefined,
-    dayOffset
-  );
-
-  const fetchResponse = async () =>
-    getFirstResponse(
-      await fetchWeatherApi(url, params, undefined, undefined, undefined, signal ? { signal } : undefined),
-      'wind chart'
-    );
-
-  let response = await fetchResponse();
-  let timezone = getResponseTimezone(response);
-  const localDateParams = createQueryParams(
+  const timezone = await resolveLocationTimezone(location, signal);
+  const params = createQueryParams(
     location,
     hourlyParams,
     model,
@@ -267,13 +257,8 @@ export async function fetchWindChartData(
     timezone,
     dayOffset
   );
-  if (localDateParams.start_date !== params.start_date || localDateParams.end_date !== params.end_date) {
-    params = localDateParams;
-    response = await fetchResponse();
-    timezone = getResponseTimezone(response);
-  }
-
-  const timezoneAbbr = response.timezoneAbbreviation() ?? 'UTC';
+  const response = await fetchResponse(params, 'wind chart', signal);
+  const date = formatDateToYYYYMMDD(new Date(`${params.start_hour}Z`), timezone);
   const selectedGridCell: Location = {
     latitude: response.latitude(),
     longitude: response.longitude(),
@@ -283,8 +268,8 @@ export async function fetchWindChartData(
   if (!daily) {
     throw new Error('Open-Meteo wind chart response is missing daily data');
   }
-  const sunrise = getDailyTime(daily, 0, 'sunrise');
-  const sunset = getDailyTime(daily, 1, 'sunset');
+  const sunrise = getDailyTime(daily, 0, 'sunrise', date, timezone);
+  const sunset = getDailyTime(daily, 1, 'sunset', date, timezone);
 
   const elevation = response.elevation();
 
@@ -302,9 +287,9 @@ export async function fetchWindChartData(
       }, {} as Partial<HourlyData>),
     } as HourlyData,
     timezone,
-    timezoneAbbr,
-    sunrise: sunrise,
-    sunset: sunset,
+    sunrise: sunrise.time,
+    sunset: sunset.time,
+    polarDaylight: !sunrise.time && !sunset.time ? (sunrise.polarDaylight ?? sunset.polarDaylight) : undefined,
     selectedGridCell,
   };
 
@@ -331,44 +316,25 @@ export async function fetchSkewTData(
   maxAltitude: MaxAltitude = 4000,
   cellSelection: CellSelection = 'nearest',
   signal?: AbortSignal,
-  dateTimezone?: string,
   dayOffset: number = 0
 ): Promise<SkewTWeatherData> {
   const variables = getSkewTVariablesForModel(model, maxAltitude);
-  const startDate = addDaysToDate(formatDateToYYYYMMDD(referenceDate, dateTimezone), dayOffset);
-  let params = {
-    hourly: [...variables.flatMap((v) => v.apiNames), 'temperature_2m', 'dew_point_2m'],
-    latitude: location.latitude,
-    longitude: location.longitude,
-    start_date: startDate,
-    end_date: startDate,
-    models: model,
-    cell_selection: cellSelection,
-    timezone: REQUEST_TIMEZONE,
-  };
-
-  const fetchResponse = async () =>
-    getFirstResponse(
-      await fetchWeatherApi(url, params, undefined, undefined, undefined, signal ? { signal } : undefined),
-      'Skew-T'
-    );
-
-  let response = await fetchResponse();
-  let timezone = getResponseTimezone(response);
-  const localStartDate = addDaysToDate(formatDateToYYYYMMDD(referenceDate, timezone), dayOffset);
-  if (localStartDate !== params.start_date) {
-    params = { ...params, start_date: localStartDate, end_date: localStartDate };
-    response = await fetchResponse();
-    timezone = getResponseTimezone(response);
-  }
-
-  const timezoneAbbr = response.timezoneAbbreviation() ?? 'UTC';
+  const timezone = await resolveLocationTimezone(location, signal);
+  const hourlyParams = [...variables.flatMap((v) => v.apiNames), 'temperature_2m', 'dew_point_2m'];
+  const params = createQueryParams(
+    location,
+    { hourly: hourlyParams },
+    model,
+    cellSelection,
+    referenceDate,
+    1,
+    timezone,
+    dayOffset
+  );
+  const response = await fetchResponse({ ...params, daily: undefined }, 'Skew-T', signal);
   const elevation = response.elevation();
-
   const hourly = getHourlySection(response, 'Skew-T');
   const times = createHourlyTimes(hourly, 'Skew-T');
-
-  const hourlyParams = params.hourly as string[];
 
   const result: SkewTWeatherData['hourly'] = {
     time: times,
@@ -406,6 +372,5 @@ export async function fetchSkewTData(
     hourly: result,
     elevation,
     timezone,
-    timezoneAbbr,
   };
 }

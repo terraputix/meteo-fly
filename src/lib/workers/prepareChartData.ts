@@ -1,3 +1,4 @@
+import { getDaylightIntervals, type DaylightInterval } from '#lib/meteo/daylight.js';
 import { getCloudCoverData } from '#lib/charts/clouds.js';
 import { buildCloudRaster } from '#lib/charts/cloudRaster.js';
 import { getWindFieldAllLevels } from '#lib/charts/wind.js';
@@ -12,17 +13,18 @@ import type {
   RainCloudChartData,
 } from './chartWorker.types';
 
-function filterDaylightHours(data: WindChartData): WindChartData {
-  const sunriseMs = data.sunrise.getTime() - 3600_000;
-  const sunsetMs = data.sunset.getTime() + 3600_000;
+function filterDaylightHours(data: WindChartData, intervals: DaylightInterval[]): WindChartData {
+  if (!intervals.length) return data;
 
   const indices: number[] = [];
   for (let i = 0; i < data.hourly.time.length; i++) {
     const t = data.hourly.time[i].getTime();
-    if (t >= sunriseMs && t <= sunsetMs) {
+    if (intervals.some(([start, end]) => t >= start - 3600_000 && t <= end + 3600_000)) {
       indices.push(i);
     }
   }
+
+  if (!indices.length) return data;
 
   function pickArray(arr: Float32Array): Float32Array {
     return new Float32Array(indices.map((i) => arr[i]));
@@ -56,7 +58,7 @@ function filterDaylightHours(data: WindChartData): WindChartData {
   };
 }
 
-function prepareTemperatureData(data: WindChartData): TemperatureChartData {
+function prepareTemperatureData(data: WindChartData, daylightIntervals: DaylightInterval[]): TemperatureChartData {
   return {
     temperatureData: data.hourly.time.map((time, i) => ({
       time,
@@ -70,6 +72,7 @@ function prepareTemperatureData(data: WindChartData): TemperatureChartData {
       time,
       value: data.hourly.relativeHumidity_2m[i] ?? NaN,
     })),
+    daylightIntervals,
     sunrise: data.sunrise,
     sunset: data.sunset,
   };
@@ -111,7 +114,9 @@ function calculateDomains(times: Date[]): [Date, Date] {
 
 export function prepareChartData(input: ChartWorkerInput): ChartWorkerSuccessOutput['data'] {
   const { windChartData, maxAltitude, model, daylightOnly } = input;
-  const data = daylightOnly ? filterDaylightHours(windChartData) : windChartData;
+  const firstTime = windChartData.hourly.time[0];
+  const daylightIntervals = firstTime ? getDaylightIntervals(firstTime, windChartData) : [];
+  const data = daylightOnly ? filterDaylightHours(windChartData, daylightIntervals) : windChartData;
   const cloudData = getCloudCoverData(data, model, maxAltitude);
   const xDomain = calculateDomains(data.hourly.time);
 
@@ -130,8 +135,7 @@ export function prepareChartData(input: ChartWorkerInput): ChartWorkerSuccessOut
     elevation: windChartData.elevation,
     modelGridElevation: windChartData.modelGridElevation,
     timezone: windChartData.timezone,
-    timezoneAbbr: windChartData.timezoneAbbr,
-    temperatureChartData: prepareTemperatureData(data),
+    temperatureChartData: prepareTemperatureData(data, daylightIntervals),
     rainCloudChartData: prepareRainAndCloudData(data),
     xDomain,
   };

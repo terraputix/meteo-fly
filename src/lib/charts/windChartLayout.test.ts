@@ -23,6 +23,7 @@ const data: PreparedWindChart = {
     temperatureData: [{ time, value: 20 }],
     dewpointData: [{ time, value: 10 }],
     humidityData: [{ time, value: 60 }],
+    daylightIntervals: [],
     sunrise: time,
     sunset: time,
   },
@@ -32,7 +33,6 @@ const data: PreparedWindChart = {
   elevation: 500,
   modelGridElevation: undefined,
   timezone: 'UTC',
-  timezoneAbbr: 'UTC',
   xDomain: [new Date(+time - 1800000), new Date(+time + 1800000)],
 };
 

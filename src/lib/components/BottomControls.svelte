@@ -1,5 +1,6 @@
 <script lang="ts">
   import { MIN_FORECAST_DAY, stepTimestep, type TimestepDirection } from '#lib/components/timestepNavigation.js';
+  import { formatTimeZone } from '#lib/helpers.js';
   import type { ChartView } from '#lib/services/types.js';
 
   let {
@@ -8,7 +9,6 @@
     hour = $bindable(0),
     traceHours = [],
     timezone = 'UTC',
-    timezoneAbbr = '',
     maxForecastDays = 8,
     chartView = 'wind',
     keyboardNavigationEnabled = false,
@@ -19,7 +19,6 @@
     hour?: number;
     traceHours?: Date[];
     timezone?: string;
-    timezoneAbbr?: string;
     maxForecastDays?: number;
     chartView?: ChartView;
     keyboardNavigationEnabled?: boolean;
@@ -54,7 +53,19 @@
     });
   }
 
+  let pendingLastTrace = $state.raw<Date[] | null>(null);
+  const selectedTimezone = $derived(formatTimeZone(traceHours[hour] ?? startDate, timezone));
+
+  $effect(() => {
+    if (pendingLastTrace && traceHours.length > 0 && traceHours !== pendingLastTrace) {
+      hour = traceHours.length - 1;
+      pendingLastTrace = null;
+    }
+  });
+
   function applyTimestep(direction: TimestepDirection, activeView = chartView) {
+    pendingLastTrace =
+      activeView === 'skewt' && direction === -1 && hour === 0 && selectedDay > MIN_FORECAST_DAY ? traceHours : null;
     ({ selectedDay, hour } = stepTimestep({
       chartView: activeView,
       direction,
@@ -94,6 +105,7 @@
   }
 
   function handleSliderInput(e: Event) {
+    pendingLastTrace = null;
     const target = e.target as HTMLInputElement;
     hour = parseInt(target.value);
   }
@@ -125,7 +137,7 @@
 
   let timestepAnnouncement = $derived.by(() => {
     if (chartView === 'skewt' && traceHours.length > 0) {
-      return `Forecast time ${formatDayHour(traceHours[hour] ?? new Date())} ${timezoneAbbr}`.trim();
+      return `Forecast time ${formatDayHour(traceHours[hour] ?? new Date())} ${selectedTimezone}`.trim();
     }
     return `Forecast ${getDayLabel(selectedDay)}, ${formatForecastDate(startDate)}`;
   });
@@ -161,7 +173,7 @@
         value={hour}
         oninput={handleSliderInput}
         aria-label="Forecast time"
-        aria-valuetext={`${formatDayHour(traceHours[hour] ?? new Date())} ${timezoneAbbr}`.trim()}
+        aria-valuetext={`${formatDayHour(traceHours[hour] ?? new Date())} ${selectedTimezone}`.trim()}
         class="h-2 flex-1 cursor-pointer rounded-lg bg-slate-200 accent-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600"
       />
       <button
@@ -177,7 +189,7 @@
       </button>
       <span class="min-w-30 text-right text-xs font-medium text-slate-700">
         {formatDayHour(traceHours[hour] ?? new Date())}
-        <span class="text-slate-400"> {timezoneAbbr}</span>
+        <span class="text-slate-400"> {selectedTimezone}</span>
       </span>
     </div>
   {/if}

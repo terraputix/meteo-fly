@@ -8,6 +8,7 @@ describe('wind tooltip pressure coordinate', () => {
       temperatureData: [{ time, value: 20 }],
       dewpointData: [{ time, value: 12 }],
       humidityData: [{ time, value: 60 }],
+      daylightIntervals: [],
       sunrise: time,
       sunset: time,
     };
@@ -36,6 +37,7 @@ describe('wind tooltip pressure coordinate', () => {
       temperatureData: [{ time, value: 20 }],
       dewpointData: [{ time, value: 12 }],
       humidityData: [{ time, value: 60 }],
+      daylightIntervals: [],
       sunrise: time,
       sunset: time,
     };
@@ -72,6 +74,7 @@ describe('canvas tooltip selection', () => {
     temperatureData: [{ time, value: 22 }],
     dewpointData: [{ time, value: 12 }],
     humidityData: [{ time, value: 60 }],
+    daylightIntervals: [],
     sunrise: time,
     sunset: time,
   };

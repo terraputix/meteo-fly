@@ -35,9 +35,9 @@ export interface WindChartData {
   elevation: number;
   modelGridElevation?: number;
   timezone: string;
-  timezoneAbbr: string;
-  sunrise: Date;
-  sunset: Date;
+  sunrise: Date | null;
+  sunset: Date | null;
+  polarDaylight?: 'day' | 'night';
   selectedGridCell: Location | null;
 }
 
@@ -77,7 +77,6 @@ export interface SkewTWeatherData {
   };
   elevation: number;
   timezone: string;
-  timezoneAbbr: string;
 }
 
 export type HourlyKeys = keyof HourlyData;

@@ -70,7 +70,7 @@
   let skewTFailure = $state.raw<WeatherRequestFailure | null>(null);
 
   const paneDirection = $derived<'horizontal' | 'vertical'>($isMobile ? 'vertical' : 'horizontal');
-  const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1));
+  const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1, windChartData?.timezone));
   const showMapLoadingStatus = $derived(!showChart && isWindChartLoading && !windChartData);
   const showMapErrorStatus = $derived(!showChart && windFailure !== null);
 
@@ -376,7 +376,6 @@
         requestParameters.maxAltitude,
         requestParameters.cellSelection,
         request.signal,
-        windChartData?.timezone,
         requestParameters.dayOffset
       );
       if (!skewTRequest.isCurrent(request)) return;
@@ -552,7 +551,7 @@
             onContentHeightChange={(height) => (chartContentHeight = height)}
             {windChartData}
             {skewTWeatherData}
-            startDate={windChartData?.hourly.time[0] ?? startDate}
+            {startDate}
             {isWindChartLoading}
             {isSkewTLoading}
             skewTError={skewTFailure?.message ?? null}

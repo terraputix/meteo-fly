@@ -96,7 +96,7 @@
 
   $effect(() => {
     if (hour >= traceHours.length && traceHours.length > 0) {
-      hour = 0;
+      hour = traceHours.length - 1;
     }
   });
 </script>
@@ -237,7 +237,6 @@
       bind:hour
       {traceHours}
       timezone={skewTData?.timezone ?? windChartData?.timezone}
-      timezoneAbbr={skewTData?.timezoneAbbr ?? windChartData?.timezoneAbbr}
       {maxForecastDays}
       {chartView}
       {keyboardNavigationEnabled}
