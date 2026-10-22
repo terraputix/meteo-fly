@@ -7,7 +7,7 @@ import {
   WIND_MARKER_OUTLINE_WIDTH,
 } from '#lib/charts/scales.js';
 import { metersToHPaExact } from '#lib/meteo/pressureLevels.js';
-import { fmtTime } from '#lib/helpers.js';
+import { fmtTime, formatTimeZone } from '#lib/helpers.js';
 import {
   curveControls,
   rainDropCount,
@@ -161,11 +161,9 @@ export function renderWindChart(
   const temperature = data.temperatureChartData;
 
   clipPanel(ctx, layout, 0, () => {
-    const sunrise = x(+temperature.sunrise);
-    const sunset = x(+temperature.sunset);
-    if (Number.isFinite(sunrise) && Number.isFinite(sunset)) {
-      ctx.fillStyle = colors.sunriseFill;
-      ctx.fillRect(sunrise, TEMP_TOP, sunset - sunrise, TEMP_HEIGHT_PX);
+    ctx.fillStyle = colors.sunriseFill;
+    for (const [start, end] of temperature.daylightIntervals) {
+      ctx.fillRect(x(start), TEMP_TOP, x(end) - x(start), TEMP_HEIGHT_PX);
     }
     for (let t = layout.tempMin; t <= layout.tempMax; t += 5)
       line(ctx, left, temperatureY(t), right, temperatureY(t), colors.gridLine);
@@ -194,6 +192,7 @@ export function renderWindChart(
     [temperature.sunrise, true],
     [temperature.sunset, false],
   ] as const) {
+    if (!time) continue;
     const px = x(+time);
     if (!Number.isFinite(px) || px < left || px > right) continue;
     daylightMarker(ctx, px + (sunrise ? -7 : 7), DAYLIGHT_CONTEXT_TOP + 15, sunrise);
@@ -430,7 +429,10 @@ export function renderWindChart(
     line(ctx, x(time), y, x(time), y + 5, colors.axisLine);
     text(ctx, fmtTime(new Date(time), data.timezone), x(time), y + 14, 'center');
   }
-  text(ctx, `Time [${data.timezoneAbbr}]`, (left + right) / 2, windBottom + 32, 'center');
+  const zones = [
+    ...new Set(data.temperatureChartData.temperatureData.map(({ time }) => formatTimeZone(time, data.timezone))),
+  ];
+  text(ctx, `Time [${zones.join(' / ')}]`, (left + right) / 2, windBottom + 32, 'center');
   ctx.restore();
 }
 

@@ -1,3 +1,4 @@
+import type { DaylightInterval } from '#lib/meteo/daylight.js';
 import type { WindChartData, WeatherModel } from '#lib/api/types.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
 import type { WindFieldLevel } from '#lib/charts/wind.js';
@@ -21,8 +22,9 @@ export interface TemperatureChartData {
   temperatureData: Array<{ time: Date; value: number }>;
   dewpointData: Array<{ time: Date; value: number }>;
   humidityData: Array<{ time: Date; value: number }>;
-  sunrise: Date;
-  sunset: Date;
+  sunrise: Date | null;
+  sunset: Date | null;
+  daylightIntervals: DaylightInterval[];
 }
 
 export interface RainCloudChartData {

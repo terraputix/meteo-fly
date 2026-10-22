@@ -138,7 +138,7 @@ function metricRow(label: string, value: string, color?: string, dashed = false)
 export function formatTooltip(store: TooltipStore, active: ActiveState, timezone: string, hoveredTime: number): string {
   const snap = snapToNearest(store.sortedTimes, hoveredTime);
   if (snap == null) return '';
-  const timeStr = fmtTime(new Date(snap), timezone);
+  const timeStr = fmtTime(new Date(snap), timezone, true);
   const { gridIndex, hoveredWindPressure } = active;
   const panelLabel =
     gridIndex === 0 ? 'Surface' : gridIndex === 1 ? 'Clouds & rain' : gridIndex === 2 ? 'Wind' : 'Forecast';

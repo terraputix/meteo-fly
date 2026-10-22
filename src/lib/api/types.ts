@@ -36,8 +36,9 @@ export interface WindChartData {
   modelGridElevation?: number;
   timezone: string;
   timezoneAbbr: string;
-  sunrise: Date;
-  sunset: Date;
+  sunrise: Date | null;
+  sunset: Date | null;
+  polarDaylight?: 'day' | 'night';
   selectedGridCell: Location | null;
 }
 

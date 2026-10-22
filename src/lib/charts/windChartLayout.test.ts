@@ -23,6 +23,7 @@ const data: PreparedWindChart = {
     temperatureData: [{ time, value: 20 }],
     dewpointData: [{ time, value: 10 }],
     humidityData: [{ time, value: 60 }],
+    daylightIntervals: [],
     sunrise: time,
     sunset: time,
   },

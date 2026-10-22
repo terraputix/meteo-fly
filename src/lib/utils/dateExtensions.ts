@@ -1,11 +1,11 @@
-// Simple utility function to add seconds to a date
+import { fromDate } from '@internationalized/date';
+
 export function addSeconds(date: Date, seconds: number): Date {
-  const newDate = new Date(date.getTime());
-  newDate.setSeconds(newDate.getSeconds() + seconds);
-  return newDate;
+  return new Date(date.getTime() + seconds * 1000);
 }
 
-export function addDays(date: Date, days: number): Date {
+export function addDays(date: Date, days: number, timeZone?: string): Date {
+  if (timeZone) return fromDate(date, timeZone).add({ days }).toDate();
   const newDate = new Date(date.getTime());
   newDate.setDate(newDate.getDate() + days);
   return newDate;

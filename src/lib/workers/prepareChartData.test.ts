@@ -50,6 +50,44 @@ describe('chart worker preparation', () => {
     expect(result.xDomain.every((date) => Number.isFinite(date.getTime()))).toBe(true);
   });
 
+  it.each(['sunrise', 'sunset', 'both'] as const)(
+    'keeps the full forecast when %s is absent in daylight-only mode',
+    (event) => {
+      const windChartData = createData();
+      if (event !== 'sunset') windChartData.sunrise = null;
+      if (event !== 'sunrise') windChartData.sunset = null;
+      const result = prepareChartData({ windChartData, maxAltitude: 4000, model: 'icon_d2', daylightOnly: true });
+      expect(result.temperatureChartData.temperatureData.map(({ time }) => time)).toEqual(windChartData.hourly.time);
+      expect(result.temperatureChartData.sunrise).toEqual(windChartData.sunrise);
+      expect(result.temperatureChartData.sunset).toEqual(windChartData.sunset);
+      expect(result.xDomain.every((date) => Number.isFinite(+date))).toBe(true);
+    }
+  );
+
+  it.each([
+    ['normal', 6, 18, undefined, Array.from({ length: 15 }, (_, i) => i + 5)],
+    ['midnight daylight', 18, 6, undefined, [0, 1, 2, 3, 4, 5, 6, 7, 17, 18, 19, 20, 21, 22, 23]],
+    ['polar day', null, null, 'day', Array.from({ length: 24 }, (_, i) => i)],
+    ['polar night', null, null, 'night', Array.from({ length: 24 }, (_, i) => i)],
+  ] as const)(
+    'filters %s using daylight intervals with one-hour padding',
+    (_name, rise, set, polarDaylight, expected) => {
+      const windChartData = createData();
+      const hour = (value: number) => new Date(Date.parse('2026-07-16T00:00Z') + value * 3600000);
+      windChartData.hourly.time = Array.from({ length: 24 }, (_, i) => hour(i));
+      windChartData.hourly.temperature_2m = Float32Array.from({ length: 24 }, (_, i) => i);
+      windChartData.sunrise = rise === null ? null : hour(rise);
+      windChartData.sunset = set === null ? null : hour(set);
+      windChartData.polarDaylight = polarDaylight;
+      const full = prepareChartData({ windChartData, maxAltitude: 4000, model: 'icon_d2' });
+      const filtered = prepareChartData({ windChartData, maxAltitude: 4000, model: 'icon_d2', daylightOnly: true });
+      expect(filtered.temperatureChartData.temperatureData.map(({ value }) => value)).toEqual(expected);
+      expect(filtered.temperatureChartData.daylightIntervals).toEqual(full.temperatureChartData.daylightIntervals);
+      expect(filtered.temperatureChartData.sunrise).toEqual(windChartData.sunrise);
+      expect(filtered.temperatureChartData.sunset).toEqual(windChartData.sunset);
+    }
+  );
+
   it('aligns the daylight domain with the first and last retained hourly cells', () => {
     const windChartData = createData();
     windChartData.sunrise = new Date('2026-07-16T10:23:00Z');
