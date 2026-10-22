@@ -135,7 +135,6 @@ export function prepareChartData(input: ChartWorkerInput): ChartWorkerSuccessOut
     elevation: windChartData.elevation,
     modelGridElevation: windChartData.modelGridElevation,
     timezone: windChartData.timezone,
-    timezoneAbbr: windChartData.timezoneAbbr,
     temperatureChartData: prepareTemperatureData(data, daylightIntervals),
     rainCloudChartData: prepareRainAndCloudData(data),
     xDomain,

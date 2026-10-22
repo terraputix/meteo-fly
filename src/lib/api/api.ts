@@ -17,7 +17,6 @@ import {
 } from './types';
 import { getVariablesForModel, makeProfileVar } from './variables';
 import { FORECAST_URL, resolveLocationTimezone } from '#lib/api/timezone.js';
-import { formatTimeZone } from '#lib/helpers.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
 
 export interface HourlyParams {
@@ -260,7 +259,6 @@ export async function fetchWindChartData(
   );
   const response = await fetchResponse(params, 'wind chart', signal);
   const date = formatDateToYYYYMMDD(new Date(`${params.start_hour}Z`), timezone);
-  const timezoneAbbr = formatTimeZone(new Date(`${params.start_hour}Z`), timezone);
   const selectedGridCell: Location = {
     latitude: response.latitude(),
     longitude: response.longitude(),
@@ -289,7 +287,6 @@ export async function fetchWindChartData(
       }, {} as Partial<HourlyData>),
     } as HourlyData,
     timezone,
-    timezoneAbbr,
     sunrise: sunrise.time,
     sunset: sunset.time,
     polarDaylight: !sunrise.time && !sunset.time ? (sunrise.polarDaylight ?? sunset.polarDaylight) : undefined,
@@ -335,7 +332,6 @@ export async function fetchSkewTData(
     dayOffset
   );
   const response = await fetchResponse({ ...params, daily: undefined }, 'Skew-T', signal);
-  const timezoneAbbr = formatTimeZone(new Date(`${params.start_hour}Z`), timezone);
   const elevation = response.elevation();
   const hourly = getHourlySection(response, 'Skew-T');
   const times = createHourlyTimes(hourly, 'Skew-T');
@@ -376,6 +372,5 @@ export async function fetchSkewTData(
     hourly: result,
     elevation,
     timezone,
-    timezoneAbbr,
   };
 }

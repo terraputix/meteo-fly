@@ -66,7 +66,6 @@ describe('solar annotations', () => {
       elevation: 0,
       modelGridElevation: undefined,
       timezone: 'UTC',
-      timezoneAbbr: 'UTC',
       xDomain: [new Date(`${date}T00:00Z`), new Date(`${date}T23:00Z`)],
       temperatureChartData: {
         temperatureData: [{ time, value: 10 }],

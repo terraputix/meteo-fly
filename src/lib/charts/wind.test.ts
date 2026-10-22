@@ -9,7 +9,6 @@ describe('wind chart data', () => {
     const data: WindChartData = {
       elevation: 500,
       timezone: 'UTC',
-      timezoneAbbr: 'UTC',
       sunrise: times[0],
       sunset: times[1],
       selectedGridCell: null,

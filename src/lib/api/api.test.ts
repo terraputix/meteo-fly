@@ -62,16 +62,13 @@ function createResponse({
   hourly = null,
   daily = createDailySection(),
   timezone = 'UTC',
-  timezoneAbbr = 'UTC',
 }: {
   hourly?: VariablesWithTime | null;
   daily?: VariablesWithTime | null;
   timezone?: string;
-  timezoneAbbr?: string;
 }): WeatherApiResponse {
   return {
     timezone: () => timezone,
-    timezoneAbbreviation: () => timezoneAbbr,
     latitude: () => 46.8,
     longitude: () => 8.2,
     elevation: () => 500,

@@ -52,7 +52,6 @@ export interface ChartWorkerSuccessOutput {
     elevation: number;
     modelGridElevation: number | undefined;
     timezone: string;
-    timezoneAbbr: string;
     temperatureChartData: TemperatureChartData;
     rainCloudChartData: RainCloudChartData;
     xDomain: [Date, Date];

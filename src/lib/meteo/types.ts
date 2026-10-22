@@ -44,6 +44,5 @@ export interface SkewTData {
   elevation: number;
   modelGridElevation?: number;
   timezone: string;
-  timezoneAbbr: string;
   pressureLevels: number[];
 }
