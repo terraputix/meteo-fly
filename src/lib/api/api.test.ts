@@ -148,6 +148,12 @@ describe('API Configuration', () => {
           ? await fetchWindChartData(location, 'icon_d2', reference, 1, 4000, 'nearest', signal)
           : await fetchSkewTData(location, 'icon_d2', reference, 4000, 'nearest', signal);
       expect(vi.mocked(fetchWeatherApi)).toHaveBeenCalledTimes(1);
+      const params = vi.mocked(fetchWeatherApi).mock.calls[0]?.[1];
+      if (view === 'skewt') {
+        expect(params).not.toHaveProperty('daily');
+      } else {
+        expect(params).toHaveProperty('daily', ['sunrise', 'sunset']);
+      }
       expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[1]).toMatchObject({
         timezone: 'GMT',
         start_hour: expectedStart,

@@ -182,7 +182,6 @@ export function createQueryParams(
 
   return {
     ...hourlyParams,
-    daily: ['sunrise', 'sunset'],
     latitude: location.latitude,
     longitude: location.longitude,
     start_date: start.toISOString().slice(0, 10),
@@ -257,7 +256,7 @@ export async function fetchWindChartData(
     timezone,
     dayOffset
   );
-  const response = await fetchResponse(params, 'wind chart', signal);
+  const response = await fetchResponse({ ...params, daily: ['sunrise', 'sunset'] }, 'wind chart', signal);
   const date = formatDateToYYYYMMDD(new Date(`${params.start_hour}Z`), timezone);
   const selectedGridCell: Location = {
     latitude: response.latitude(),
@@ -331,7 +330,7 @@ export async function fetchSkewTData(
     timezone,
     dayOffset
   );
-  const response = await fetchResponse({ ...params, daily: undefined }, 'Skew-T', signal);
+  const response = await fetchResponse(params, 'Skew-T', signal);
   const elevation = response.elevation();
   const hourly = getHourlySection(response, 'Skew-T');
   const times = createHourlyTimes(hourly, 'Skew-T');
