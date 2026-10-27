@@ -1,3 +1,4 @@
+import { METRIC_UNITS, temperature, formatAltitude, type UnitPreferences } from '#lib/utils/units.js';
 import { CHART_COLORS as colors } from '#lib/charts/chartColors.js';
 import {
   windColorScale,
@@ -149,7 +150,8 @@ export function renderWindChart(
   data: PreparedWindChart,
   layout: WindChartLayout,
   axisUnit: WindAxisUnit = 'm',
-  cloudImage: CanvasImageSource | null = null
+  cloudImage: CanvasImageSource | null = null,
+  units: UnitPreferences = METRIC_UNITS
 ) {
   const { left, right, x, pressureY, temperatureY, humidityY } = layout;
   ctx.save();
@@ -158,39 +160,40 @@ export function renderWindChart(
     ctx.restore();
     return;
   }
-  const temperature = data.temperatureChartData;
+  const temperatureData = data.temperatureChartData;
 
   clipPanel(ctx, layout, 0, () => {
     ctx.fillStyle = colors.sunriseFill;
-    for (const [start, end] of temperature.daylightIntervals) {
+    for (const [start, end] of temperatureData.daylightIntervals) {
       ctx.fillRect(x(start), TEMP_TOP, x(end) - x(start), TEMP_HEIGHT_PX);
     }
     for (let t = layout.tempMin; t <= layout.tempMax; t += 5)
       line(ctx, left, temperatureY(t), right, temperatureY(t), colors.gridLine);
     drawSmoothLine(
       ctx,
-      temperature.temperatureData.map((d) => [x(+d.time), temperatureY(d.value)]),
+      temperatureData.temperatureData.map((d) => [x(+d.time), temperatureY(d.value)]),
       colors.temperature
     );
     drawSmoothLine(
       ctx,
-      temperature.dewpointData.map((d) => [x(+d.time), temperatureY(d.value)]),
+      temperatureData.dewpointData.map((d) => [x(+d.time), temperatureY(d.value)]),
       colors.dewpoint
     );
     drawSmoothLine(
       ctx,
-      temperature.humidityData.map((d) => [x(+d.time), humidityY(d.value)]),
+      temperatureData.humidityData.map((d) => [x(+d.time), humidityY(d.value)]),
       colors.humidity,
       [5, 3]
     );
   });
-  for (let t = layout.tempMin; t <= layout.tempMax; t += 5) text(ctx, `${t}`, left - 18, temperatureY(t), 'right');
+  for (let t = layout.tempMin; t <= layout.tempMax; t += 5)
+    text(ctx, `${Math.round(temperature(t, units))}`, left - 18, temperatureY(t), 'right');
   for (let h = 0; h <= 100; h += 25) text(ctx, `${h}`, right + 3, humidityY(h));
-  text(ctx, '°C', left - 10, TEMP_TOP - 5);
+  text(ctx, units.temperature, left - 10, TEMP_TOP - 5);
   text(ctx, '%', right - 3, TEMP_TOP, 'right');
   for (const [time, sunrise] of [
-    [temperature.sunrise, true],
-    [temperature.sunset, false],
+    [temperatureData.sunrise, true],
+    [temperatureData.sunset, false],
   ] as const) {
     if (!time) continue;
     const px = x(+time);
@@ -369,7 +372,7 @@ export function renderWindChart(
       if (annotation.value == null || !Number.isFinite(annotation.value)) return [];
       const y = pressureY(metersToHPaExact(annotation.value));
       if (y < windPanel.top || y > windPanel.top + windPanel.height) return [];
-      const label = `${annotation.label} ${annotation.value}m`;
+      const label = `${annotation.label} ${formatAltitude(annotation.value, units)}`;
       const width = ctx.measureText(label).width;
       return [
         {
@@ -411,7 +414,7 @@ export function renderWindChart(
   });
   if (axisUnit === 'm') {
     for (let altitude = 0; altitude < layout.maxAltitude; altitude += 500)
-      text(ctx, `${altitude}m`, left - 8, pressureY(metersToHPaExact(altitude)), 'right', '#666', 10);
+      text(ctx, formatAltitude(altitude, units), left - 8, pressureY(metersToHPaExact(altitude)), 'right', '#666', 10);
   } else {
     for (const level of layout.nativeLevels)
       text(ctx, `${level.hPa}hPa`, left - 8, pressureY(level.hPa), 'right', '#666', 9);

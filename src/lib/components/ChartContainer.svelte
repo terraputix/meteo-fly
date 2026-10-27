@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { units } from '#lib/stores/units.js';
+  import { windSpeed } from '#lib/utils/units.js';
   import type { WindChartData, WeatherModel, SkewTWeatherData } from '#lib/api/types.js';
   import { MODEL_FORECAST_DAYS } from '#lib/api/models.js';
   import WindChart from './WindChart.svelte';
@@ -179,12 +181,12 @@
                 </div>
                 <div class="flex min-w-36 flex-1 basis-44 items-center gap-3">
                   <span class="text-[0.65rem] tracking-wide whitespace-nowrap text-slate-400 uppercase">
-                    Wind <small class="lowercase opacity-60">km/h</small>
+                    Wind <small class="lowercase opacity-60">{$units.wind}</small>
                   </span>
                   <div class="flex flex-1 flex-col gap-0.75">
                     <div class="h-1.25 w-full rounded-full" style="background: {windGradient};"></div>
                     <div class="flex justify-between font-mono text-[0.6rem] text-slate-300">
-                      <span>0</span><span>{windMaxSpeed}</span>
+                      <span>0</span><span>{Math.round(windSpeed(windMaxSpeed, $units))}</span>
                     </div>
                   </div>
                 </div>

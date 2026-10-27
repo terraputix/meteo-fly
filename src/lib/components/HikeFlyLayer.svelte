@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { units } from '#lib/stores/units.js';
+  import { formatAltitude } from '#lib/utils/units.js';
   import type { MapLayerMouseEvent } from 'maplibre-gl';
   import { onDestroy } from 'svelte';
   import { isMobile } from '#lib/stores/media.js';
@@ -313,7 +315,9 @@
           }}
           disabled={stepMeters >= 200}>+</button
         >
-        <span class="w-12 text-right tabular-nums text-slate-800 {$isMobile ? 'text-sm' : ''}">{stepMeters}m</span>
+        <span class="w-12 text-right tabular-nums text-slate-800 {$isMobile ? 'text-sm' : ''}"
+          >{formatAltitude(stepMeters, $units)}</span
+        >
       </label>
     </div>
   </div>
@@ -325,10 +329,10 @@
     style="left: {hoverPos.x}px; top: {hoverPos.y}px;"
   >
     <div class="text-slate-500">
-      DEM <span class="font-semibold text-slate-700">{hoveredFeature.terrainElevation} m</span>
+      DEM <span class="font-semibold text-slate-700">{formatAltitude(hoveredFeature.terrainElevation, $units)}</span>
     </div>
     <div class="text-slate-500">
-      AGL <span class="font-semibold text-slate-700">{hoveredFeature.heightAGL} m</span>
+      AGL <span class="font-semibold text-slate-700">{formatAltitude(hoveredFeature.heightAGL, $units)}</span>
     </div>
   </div>
 {/if}

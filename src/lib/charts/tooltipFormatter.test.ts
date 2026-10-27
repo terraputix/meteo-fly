@@ -1,3 +1,4 @@
+import { IMPERIAL_UNITS, METRIC_UNITS } from '#lib/utils/units.js';
 import { describe, expect, it } from 'vitest';
 import { buildTooltipStore, createActiveState, formatTooltip } from '#lib/charts/tooltipFormatter.js';
 
@@ -89,6 +90,28 @@ describe('canvas tooltip selection', () => {
     [{ time, value: 1800 }],
     [{ time, pressure: 900, value: 65 }]
   );
+
+  it('converts all measurements while retaining pressure and humidity', () => {
+    const html = formatTooltip(store, createActiveState(), 'UTC', +time, IMPERIAL_UNITS);
+    expect(html).toContain('71.6&nbsp;°F');
+    expect(html).toContain('53.6&nbsp;°F');
+    expect(html).toContain('0.08&nbsp;in/h');
+    expect(html).toContain('3241&nbsp;ft');
+    expect(html).toContain('12.4&nbsp;mph');
+    expect(html).toContain('900&nbsp;hPa');
+    expect(html).toContain('60&nbsp;%');
+    const lcl = formatTooltip(
+      store,
+      { gridIndex: 2, hoveredWindPressure: 900, showLcl: true },
+      'UTC',
+      +time,
+      IMPERIAL_UNITS
+    );
+    expect(lcl).toContain('5906&nbsp;ft');
+    const knots = formatTooltip(store, createActiveState(), 'UTC', +time, { ...METRIC_UNITS, wind: 'kt' });
+    expect(knots).toContain('10.8&nbsp;kt');
+    expect(knots).toContain('22.0&nbsp;°C');
+  });
 
   it('shows only the selected panel while retaining the same time lookup', () => {
     const temp = formatTooltip(store, { gridIndex: 0, hoveredWindPressure: null }, 'UTC', +time + 1000);

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { units } from '#lib/stores/units.js';
+  import { formatAltitude } from '#lib/utils/units.js';
   import { onMount, onDestroy } from 'svelte';
   import {
     GPUInitializationError,
@@ -120,6 +122,10 @@
   }
 
   function formatDistance(distanceMeters: number) {
+    if ($units.altitude === 'ft')
+      return distanceMeters >= 1609.344
+        ? `${(distanceMeters / 1609.344).toFixed(1)} mi`
+        : formatAltitude(distanceMeters, $units);
     return distanceMeters >= 1000
       ? `${(distanceMeters / 1000).toFixed(distanceMeters >= 10000 ? 0 : 1)} km`
       : `${Math.round(distanceMeters)} m`;
@@ -138,8 +144,8 @@
   function updateElevationBadge() {
     if (!elevationBadge) return;
     const parts: string[] = [];
-    if (lastTerrainElevation != null) parts.push(`Map ${lastTerrainElevation}m`);
-    if (gridCellElevation != null) parts.push(`API DEM ${Math.round(gridCellElevation)}m`);
+    if (lastTerrainElevation != null) parts.push(`Map ${formatAltitude(lastTerrainElevation, $units)}`);
+    if (gridCellElevation != null) parts.push(`API DEM ${formatAltitude(gridCellElevation, $units)}`);
     if (parts.length === 0) {
       elevationBadge.style.display = 'none';
       return;
@@ -254,7 +260,8 @@
     }
 
     const lngLat: LngLatLike = [selectedGridCell.longitude, selectedGridCell.latitude];
-    const badgeText = modelGridElevation != null ? `Grid cell · ${Math.round(modelGridElevation)} m` : 'Grid cell';
+    const badgeText =
+      modelGridElevation != null ? `Grid cell · ${formatAltitude(modelGridElevation, $units)}` : 'Grid cell';
 
     if (!selectedGridCellMarker) {
       const element = document.createElement('div');
@@ -311,6 +318,7 @@
   $effect(() => {
     void selectedGridCell;
     void modelGridElevation;
+    void $units.altitude;
     if (map) updateSelectedGridCellMarker();
   });
   $effect(() => {
@@ -692,7 +700,7 @@
       <div class="mb-1 text-[10px] text-slate-400 whitespace-nowrap">
         {contextMenuLngLat?.lat.toFixed(5)}, {contextMenuLngLat?.lng.toFixed(5)}
         {#if contextMenuElevation != null}
-          · {contextMenuElevation}m
+          · {formatAltitude(contextMenuElevation, $units)}
         {:else}
           · no terrain
         {/if}
