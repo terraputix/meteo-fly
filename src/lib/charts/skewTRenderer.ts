@@ -1,3 +1,4 @@
+import { METRIC_UNITS, temperature, windSpeed, formatAltitude, type UnitPreferences } from '#lib/utils/units.js';
 import { metersToHPa } from '#lib/meteo/pressureLevels.js';
 import {
   RD,
@@ -336,7 +337,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
 
 // ─── Axis ──────────────────────────────────────────────────────────────────────
 
-function drawAxis(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
+function drawAxis(ctx: CanvasRenderingContext2D, layout: PlotLayout, units: UnitPreferences) {
   const { plotLeft, plotTop, plotWidth, plotHeight } = layout;
 
   ctx.save();
@@ -373,7 +374,15 @@ function drawAxis(ctx: CanvasRenderingContext2D, layout: PlotLayout) {
   for (let t = isoStart; t <= isoEnd; t += 10) {
     const [x] = tempPressureToCanvas(layout, t, layout.maxP);
     if (x < plotLeft || x > plotLeft + plotWidth) continue;
-    drawText(ctx, `${t}°`, x, plotTop + plotHeight + 16, '#666', 'center', 'top');
+    drawText(
+      ctx,
+      `${Math.round(temperature(t, units))}${units.temperature}`,
+      x,
+      plotTop + plotHeight + 16,
+      '#666',
+      'center',
+      'top'
+    );
     ctx.save();
     ctx.strokeStyle = AXIS_COLOR;
     ctx.lineWidth = 1;
@@ -419,7 +428,13 @@ function drawTraces(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: Pl
 
 // ─── Annotations ───────────────────────────────────────────────────────────────
 
-function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layout: PlotLayout, elevation: number) {
+function drawAnnotations(
+  ctx: CanvasRenderingContext2D,
+  trace: SkewTTrace,
+  layout: PlotLayout,
+  elevation: number,
+  units: UnitPreferences
+) {
   const { plotLeft, plotWidth } = layout;
 
   const lclPressure = metersToHPa(trace.lcl);
@@ -436,7 +451,7 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
   );
   drawText(
     ctx,
-    `LCL (${Math.round(trace.lcl)}m)`,
+    `LCL (${formatAltitude(trace.lcl, units)})`,
     plotLeft + plotWidth - 4,
     lclY - 4,
     CHART_COLORS.lcl,
@@ -458,7 +473,7 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
     ctx.fill();
     drawText(
       ctx,
-      `${trace.surfaceTemp.toFixed(1)}°C`,
+      `${temperature(trace.surfaceTemp, units).toFixed(1)}${units.temperature}`,
       stX + 6,
       elevY + 8,
       CHART_COLORS.temperature,
@@ -473,7 +488,7 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, trace: SkewTTrace, layou
     ctx.fill();
     drawText(
       ctx,
-      `${trace.surfaceDewpoint.toFixed(1)}°C`,
+      `${temperature(trace.surfaceDewpoint, units).toFixed(1)}${units.temperature}`,
       sdX + 6,
       elevY + 8,
       CHART_COLORS.dewpoint,
@@ -545,7 +560,8 @@ function drawElevationLine(
   ctx: CanvasRenderingContext2D,
   elevation: number,
   layout: PlotLayout,
-  modelGridElevation?: number
+  modelGridElevation: number | undefined,
+  units: UnitPreferences
 ) {
   const { plotLeft, plotWidth, minP, maxP } = layout;
 
@@ -581,13 +597,19 @@ function drawElevationLine(
     drawOneLine(
       modelGridElevation,
       CHART_COLORS.modelGridElevation,
-      `Model Grid Elev. ${modelGridElevation}m`,
+      `Model Grid Elev. ${formatAltitude(modelGridElevation, units)}`,
       'left',
       gridBelow ? 'bottom' : 'top'
     );
   }
 
-  drawOneLine(elevation, CHART_COLORS.elevation, `DEM Elev. ${elevation}m`, 'right', gridBelow ? 'top' : 'bottom');
+  drawOneLine(
+    elevation,
+    CHART_COLORS.elevation,
+    `DEM Elev. ${formatAltitude(elevation, units)}`,
+    'right',
+    gridBelow ? 'top' : 'bottom'
+  );
 }
 
 // ─── Hover overlay ─────────────────────────────────────────────────────────────
@@ -617,7 +639,8 @@ export function renderHoverOverlay(
   trace: SkewTTrace,
   hitResult: HitTestResult,
   canvasWidth: number,
-  elevation: number
+  elevation: number,
+  units: UnitPreferences = METRIC_UNITS
 ): void {
   const { plotLeft, plotTop, plotWidth, plotHeight } = layout;
   const mouseY = pressureToCanvasY(layout, hitResult.pressure);
@@ -629,7 +652,7 @@ export function renderHoverOverlay(
     ctx.save();
     ctx.font = 'bold 11px sans-serif';
     const line1 = `${Math.round(hitResult.pressure)} hPa`;
-    const line2 = `${Math.round(hitResult.heightMeters)} m`;
+    const line2 = formatAltitude(hitResult.heightMeters, units);
     const w1 = ctx.measureText(line1).width;
     const w2 = ctx.measureText(line2).width;
     ctx.restore();
@@ -687,7 +710,7 @@ export function renderHoverOverlay(
   {
     ctx.save();
     ctx.font = 'bold 11px sans-serif';
-    const label = `${hitResult.windSpeed.toFixed(1)} km/h @ ${hitResult.windDirection}°`;
+    const label = `${windSpeed(hitResult.windSpeed, units).toFixed(1)} ${units.wind} @ ${hitResult.windDirection}°`;
     const textW = ctx.measureText(label).width;
     ctx.restore();
 
@@ -759,7 +782,7 @@ export function renderHoverOverlay(
       ctx.restore();
       drawText(
         ctx,
-        `${interpTemp.toFixed(1)}°C`,
+        `${temperature(interpTemp, units).toFixed(1)}${units.temperature}`,
         tx - 8,
         mouseY - 10,
         CHART_COLORS.temperature,
@@ -778,7 +801,7 @@ export function renderHoverOverlay(
       ctx.restore();
       drawText(
         ctx,
-        `${interpDew.toFixed(1)}°C`,
+        `${temperature(interpDew, units).toFixed(1)}${units.temperature}`,
         dx - 8,
         mouseY + 10,
         CHART_COLORS.dewpoint,
@@ -846,7 +869,7 @@ export function renderHoverOverlay(
     if (dryPts.length >= 2) {
       drawLine(ctx, dryPts, CHART_COLORS.dryAdiabat, 1.5, [6, 4]);
       const thetaC = thetaK - 273.15;
-      const labelText = `θ = ${thetaC.toFixed(1)}°C`;
+      const labelText = `θ = ${temperature(thetaC, units).toFixed(1)}${units.temperature}`;
       if (elevP >= hoverP && elevP <= maxP) {
         const tC_elev = thetaK * Math.pow(elevP / 1000, RD / CP) - 273.15;
         const [lx] = tempPressureToCanvas(layout, tC_elev, elevP);
@@ -915,7 +938,8 @@ export function renderSkewT(
   skewTData: SkewTData,
   selectedTraceIndex: number,
   width: number,
-  height: number
+  height: number,
+  units: UnitPreferences = METRIC_UNITS
 ): SkewTRenderResult | null {
   const margin = SKEWT_MARGIN;
   const plotLeft = margin.left;
@@ -931,10 +955,10 @@ export function renderSkewT(
 
   drawGrid(ctx, layout);
   drawCloudCover(ctx, trace, layout);
-  drawElevationLine(ctx, skewTData.elevation, layout, skewTData.modelGridElevation);
-  drawAxis(ctx, layout);
+  drawElevationLine(ctx, skewTData.elevation, layout, skewTData.modelGridElevation, units);
+  drawAxis(ctx, layout, units);
   drawTraces(ctx, trace, layout);
-  drawAnnotations(ctx, trace, layout, skewTData.elevation);
+  drawAnnotations(ctx, trace, layout, skewTData.elevation, units);
 
   const hitTest: HitTestFn = (cx, cy) => {
     if (cx < plotLeft || cx > plotLeft + plotWidth || cy < plotTop || cy > plotTop + plotHeight) return null;

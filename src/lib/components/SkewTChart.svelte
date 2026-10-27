@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { units } from '#lib/stores/units.js';
+  import { formatAltitude } from '#lib/utils/units.js';
   import { onMount, onDestroy } from 'svelte';
   import {
     renderSkewT,
@@ -66,7 +68,7 @@
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, totalHeight);
 
-    const result = renderSkewT(ctx, skewTData, hour, width, totalHeight);
+    const result = renderSkewT(ctx, skewTData, hour, width, totalHeight, $units);
     hitTest = result?.hitTest ?? null;
     lastLayout = result?.layout ?? null;
     currentTrace = result?.layout ? (skewTData.traces[hour] ?? skewTData.traces[0]) : null;
@@ -82,7 +84,7 @@
     }
   }
 
-  $: if (canvas && skewTData && (hour, totalHeight, chartWidth, true)) render();
+  $: if (canvas && skewTData && (hour, totalHeight, chartWidth, $units, true)) render();
 
   onMount(() => {
     if (!container) return;
@@ -111,7 +113,7 @@
     overlayCtx.save();
     overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     overlayCtx.clearRect(0, 0, width, totalHeight);
-    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width, skewTData.elevation);
+    renderHoverOverlay(overlayCtx, lastLayout, currentTrace, result, width, skewTData.elevation, $units);
     overlayCtx.restore();
   }
 
@@ -164,7 +166,7 @@
         <select
           bind:value={maxAltitude}
           aria-label="Skew-T top height"
-          title="Skew-T top height: {maxAltitude}m"
+          title="Skew-T top height: {formatAltitude(maxAltitude, $units)}"
           class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-4 pl-0 text-right font-semibold text-slate-700 outline-none"
         >
           {#each topPressureOptions as option (option.value)}

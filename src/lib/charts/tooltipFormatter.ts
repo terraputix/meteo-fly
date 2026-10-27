@@ -1,3 +1,11 @@
+import {
+  METRIC_UNITS,
+  temperature,
+  altitude,
+  windSpeed,
+  rain as convertRain,
+  type UnitPreferences,
+} from '#lib/utils/units.js';
 import type { TemperatureChartData, RainCloudChartData } from '#lib/workers/chartWorker.types.js';
 import type { WindFieldLevel } from '#lib/charts/wind.js';
 import { windDirectionLabel } from '#lib/meteo/wind.js';
@@ -135,7 +143,13 @@ function metricRow(label: string, value: string, color?: string, dashed = false)
   </div>`;
 }
 
-export function formatTooltip(store: TooltipStore, active: ActiveState, timezone: string, hoveredTime: number): string {
+export function formatTooltip(
+  store: TooltipStore,
+  active: ActiveState,
+  timezone: string,
+  hoveredTime: number,
+  units: UnitPreferences = METRIC_UNITS
+): string {
   const snap = snapToNearest(store.sortedTimes, hoveredTime);
   if (snap == null) return '';
   const timeStr = fmtTime(new Date(snap), timezone, true);
@@ -150,8 +164,16 @@ export function formatTooltip(store: TooltipStore, active: ActiveState, timezone
   if (gridIndex === 0 || gridIndex === -1) {
     const td = store.tempByTime.get(snap);
     if (td) {
-      html += metricRow('Temperature', measurement(td.temp, '°C', 1), CHART_COLORS.temperature);
-      html += metricRow('Dewpoint', measurement(td.dew, '°C', 1), CHART_COLORS.dewpoint);
+      html += metricRow(
+        'Temperature',
+        measurement(temperature(td.temp, units), units.temperature, 1),
+        CHART_COLORS.temperature
+      );
+      html += metricRow(
+        'Dewpoint',
+        measurement(temperature(td.dew, units), units.temperature, 1),
+        CHART_COLORS.dewpoint
+      );
       html += metricRow('Humidity', measurement(td.hum, '%', 0), CHART_COLORS.humidity, true);
     }
   }
@@ -167,7 +189,7 @@ export function formatTooltip(store: TooltipStore, active: ActiveState, timezone
     }
     const rain = store.rainByTime.get(snap);
     if (rain != null) {
-      html += `<div class="mt-1 border-t border-slate-100 pt-1">${metricRow('Rain', measurement(rain, 'mm/h', 1), CHART_COLORS.rain)}</div>`;
+      html += `<div class="mt-1 border-t border-slate-100 pt-1">${metricRow('Rain', measurement(convertRain(rain, units), `${units.rain}/h`, units.rain === 'in' ? 2 : 1), CHART_COLORS.rain)}</div>`;
     }
   }
 
@@ -187,11 +209,11 @@ export function formatTooltip(store: TooltipStore, active: ActiveState, timezone
         <div class="flex items-center gap-1.5 text-[10px] text-slate-500">
           <span>${pressure}&nbsp;hPa</span>
           <span aria-hidden="true" class="text-slate-300">·</span>
-          <span>≈${measurement(wind.height, 'm')}</span>
+          <span>≈${measurement(altitude(wind.height, units), units.altitude, 0)}</span>
         </div>
         <div class="flex items-center justify-between gap-3 py-0.5">
           <span class="font-semibold text-slate-900">
-            ${measurement(wind.speed, 'km/h')}
+            ${measurement(windSpeed(wind.speed, units), units.wind, units.wind === 'km/h' ? undefined : 1)}
           </span>
           <span class="text-slate-600">${windDirectionLabel(wind.direction)} (${wind.direction}°)</span>
         </div>
@@ -206,7 +228,7 @@ export function formatTooltip(store: TooltipStore, active: ActiveState, timezone
     }
     const cb = store.lclByTime.get(snap);
     if (cb != null && gridIndex === 2 && active.showLcl) {
-      html += `<div class="mt-1 border-t border-slate-100 pt-1">${metricRow('LCL', measurement(cb, 'm', 0), CHART_COLORS.lcl)}</div>`;
+      html += `<div class="mt-1 border-t border-slate-100 pt-1">${metricRow('LCL', measurement(altitude(cb, units), units.altitude, 0), CHART_COLORS.lcl)}</div>`;
     }
   }
 

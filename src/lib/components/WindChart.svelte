@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { units } from '#lib/stores/units.js';
+  import { formatAltitude, type UnitPreferences } from '#lib/utils/units.js';
   import { buildTooltipStore, formatTooltip, snapToNearest, type TooltipStore } from '#lib/charts/tooltipFormatter.js';
   import {
     DAYLIGHT_CONTEXT_TOP,
@@ -10,7 +12,7 @@
     type WindChartLayout,
   } from '#lib/charts/windChartLayout.js';
   import { renderWindChart, renderWindChartOverlay, type WindAxisUnit } from '#lib/charts/windChartRenderer.js';
-  import { getNativeLevelsForModel } from '#lib/meteo/pressureLevels.js';
+  import { getNativeLevelsForModel, metersToHPaExact } from '#lib/meteo/pressureLevels.js';
   import { getWindChartSize } from '#lib/charts/chartSizing.js';
   import type { WindChartData } from '#lib/api/types.js';
   import type { ChartWorkerOutput, ChartWorkerRequest } from '#lib/workers/chartWorker.types.js';
@@ -38,6 +40,7 @@
   let isRendering = $state(false);
   let renderError = $state('');
   let axisUnit = $state<WindAxisUnit>('m');
+  let topHeightY = $state(WIND_TOP);
 
   let isBusy = $derived(isLoading || isRendering);
 
@@ -52,6 +55,7 @@
     daylightOnly: boolean;
     loading: boolean;
     axisUnit: WindAxisUnit;
+    units: UnitPreferences;
   };
 
   function renderChart(node: HTMLElement, params: RenderChartParams) {
@@ -95,7 +99,8 @@
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Canvas 2D is unavailable');
         layout = buildWindChartLayout(prepared, node.clientWidth, node.clientHeight, params.maxAltitude, params.model);
-        renderWindChart(ctx, prepared, layout, params.axisUnit, cloudImage);
+        topHeightY = layout.pressureY(metersToHPaExact(params.maxAltitude));
+        renderWindChart(ctx, prepared, layout, params.axisUnit, cloudImage, params.units);
       } catch (error) {
         layout = null;
         renderError = 'Unable to draw the weather chart.';
@@ -243,7 +248,7 @@
         lclY >= windPanel.top &&
         lclY <= windPanel.top + windPanel.height &&
         Math.abs(py - lclY) <= 10;
-      tooltip.innerHTML = formatTooltip(store, { ...hit, showLcl }, prepared.timezone, hit.time);
+      tooltip.innerHTML = formatTooltip(store, { ...hit, showLcl }, prepared.timezone, hit.time, params.units);
       tooltip.hidden = false;
       const visibleRect = scrollContainer?.getBoundingClientRect() ?? rect;
       const bounds = {
@@ -291,14 +296,14 @@
 
     return {
       update(next: RenderChartParams) {
-        const axisChanged = next.axisUnit !== params.axisUnit;
+        const axisChanged = next.axisUnit !== params.axisUnit || next.units !== params.units;
         const changed =
           next.data !== params.data ||
           next.daylightOnly !== params.daylightOnly ||
           next.maxAltitude !== params.maxAltitude ||
           next.model !== params.model;
         params = next;
-        if (params.loading) clearSelection();
+        if (params.loading || axisChanged) clearSelection();
         if (changed) prepare();
         else if (axisChanged) schedulePaint();
       },
@@ -332,21 +337,27 @@
     <ChartLoadingOverlay visible={isBusy} message="Loading weather data…" />
 
     <label
-      class="group absolute left-0 z-[5] flex h-5 w-[54px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
-      style="top: {WIND_TOP - 20}px;"
+      class="group absolute left-0 z-[5] flex h-5 w-[54px] items-center rounded bg-white text-[10px] transition hover:bg-slate-50 focus-within:ring-2 focus-within:ring-indigo-500/20"
+      style="top: {topHeightY}px; transform: translateY(-50%);"
     >
+      <span
+        aria-hidden="true"
+        class="pointer-events-none w-full pr-2 text-right font-semibold whitespace-nowrap text-slate-700"
+      >
+        {formatAltitude(maxAltitude, $units)}
+      </span>
       <select
         bind:value={maxAltitude}
         aria-label="Wind chart top height"
         title="Wind chart top height"
-        class="h-full w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-4 pl-0 text-right font-semibold text-slate-700 outline-none"
+        class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       >
         {#each MAX_ALTITUDE_OPTIONS as option (option.value)}
-          <option value={option.value}>{option.value}m</option>
+          <option value={option.value}>{formatAltitude(option.value, $units)}</option>
         {/each}
       </select>
       <ChevronDownIcon
-        class="pointer-events-none absolute right-0.5 h-3 w-3 text-slate-500 transition group-hover:text-slate-700"
+        class="pointer-events-none absolute right-0 h-2 w-2 text-slate-400 transition group-hover:text-slate-700"
         aria-hidden="true"
       />
     </label>
@@ -370,18 +381,26 @@
     <button
       type="button"
       aria-pressed={axisUnit === 'hPa'}
-      aria-label="Use pressure scale instead of metres"
-      title={axisUnit === 'm' ? 'Switch scale to pressure (hPa)' : 'Switch scale to altitude (m)'}
+      aria-label="Use pressure scale instead of altitude"
+      title={axisUnit === 'm' ? 'Switch scale to pressure (hPa)' : `Switch scale to altitude (${$units.altitude})`}
       class="absolute bottom-1 left-0 z-[5] flex h-6 w-[54px] items-center justify-center gap-1 rounded text-[10px] text-slate-500 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
       onclick={() => (axisUnit = axisUnit === 'm' ? 'hPa' : 'm')}
     >
-      <span class:font-semibold={axisUnit === 'm'} class:text-slate-800={axisUnit === 'm'}>m</span>
+      <span class:font-semibold={axisUnit === 'm'} class:text-slate-800={axisUnit === 'm'}>{$units.altitude}</span>
       <span aria-hidden="true">/</span>
       <span class:font-semibold={axisUnit === 'hPa'} class:text-slate-800={axisUnit === 'hPa'}>hPa</span>
     </button>
 
     <div
-      use:renderChart={{ data: windChartData, maxAltitude, model, daylightOnly, loading: isLoading, axisUnit }}
+      use:renderChart={{
+        data: windChartData,
+        maxAltitude,
+        model,
+        daylightOnly,
+        loading: isLoading,
+        axisUnit,
+        units: $units,
+      }}
       class="chart-content"
       style="opacity: {isBusy ? 0 : 1};"
     >

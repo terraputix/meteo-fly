@@ -41,6 +41,7 @@
 - **State source of truth**: Page parameters drive selected location, day, model, and max altitude; they are mirrored to URL params and persisted locally.
 - **Data flow**: `+page.svelte` fetches weather data, passes it into `ChartContainer.svelte`, then `WindChart.svelte` offloads heavy chart preparation to `src/lib/workers/chartWorker.ts`.
 - **Worker split**: Expensive chart shaping and Hike & Fly terrain/raster processing belong in pure helpers or workers, not in UI components.
+- **Display units**: Persist preferences in `src/lib/stores/units.ts`; conversions live in `src/lib/utils/units.ts`. Keep API data, workers, calculations, chart geometry, and wind color thresholds in canonical metric units. Convert only display values; pressure remains hPa.
 - **Chart stack**: Reuse existing chart builders and tooltip/state helpers before adding new rendering abstractions.
 - **Forecast time ranges**: Cache location timezone metadata and request hourly data using explicit UTC bounds for the selected local calendar days. Select sunrise/sunset by local date. Preserve 23- and 25-hour DST days.
 - **Forecast models**: Supported models are defined canonically in `src/lib/api/types.ts`; UI selectors must stay aligned with that union.

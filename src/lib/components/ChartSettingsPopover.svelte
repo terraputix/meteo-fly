@@ -1,6 +1,7 @@
 <script lang="ts">
   import { CELL_SELECTION_OPTIONS, type CellSelection } from '#lib/api/types.js';
   import * as Popover from '#lib/components/ui/popover/index.js';
+  import UnitSettings from '#lib/components/UnitSettings.svelte';
   import SettingsIcon from '@lucide/svelte/icons/settings';
 
   let {
@@ -49,6 +50,9 @@
             </button>
           {/each}
         </div>
+      </div>
+      <div class="border-t border-slate-100 pt-3">
+        <UnitSettings />
       </div>
     </div>
   </Popover.Content>
