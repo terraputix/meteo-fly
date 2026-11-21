@@ -6,6 +6,7 @@
   import WindChart from './WindChart.svelte';
   import SkewTChart from './SkewTChart.svelte';
   import Footer from './Footer.svelte';
+  import ForecastError from '#lib/components/ForecastError.svelte';
   import { windColors, windMaxSpeed } from '#lib/charts/scales.js';
   import { CHART_COLORS, WIND_CLOUD_BANDS, WIND_CLOUD_EDGE_ALPHA } from '#lib/charts/chartColors.js';
   import { buildSkewTData } from '#lib/meteo/skewT.js';
@@ -179,18 +180,8 @@
             isLoading={isSkewTLoading || (isWindChartLoading && !windChartData)}
           />
           {#if skewTError}
-            <div
-              class="absolute top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
-              role="alert"
-            >
-              <span>{skewTError}</span>
-              <button
-                type="button"
-                class="rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                onclick={onRetrySkewT}
-              >
-                Retry
-              </button>
+            <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
+              <ForecastError message={skewTError} retry={onRetrySkewT} class="w-full max-w-md flex-col text-center" />
             </div>
           {:else if windChartData && !isSkewTLoading && soundingHour < 0}
             <div class="absolute inset-0 flex items-center justify-center text-sm text-slate-500">

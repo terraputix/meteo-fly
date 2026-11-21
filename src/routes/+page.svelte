@@ -6,6 +6,7 @@
   import { isMobile } from '#lib/stores/media.js';
   import WindComparisonGrid from '#lib/components/WindComparisonGrid.svelte';
   import BottomControls from '#lib/components/BottomControls.svelte';
+  import ForecastError from '#lib/components/ForecastError.svelte';
   import { MODEL_FORECAST_DAYS, type CompassModel } from '#lib/api/models.js';
   import LocationMap from '#lib/components/LocationMap.svelte';
   import ChartContainer from '#lib/components/ChartContainer.svelte';
@@ -124,11 +125,30 @@
   const maxForecastDays = $derived(
     comparing ? MODEL_FORECAST_DAYS.gfs_seamless : MODEL_FORECAST_DAYS[parameters.selectedModel]
   );
-  const showMapLoadingStatus = $derived(!showChart && comparing && !comparison && !comparisonFailed);
-  const showMapErrorStatus = $derived(!showChart && comparing && comparisonFailed);
+  const mapForecastStatus = $derived(
+    showChart
+      ? null
+      : comparing
+        ? {
+            loading: !comparison && !comparisonFailed,
+            errorMessage: comparisonFailed ? 'Wind comparison could not load.' : null,
+            retry: () => comparisonRetry++,
+          }
+        : {
+            loading: isWindChartLoading && !windChartData,
+            errorMessage: windFailure?.message ?? null,
+            retry: retryWindChart,
+          }
+  );
 
   const mapControlsTopOffset = $derived(
-    $isMobile ? (showMapErrorStatus ? '7.5rem' : showMapLoadingStatus ? '3.75rem' : '0.75rem') : '0.75rem'
+    $isMobile
+      ? mapForecastStatus?.errorMessage
+        ? '7.5rem'
+        : mapForecastStatus?.loading
+          ? '3.75rem'
+          : '0.75rem'
+      : '0.75rem'
   );
 
   const outdatedCachedAt = $derived(
@@ -521,7 +541,7 @@
   class="relative flex flex-col h-dvh w-full overflow-hidden bg-slate-100"
   style="--map-controls-top-offset: {mapControlsTopOffset};"
 >
-  {#if showMapLoadingStatus}
+  {#if mapForecastStatus?.loading}
     <div
       class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
       role="status"
@@ -530,23 +550,15 @@
         Loading weather data…
       </div>
     </div>
-  {:else if showMapErrorStatus}
+  {:else if mapForecastStatus?.errorMessage}
     <div
       class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
     >
-      <div
-        class="pointer-events-auto flex max-w-lg items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 shadow-md ring-1 ring-red-200"
-        role="alert"
-      >
-        <span>Wind comparison could not load.</span>
-        <button
-          type="button"
-          class="shrink-0 rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-          onclick={() => comparisonRetry++}
-        >
-          Retry
-        </button>
-      </div>
+      <ForecastError
+        message={mapForecastStatus.errorMessage}
+        retry={mapForecastStatus.retry}
+        class="max-w-lg shadow-md"
+      />
     </div>
   {/if}
 
@@ -666,19 +678,11 @@
             </ChartContainer>
             {#if windFailure && chartView !== 'comparison'}
               <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
-                <div
-                  class="pointer-events-auto flex max-w-md flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
-                  role="alert"
-                >
-                  <span>{windFailure.message}</span>
-                  <button
-                    type="button"
-                    class="rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                    onclick={retryWindChart}
-                  >
-                    Retry
-                  </button>
-                </div>
+                <ForecastError
+                  message={windFailure.message}
+                  retry={retryWindChart}
+                  class="max-w-md flex-col text-center"
+                />
               </div>
             {/if}
           </div>

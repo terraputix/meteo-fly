@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SurfaceWindDay } from '#lib/api/api.js';
   import { COMPASS_MODELS, type CompassModel } from '#lib/api/models.js';
+  import ForecastError from '#lib/components/ForecastError.svelte';
   import { windColorScale, windColors, windMaxSpeed } from '#lib/charts/scales.js';
   import { windRotation } from '#lib/charts/windChartLayout.js';
   import { fmtTime } from '#lib/helpers.js';
@@ -65,9 +66,7 @@
 </script>
 
 {#if failed}
-  <p role="alert" class="p-4 text-sm">
-    Wind comparison could not load. <button class="underline" onclick={retry}>Retry</button>
-  </p>
+  <ForecastError message="Wind comparison could not load." {retry} />
 {:else if day}
   <div class="mb-1 flex items-baseline justify-between gap-2 px-1">
     <h2 class="text-sm font-semibold text-slate-800">
