@@ -1,5 +1,3 @@
-import type { ChartView } from '#lib/services/types.js';
-
 export const MIN_FORECAST_DAY = -13;
 
 export type TimestepDirection = -1 | 1;
@@ -10,7 +8,7 @@ export interface TimestepState {
 }
 
 interface StepTimestepOptions extends TimestepState {
-  chartView: ChartView;
+  mode: 'day' | 'hour';
   direction: TimestepDirection;
   traceCount: number;
   maxForecastDays: number;
@@ -41,7 +39,7 @@ function stepTrace(
 }
 
 export function stepTimestep(options: StepTimestepOptions): TimestepState {
-  if (options.chartView === 'wind') {
+  if (options.mode === 'day') {
     return {
       selectedDay: stepDay(options.selectedDay, options.direction, options.maxForecastDays),
       hour: options.hour,

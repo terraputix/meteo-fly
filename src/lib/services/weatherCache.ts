@@ -12,7 +12,7 @@ export interface WeatherCacheExpiration {
   delete(): Promise<void>;
 }
 
-export type WeatherCacheDataset = 'wind' | 'skewt';
+export type WeatherCacheDataset = 'wind' | 'skewt' | 'comparison';
 
 export interface WeatherCacheDependencies {
   cacheStorage: Pick<CacheStorage, 'open' | 'delete'>;
@@ -58,6 +58,11 @@ function createCachedResponse(response: Response, cachedAt: number): Response {
 
 function getWeatherCacheDataset(request: Request): WeatherCacheDataset | null {
   const searchParams = new URL(request.url).searchParams;
+  if (
+    searchParams.get('hourly')?.startsWith('wind_speed_10m,wind_direction_10m,wind_gusts_10m') &&
+    !searchParams.has('daily')
+  )
+    return 'comparison';
   if (searchParams.has('daily')) return 'wind';
   if (searchParams.has('hourly')) return 'skewt';
   return null;
@@ -178,6 +183,10 @@ export async function cleanupLegacyWeatherCaches(cacheStorage: Pick<CacheStorage
 export function isWeatherCacheOutdatedMessage(value: unknown): value is WeatherCacheOutdatedMessage {
   if (typeof value !== 'object' || value === null) return false;
   if (!('type' in value) || value.type !== 'weather-cache-outdated') return false;
-  if (!('dataset' in value) || (value.dataset !== 'wind' && value.dataset !== 'skewt')) return false;
+  if (
+    !('dataset' in value) ||
+    (value.dataset !== 'wind' && value.dataset !== 'skewt' && value.dataset !== 'comparison')
+  )
+    return false;
   return 'cachedAt' in value && typeof value.cachedAt === 'number' && Number.isFinite(value.cachedAt);
 }

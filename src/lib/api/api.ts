@@ -1,3 +1,5 @@
+import { Model } from '@openmeteo/sdk/model';
+import { COMPASS_MODELS, type CompassModel } from '#lib/api/models.js';
 import { fetchWeatherApi } from 'openmeteo';
 import { fromDate, toCalendarDate, toZoned } from '@internationalized/date';
 import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
@@ -372,4 +374,57 @@ export async function fetchSkewTData(
     elevation,
     timezone,
   };
+}
+
+export type SurfaceWindDay = {
+  time: Date[];
+  timezone: string;
+  models: Partial<Record<CompassModel, Map<number, { speed: number; direction: number; gust: number }>>>;
+};
+
+export async function fetchSurfaceWindDay(
+  location: Location,
+  dayOffset: number,
+  cellSelection: CellSelection,
+  signal: AbortSignal
+): Promise<SurfaceWindDay> {
+  const timezone = await resolveLocationTimezone(location, signal);
+  const names = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'];
+  const params = createQueryParams(
+    location,
+    { hourly: names },
+    'icon_seamless',
+    cellSelection,
+    new Date(),
+    1,
+    timezone,
+    dayOffset
+  );
+  const models = COMPASS_MODELS.map((option) => option.id);
+  const responses = await fetchWeatherApi(FORECAST_URL, { ...params, models }, undefined, undefined, undefined, {
+    signal,
+  });
+  const result: SurfaceWindDay = { time: [], timezone, models: {} };
+  const timestamps = new Set<number>();
+  for (const response of responses) {
+    const model = models.find((id) => Model[id] === response.model());
+    const hourly = response.hourly();
+    if (!model || !hourly) continue;
+    const times = createHourlyTimes(hourly, 'wind comparison');
+    for (const time of times) timestamps.add(+time);
+    const [speeds, directions, gusts] = names.map((name) => getHourlyValues(names, hourly, name, times.length));
+    result.models[model] = new Map(
+      times.map((time, i) => [
+        +time,
+        {
+          speed: speeds?.[i] ?? NaN,
+          direction: directions?.[i] ?? NaN,
+          gust: gusts?.[i] ?? NaN,
+        },
+      ])
+    );
+  }
+  if (!timestamps.size) throw new Error('Open-Meteo returned no model comparison data');
+  result.time = [...timestamps].sort((a, b) => a - b).map((t) => new Date(t));
+  return result;
 }

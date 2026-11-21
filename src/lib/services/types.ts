@@ -1,7 +1,7 @@
 import type { CellSelection, Location, WeatherModel } from '#lib/api/types.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
 
-export type ChartView = 'wind' | 'skewt';
+export type ChartView = 'wind' | 'skewt' | 'comparison';
 
 export interface PageParameters {
   location: Location;

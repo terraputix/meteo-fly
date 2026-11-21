@@ -40,6 +40,7 @@
 - **Single-page client app**: Keep everything browser-compatible. Do not introduce server runtime files.
 - **State source of truth**: Page parameters drive selected location, day, model, and max altitude; they are mirrored to URL params and persisted locally.
 - **Data flow**: `+page.svelte` fetches weather data, passes it into `ChartContainer.svelte`, then `WindChart.svelte` offloads heavy chart preparation to `src/lib/workers/chartWorker.ts`.
+- **Forecast timeline**: The forecast panel contains the day/hour controls. Compare winds automatically shows the wind compass at the selected point. Its rim uses a 2 km ground radius with a minimum on-screen diameter of 33% of the map pane’s shorter side on desktop and 60% on mobile. Each fletch shows a model’s 10 m wind. The comparison panel includes gusts from the same full-day batch, including when the chart pane is closed. Skew-T selects its trace by timestamp.
 - **Worker split**: Expensive chart shaping and Hike & Fly terrain/raster processing belong in pure helpers or workers, not in UI components.
 - **Display units**: Persist preferences in `src/lib/stores/units.ts`; conversions live in `src/lib/utils/units.ts`. Keep API data, workers, calculations, chart geometry, and wind color thresholds in canonical metric units. Convert only display values; pressure remains hPa.
 - **Chart stack**: Reuse existing chart builders and tooltip/state helpers before adding new rendering abstractions.
@@ -93,6 +94,9 @@
 - Location state and geolocation behavior live in `src/lib/services/location/`.
 
 ### Charting
+
+- Wind Chart, Skew-T, and comparison table arrows show the direction the air travels. Direction labels such as SSW report where the wind comes from.
+- Map compass tips point outward at the wind's source bearing on the rim.
 
 - UI container: `src/lib/components/ChartContainer.svelte`
 - Canvas lifecycle, interaction, and worker orchestration: `src/lib/components/WindChart.svelte`

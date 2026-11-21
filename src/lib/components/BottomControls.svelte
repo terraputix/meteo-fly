@@ -1,7 +1,6 @@
 <script lang="ts">
   import { MIN_FORECAST_DAY, stepTimestep, type TimestepDirection } from '#lib/components/timestepNavigation.js';
   import { formatTimeZone } from '#lib/helpers.js';
-  import type { ChartView } from '#lib/services/types.js';
 
   let {
     selectedDay = $bindable(),
@@ -10,9 +9,8 @@
     traceHours = [],
     timezone = 'UTC',
     maxForecastDays = 8,
-    chartView = 'wind',
     keyboardNavigationEnabled = false,
-    onclose = undefined,
+    dayNavigationOnly = false,
   }: {
     selectedDay: number;
     startDate: Date;
@@ -20,14 +18,14 @@
     traceHours?: Date[];
     timezone?: string;
     maxForecastDays?: number;
-    chartView?: ChartView;
     keyboardNavigationEnabled?: boolean;
-    onclose?: () => void;
+    dayNavigationOnly?: boolean;
   } = $props();
 
   const keyboardNavigationExclusionSelector = [
     'a[href]',
     'input',
+    'button',
     'select',
     'textarea',
     'summary',
@@ -63,11 +61,12 @@
     }
   });
 
-  function applyTimestep(direction: TimestepDirection, activeView = chartView) {
+  function applyTimestep(direction: TimestepDirection, mode: 'day' | 'hour' = 'hour') {
+    if (mode === 'hour' && !traceHours.length) return;
     pendingLastTrace =
-      activeView === 'skewt' && direction === -1 && hour === 0 && selectedDay > MIN_FORECAST_DAY ? traceHours : null;
+      mode === 'hour' && direction === -1 && hour === 0 && selectedDay > MIN_FORECAST_DAY ? traceHours : null;
     ({ selectedDay, hour } = stepTimestep({
-      chartView: activeView,
+      mode,
       direction,
       selectedDay,
       hour,
@@ -78,12 +77,12 @@
 
   function handleNextDay(e: MouseEvent) {
     e.preventDefault();
-    applyTimestep(1, 'wind');
+    applyTimestep(1, 'day');
   }
 
   function handlePrevDay(e: MouseEvent) {
     e.preventDefault();
-    applyTimestep(-1, 'wind');
+    applyTimestep(-1, 'day');
   }
 
   function formatDayHour(date: Date): string {
@@ -97,11 +96,11 @@
   }
 
   function prevTrace() {
-    applyTimestep(-1, 'skewt');
+    applyTimestep(-1, 'hour');
   }
 
   function nextTrace() {
-    applyTimestep(1, 'skewt');
+    applyTimestep(1, 'hour');
   }
 
   function handleSliderInput(e: Event) {
@@ -132,11 +131,11 @@
     }
 
     event.preventDefault();
-    applyTimestep(event.key === 'ArrowLeft' ? -1 : 1);
+    applyTimestep(event.key === 'ArrowLeft' ? -1 : 1, dayNavigationOnly ? 'day' : 'hour');
   }
 
   let timestepAnnouncement = $derived.by(() => {
-    if (chartView === 'skewt' && traceHours.length > 0) {
+    if (traceHours.length > 0) {
       return `Forecast time ${formatDayHour(traceHours[hour] ?? new Date())} ${selectedTimezone}`.trim();
     }
     return `Forecast ${getDayLabel(selectedDay)}, ${formatForecastDate(startDate)}`;
@@ -147,13 +146,14 @@
 
 <div
   class="flex flex-col gap-1"
+  data-forecast-timeline
   role="group"
   aria-label="Forecast timestep controls"
   aria-keyshortcuts="ArrowLeft ArrowRight"
 >
   <span class="sr-only" aria-live="polite" aria-atomic="true">{timestepAnnouncement}</span>
   {#if traceHours.length > 0}
-    <div class="flex items-center gap-2 px-1">
+    <div class="flex min-w-0 flex-1 items-center gap-2 px-1">
       <span class="text-xs font-medium text-slate-500">Time</span>
       <button
         type="button"
@@ -243,23 +243,6 @@
         stroke="currentColor"
       >
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-      </svg>
-    </button>
-
-    <button
-      type="button"
-      onclick={() => onclose?.()}
-      class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm transition hover:bg-white hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 sm:h-10 sm:w-10"
-      aria-label="Close chart panel"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-4 w-4 sm:h-5 sm:w-5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
       </svg>
     </button>
   </div>

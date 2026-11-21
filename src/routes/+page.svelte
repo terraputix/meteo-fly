@@ -4,12 +4,21 @@
   import { page } from '$app/state';
   import { afterNavigate, goto } from '$app/navigation';
   import { isMobile } from '#lib/stores/media.js';
+  import WindComparisonGrid from '#lib/components/WindComparisonGrid.svelte';
+  import BottomControls from '#lib/components/BottomControls.svelte';
+  import { MODEL_FORECAST_DAYS, type CompassModel } from '#lib/api/models.js';
   import LocationMap from '#lib/components/LocationMap.svelte';
   import ChartContainer from '#lib/components/ChartContainer.svelte';
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '#lib/components/ui/resizable/index.js';
   import { getInitialParameters } from '#lib/services/defaults.js';
-  import { type PageParameters } from '#lib/services/types.js';
-  import { fetchWindChartData, fetchModelGridElevation, fetchSkewTData } from '#lib/api/api.js';
+  import { type PageParameters, type ChartView } from '#lib/services/types.js';
+  import {
+    fetchSurfaceWindDay,
+    type SurfaceWindDay,
+    fetchWindChartData,
+    fetchModelGridElevation,
+    fetchSkewTData,
+  } from '#lib/api/api.js';
   import type { Location, WindChartData, SkewTWeatherData } from '#lib/api/types.js';
   import { addDays } from '#lib/utils/dateExtensions.js';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
@@ -23,7 +32,8 @@
   );
   let showChart = $state(true);
   let routerReady = $state(false);
-  let chartView: 'wind' | 'skewt' = $state(parameters.chartView ?? 'wind');
+  let chartView: ChartView = $state(parameters.chartView ?? 'comparison');
+  const comparing = $derived(chartView === 'comparison');
   let selectedHour = $state(parameters.hour ?? 0);
   let windChartData = $state.raw<WindChartData | null>(null);
   let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
@@ -31,6 +41,44 @@
   let isSkewTLoading = $state(false);
   let windOutdatedCachedAt: number | null = $state(null);
   let skewTOutdatedCachedAt: number | null = $state(null);
+
+  let comparison = $state.raw<SurfaceWindDay | null>(null);
+  let inspectedModels = $state<CompassModel[]>([]);
+  let highlighted = $state<CompassModel | null>(null);
+  let comparisonFailed = $state(false);
+  let comparisonRetry = $state(0);
+  let comparisonCachedAt = $state<number | null>(null);
+  $effect(() => {
+    void comparisonRetry;
+    comparison = null;
+    comparisonFailed = false;
+    comparisonCachedAt = null;
+    if (!comparing) return;
+    const controller = new AbortController();
+    void fetchSurfaceWindDay(
+      { ...parameters.location },
+      parameters.selectedDay - 1,
+      parameters.cellSelection,
+      controller.signal
+    )
+      .then((day) => {
+        if (!controller.signal.aborted) comparison = day;
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) comparisonFailed = true;
+      });
+    return () => controller.abort();
+  });
+  const timeline = $derived(
+    comparing
+      ? (comparison?.time ?? [])
+      : chartView === 'skewt' && !isSkewTLoading
+        ? (skewTWeatherData?.hourly.time ?? [])
+        : []
+  );
+  $effect(() => {
+    if (timeline.length && selectedHour >= timeline.length) selectedHour = timeline.length - 1;
+  });
 
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
   let panelTransitionTimer: ReturnType<typeof setTimeout> | null = null;
@@ -70,15 +118,26 @@
   let skewTFailure = $state.raw<WeatherRequestFailure | null>(null);
 
   const paneDirection = $derived<'horizontal' | 'vertical'>($isMobile ? 'vertical' : 'horizontal');
-  const startDate = $derived(addDays(new Date(), parameters.selectedDay - 1, windChartData?.timezone));
-  const showMapLoadingStatus = $derived(!showChart && isWindChartLoading && !windChartData);
-  const showMapErrorStatus = $derived(!showChart && windFailure !== null);
+  const startDate = $derived(
+    addDays(new Date(), parameters.selectedDay - 1, comparison?.timezone ?? windChartData?.timezone)
+  );
+  const maxForecastDays = $derived(
+    comparing ? MODEL_FORECAST_DAYS.gfs_seamless : MODEL_FORECAST_DAYS[parameters.selectedModel]
+  );
+  const showMapLoadingStatus = $derived(!showChart && comparing && !comparison && !comparisonFailed);
+  const showMapErrorStatus = $derived(!showChart && comparing && comparisonFailed);
 
   const mapControlsTopOffset = $derived(
     $isMobile ? (showMapErrorStatus ? '7.5rem' : showMapLoadingStatus ? '3.75rem' : '0.75rem') : '0.75rem'
   );
 
-  const outdatedCachedAt = $derived(chartView === 'wind' ? windOutdatedCachedAt : skewTOutdatedCachedAt);
+  const outdatedCachedAt = $derived(
+    chartView === 'comparison'
+      ? comparisonCachedAt
+      : chartView === 'wind'
+        ? windOutdatedCachedAt
+        : skewTOutdatedCachedAt
+  );
   const outdatedCachedAtLabel = $derived(
     outdatedCachedAt === null
       ? ''
@@ -178,12 +237,6 @@
       chartPaneSizes[paneDirection] = chartPane.getSize();
     }
     showChart = false;
-    clearTimeout(updateTimer ?? undefined);
-    updateTimer = null;
-    windRequest.cancel();
-    skewTRequest.cancel();
-    isWindChartLoading = false;
-    isSkewTLoading = false;
     chartPane?.collapse();
 
     if (!chartPane || prefersReducedMotion()) {
@@ -200,7 +253,7 @@
       closeChartPanel();
     } else {
       void openChartPanel();
-      if (!windChartData && !isWindChartLoading) {
+      if (!comparing && !windChartData && !isWindChartLoading) {
         scheduleWindChartUpdate(getWeatherRequestParameters());
       }
     }
@@ -290,7 +343,7 @@
     clearPanelTransitionTimer();
     renderChartPanel = true;
     showChart = true;
-    if (!windChartData && !isWindChartLoading) {
+    if (!comparing && !windChartData && !isWindChartLoading) {
       scheduleWindChartUpdate(getWeatherRequestParameters());
     }
   }
@@ -302,6 +355,19 @@
   }
 
   $effect(() => {
+    const maxDay = maxForecastDays;
+    if (parameters.selectedDay > maxDay) {
+      parameters.selectedDay = maxDay;
+      return;
+    }
+    if (comparing) {
+      windRequest.cancel();
+      clearTimeout(updateTimer ?? undefined);
+      windChartData = null;
+      isWindChartLoading = false;
+      windFailure = null;
+      return;
+    }
     scheduleWindChartUpdate(getWeatherRequestParameters());
   });
 
@@ -349,7 +415,6 @@
       if (!windRequest.isCurrent(request)) return;
 
       windChartData = { ...result, modelGridElevation };
-      await openChartPanel();
     } catch (err) {
       if (!windRequest.isCurrent(request) || isAbortError(err)) return;
       console.error(err);
@@ -409,6 +474,8 @@
       if (event.data.dataset === 'wind') {
         windOutdatedCachedAt =
           windOutdatedCachedAt === null ? event.data.cachedAt : Math.min(windOutdatedCachedAt, event.data.cachedAt);
+      } else if (event.data.dataset === 'comparison') {
+        comparisonCachedAt = event.data.cachedAt;
       } else {
         skewTOutdatedCachedAt =
           skewTOutdatedCachedAt === null ? event.data.cachedAt : Math.min(skewTOutdatedCachedAt, event.data.cachedAt);
@@ -451,9 +518,7 @@
 </svelte:head>
 
 <div
-  bind:this={pageElement}
-  bind:clientHeight={viewportHeight}
-  class="relative h-dvh w-full overflow-hidden bg-slate-100"
+  class="relative flex flex-col h-dvh w-full overflow-hidden bg-slate-100"
   style="--map-controls-top-offset: {mapControlsTopOffset};"
 >
   {#if showMapLoadingStatus}
@@ -465,7 +530,7 @@
         Loading weather data…
       </div>
     </div>
-  {:else if showMapErrorStatus && windFailure}
+  {:else if showMapErrorStatus}
     <div
       class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
     >
@@ -473,11 +538,11 @@
         class="pointer-events-auto flex max-w-lg items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 shadow-md ring-1 ring-red-200"
         role="alert"
       >
-        <span>{windFailure.message}</span>
+        <span>Wind comparison could not load.</span>
         <button
           type="button"
           class="shrink-0 rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-          onclick={retryWindChart}
+          onclick={() => comparisonRetry++}
         >
           Retry
         </button>
@@ -485,105 +550,145 @@
     </div>
   {/if}
 
-  <ResizablePaneGroup direction={paneDirection}>
-    <ResizablePane
-      defaultSize={50}
-      minSize={$isMobile ? 10 : 30}
-      class={isChartPaneDragging ? '' : 'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'}
-    >
-      <div class="relative h-full w-full overflow-hidden bg-slate-200">
-        <LocationMap
-          latitude={parameters.location.latitude}
-          longitude={parameters.location.longitude}
-          bind:chartOpen={showChart}
-          bind:model={parameters.selectedModel}
-          bind:cellSelection={parameters.cellSelection}
-          selectedGridCell={windChartData?.selectedGridCell ?? null}
-          gridCellElevation={windChartData?.elevation}
-          modelGridElevation={windChartData?.modelGridElevation}
-          onToggleChart={toggleChartPanel}
-          onLocationChange={updateLocation}
-          onMapViewChange={saveCurrentURL}
-        />
-      </div>
-    </ResizablePane>
-
-    <ResizableHandle
-      withHandle
-      disabled={!showChart && !isChartPaneDragging}
-      tabindex={showChart ? 0 : -1}
-      onDraggingChange={handleChartPaneDraggingChange}
-      class="transition-opacity duration-200 motion-reduce:transition-none {showChart
-        ? 'opacity-100'
-        : 'pointer-events-none opacity-0'}"
-    />
-    <ResizablePane
-      bind:this={chartPane}
-      defaultSize={50}
-      minSize={$isMobile ? 10 : 30}
-      collapsedSize={0}
-      collapsible
-      onCollapse={handleChartPaneCollapse}
-      onExpand={handleChartPaneExpand}
-      onResize={handleChartPaneResize}
-      ontransitionend={handleChartPaneTransitionEnd}
-      class={isChartPaneDragging ? '' : 'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'}
-    >
-      {#if renderChartPanel}
-        <div
-          class="relative flex h-full min-h-0 flex-col overflow-hidden bg-white p-0 transition-opacity duration-200 motion-reduce:transition-none sm:p-0 {showChart &&
-          chartPanelReady
-            ? 'opacity-100'
-            : 'pointer-events-none opacity-0'}"
-          aria-hidden={!showChart}
-          inert={!showChart}
-        >
-          {#if outdatedCachedAt !== null}
-            <div bind:offsetHeight={cacheNoticeHeight} class="shrink-0 px-3 pt-3">
-              <div class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
-                Showing cached weather data last fetched {outdatedCachedAtLabel}. The latest forecast could not be
-                loaded.
-              </div>
-            </div>
-          {/if}
-          <ChartContainer
-            bind:this={chartContainer}
-            onContentHeightChange={(height) => (chartContentHeight = height)}
-            {windChartData}
-            {skewTWeatherData}
-            {startDate}
-            {isWindChartLoading}
-            {isSkewTLoading}
-            skewTError={skewTFailure?.message ?? null}
-            onRetrySkewT={retrySkewT}
-            bind:selectedDay={parameters.selectedDay}
-            bind:maxAltitude={parameters.maxAltitude}
+  <div bind:this={pageElement} bind:clientHeight={viewportHeight} class="relative min-h-0 flex-1">
+    <ResizablePaneGroup direction={paneDirection}>
+      <ResizablePane
+        defaultSize={50}
+        minSize={$isMobile ? 10 : 30}
+        class={isChartPaneDragging
+          ? ''
+          : 'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'}
+      >
+        <div class="relative h-full w-full overflow-hidden bg-slate-200">
+          <LocationMap
+            {comparison}
+            {comparing}
+            {highlighted}
+            onInspectModels={(models) => (inspectedModels = models)}
+            selectedTime={timeline[selectedHour]}
+            latitude={parameters.location.latitude}
+            longitude={parameters.location.longitude}
+            bind:chartOpen={showChart}
             bind:model={parameters.selectedModel}
-            bind:chartView
-            bind:hour={selectedHour}
-            bind:daylightOnly={parameters.daylightOnly}
-            keyboardNavigationEnabled={showChart}
-            onClose={closeChartPanel}
+            bind:cellSelection={parameters.cellSelection}
+            selectedGridCell={windChartData?.selectedGridCell ?? null}
+            gridCellElevation={windChartData?.elevation}
+            modelGridElevation={windChartData?.modelGridElevation}
+            onToggleChart={toggleChartPanel}
+            onLocationChange={updateLocation}
+            onMapViewChange={saveCurrentURL}
           />
-          {#if windFailure}
-            <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
-              <div
-                class="pointer-events-auto flex max-w-md flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
-                role="alert"
-              >
-                <span>{windFailure.message}</span>
-                <button
-                  type="button"
-                  class="rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                  onclick={retryWindChart}
-                >
-                  Retry
-                </button>
-              </div>
-            </div>
-          {/if}
         </div>
-      {/if}
-    </ResizablePane>
-  </ResizablePaneGroup>
+      </ResizablePane>
+
+      <ResizableHandle
+        withHandle
+        disabled={!showChart && !isChartPaneDragging}
+        tabindex={showChart ? 0 : -1}
+        onDraggingChange={handleChartPaneDraggingChange}
+        class="transition-opacity duration-200 motion-reduce:transition-none {showChart
+          ? 'opacity-100'
+          : 'pointer-events-none opacity-0'}"
+      />
+      <ResizablePane
+        bind:this={chartPane}
+        defaultSize={50}
+        minSize={$isMobile ? 10 : 30}
+        collapsedSize={0}
+        collapsible
+        onCollapse={handleChartPaneCollapse}
+        onExpand={handleChartPaneExpand}
+        onResize={handleChartPaneResize}
+        ontransitionend={handleChartPaneTransitionEnd}
+        class={isChartPaneDragging
+          ? ''
+          : 'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'}
+      >
+        {#if renderChartPanel}
+          <div
+            class="relative flex h-full min-h-0 flex-col overflow-hidden bg-white p-0 transition-opacity duration-200 motion-reduce:transition-none sm:p-0 {showChart &&
+            chartPanelReady
+              ? 'opacity-100'
+              : 'pointer-events-none opacity-0'}"
+            aria-hidden={!showChart}
+            inert={!showChart}
+          >
+            {#if outdatedCachedAt !== null}
+              <div bind:offsetHeight={cacheNoticeHeight} class="shrink-0 px-3 pt-3">
+                <div class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
+                  Showing cached weather data last fetched {outdatedCachedAtLabel}. The latest forecast could not be
+                  loaded.
+                </div>
+              </div>
+            {/if}
+            <ChartContainer
+              bind:this={chartContainer}
+              onContentHeightChange={(height) => (chartContentHeight = height)}
+              {windChartData}
+              {skewTWeatherData}
+              {isWindChartLoading}
+              {isSkewTLoading}
+              skewTError={skewTFailure?.message ?? null}
+              onRetrySkewT={retrySkewT}
+              bind:maxAltitude={parameters.maxAltitude}
+              bind:model={parameters.selectedModel}
+              bind:chartView
+              selectedTime={timeline[selectedHour]}
+              bind:daylightOnly={parameters.daylightOnly}
+              onClose={closeChartPanel}
+            >
+              {#snippet timestepControls()}
+                <BottomControls
+                  bind:selectedDay={parameters.selectedDay}
+                  {startDate}
+                  bind:hour={selectedHour}
+                  traceHours={timeline}
+                  timezone={comparing
+                    ? comparison?.timezone
+                    : chartView === 'skewt'
+                      ? skewTWeatherData?.timezone
+                      : windChartData?.timezone}
+                  {maxForecastDays}
+                  keyboardNavigationEnabled={showChart}
+                  dayNavigationOnly={chartView === 'wind'}
+                />
+              {/snippet}
+              {#snippet comparisonGrid()}
+                <WindComparisonGrid
+                  bind:highlighted
+                  {inspectedModels}
+                  day={comparison}
+                  failed={comparisonFailed}
+                  retry={() => comparisonRetry++}
+                  bind:hour={selectedHour}
+                />
+              {/snippet}
+            </ChartContainer>
+            {#if windFailure && chartView !== 'comparison'}
+              <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
+                <div
+                  class="pointer-events-auto flex max-w-md flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
+                  role="alert"
+                >
+                  <span>{windFailure.message}</span>
+                  <button
+                    type="button"
+                    class="rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    onclick={retryWindChart}
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </ResizablePane>
+    </ResizablePaneGroup>
+  </div>
+  {#if !showChart && comparing && comparisonCachedAt !== null}
+    <p class="text-center text-xs text-amber-800">
+      Showing cached wind forecast from {new Date(comparisonCachedAt).toLocaleString()}.
+    </p>
+  {/if}
 </div>

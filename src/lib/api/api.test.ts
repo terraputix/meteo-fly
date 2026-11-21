@@ -1,3 +1,5 @@
+import { Model } from '@openmeteo/sdk/model';
+import { COMPASS_MODELS } from '#lib/api/models.js';
 import { resetLocalTimeZone } from '@internationalized/date';
 import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest';
 import { fetchWeatherApi } from 'openmeteo';
@@ -8,6 +10,7 @@ import { getVariablesForModel } from './variables';
 import {
   createHourlyParams,
   createQueryParams,
+  fetchSurfaceWindDay,
   fetchModelGridElevation,
   fetchSkewTData,
   fetchWindChartData,
@@ -86,6 +89,47 @@ describe('API Configuration', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     resetLocalTimeZone();
+  });
+
+  it('compares individual ICON and GFS forecasts and keeps other seamless families', () => {
+    const ids = COMPASS_MODELS.map((model) => model.id);
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        'icon_d2',
+        'icon_eu',
+        'icon_global',
+        'gem_seamless',
+        'ukmo_seamless',
+        'meteofrance_seamless',
+        'meteoswiss_icon_ch1',
+        'meteoswiss_icon_ch2',
+        'gfs_global',
+        'ecmwf_ifs',
+      ])
+    );
+    for (const id of ['icon_seamless', 'gfs_seamless', 'meteoswiss_icon_seamless']) expect(ids).not.toContain(id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const names = COMPASS_MODELS.map((model) => model.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })));
+  });
+
+  it('loads one day for all models and identifies reordered responses by model and timestamp', async () => {
+    const names = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'];
+    const response = (model: Model, speed: number) =>
+      Object.assign(
+        createResponse({
+          hourly: createHourlySection(names, { wind_speed_10m: [speed], wind_direction_10m: [90] }),
+        }),
+        { model: () => model }
+      );
+    vi.mocked(fetchWeatherApi).mockResolvedValueOnce([response(Model.gfs_global, 18), response(Model.icon_d2, 7)]);
+    const day = await fetchSurfaceWindDay({ latitude: 46, longitude: 8 }, 0, 'nearest', new AbortController().signal);
+    expect(fetchWeatherApi).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetchWeatherApi).mock.calls[0][1].models).toEqual(COMPASS_MODELS.map((option) => option.id));
+    expect(day.time).toHaveLength(24);
+    expect(day.models.gfs_global?.get(+day.time[0])).toEqual({ speed: 18, direction: 90, gust: NaN });
+    expect(day.models.icon_d2?.get(+day.time[0])?.speed).toBe(7);
+    expect(day.models.icon_eu).toBeUndefined();
   });
 
   it.each([
