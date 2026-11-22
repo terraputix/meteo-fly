@@ -4,6 +4,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@utility initial-map-pane {
+  flex-grow: calc(100 - var(--saved-chart-pane-horizontal, 50)) !important;
+
+  @variant max-sm {
+    flex: calc(100 - var(--saved-chart-pane-vertical, 0)) !important;
+  }
+}
+
+@utility initial-chart-pane {
+  flex-grow: var(--saved-chart-pane-horizontal, 50) !important;
+
+  @variant max-sm {
+    flex: var(--saved-chart-pane-vertical, 0 0 auto) !important;
+    min-height: var(--mobile-pane-min);
+    max-height: max(var(--initial-mobile-chart-max), calc(var(--saved-chart-pane-vertical, 0) * 1%));
+  }
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);

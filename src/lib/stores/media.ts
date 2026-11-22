@@ -4,7 +4,7 @@ import { browser } from '$app/env';
 export const isMobile = readable(false, (set) => {
   if (!browser) return;
 
-  const query = window.matchMedia('(max-width: 639px)'); // Tailwind's 'sm' breakpoint is 640px
+  const query = window.matchMedia('(width < 40rem)'); // Tailwind's sm breakpoint
   set(query.matches);
 
   const handler = (e: MediaQueryListEvent) => set(e.matches);

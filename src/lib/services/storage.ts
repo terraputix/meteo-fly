@@ -1,5 +1,20 @@
 const LAST_URL_KEY = 'last-url';
 
+export type ChartPaneDirection = 'horizontal' | 'vertical';
+
+export function getInitialChartPaneSize(direction: ChartPaneDirection): number | undefined {
+  const size = document.documentElement.style.getPropertyValue(`--saved-chart-pane-${direction}`);
+  return size ? Number(size) : undefined;
+}
+
+export function saveChartPaneSize(direction: ChartPaneDirection, size: number) {
+  try {
+    localStorage.setItem(`meteo-fly-chart-pane-${direction}`, String(size));
+  } catch {
+    // The current page keeps the selected size in memory.
+  }
+}
+
 export function buildVisitedURL(location: Pick<Location, 'pathname' | 'search' | 'hash'>): string {
   return `${location.pathname}${location.search}${location.hash}`;
 }
