@@ -85,7 +85,7 @@
   let mapError = $state<string | null>(null);
   let marker: Marker;
   let selectedLocationElement: HTMLDivElement;
-  let compassMarker: Marker | undefined;
+  let compassMarker = $state.raw<Marker>();
   let compassElement: HTMLDivElement;
   const rows = $derived.by(() => {
     const t = selectedTime?.getTime();
@@ -338,9 +338,6 @@
       marker.setLngLat(newPos);
       map.setCenter(newPos);
     }
-  });
-  $effect(() => {
-    if (map && compassMarker) compassMarker.setLngLat([longitude, latitude]);
   });
 
   $effect(() => {
@@ -644,9 +641,9 @@
 
   <div hidden>
     <div bind:this={compassElement} style:pointer-events="none">
-      {#if comparing && selectedTime && map}
+      {#if comparing && selectedTime && map && compassMarker}
         <div class="pointer-events-none absolute left-1/2 top-1/2 size-[348px] -translate-x-1/2 -translate-y-1/2">
-          <WindCompass {rows} {highlighted} {onInspectModels} {map} {latitude} {longitude} />
+          <WindCompass {rows} {highlighted} {onInspectModels} {map} marker={compassMarker} {latitude} {longitude} />
         </div>
       {/if}
     </div>

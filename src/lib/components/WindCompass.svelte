@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Map as ForecastMap } from 'maplibre-gl';
+  import type { Map as ForecastMap, Marker } from 'maplibre-gl';
+  import { untrack } from 'svelte';
   import type { CompassModel } from '#lib/api/models.js';
   import { windCompassRimPoint } from '#lib/meteo/surfaceWind.js';
   import { windColorScale } from '#lib/charts/scales.js';
@@ -11,6 +12,7 @@
   let {
     rows,
     map,
+    marker,
     latitude,
     longitude,
     highlighted,
@@ -18,6 +20,7 @@
   }: {
     rows: { id: CompassModel; name: string; bearing: number | null; speed: number; gust: number }[];
     map: ForecastMap;
+    marker: Marker;
     latitude: number;
     longitude: number;
     highlighted: CompassModel | null;
@@ -46,28 +49,34 @@
 
   let projectionRevision = $state(0);
   $effect(() => {
+    marker.setLngLat([longitude, latitude]);
     const refresh = () => projectionRevision++;
+    untrack(refresh);
     map.on('move', refresh);
+    map.on('moveend', refresh);
     map.on('resize', refresh);
     map.on('idle', refresh);
     return () => {
       map.off('move', refresh);
+      map.off('moveend', refresh);
       map.off('resize', refresh);
       map.off('idle', refresh);
     };
   });
 
-  const center = $derived.by(() => {
+  const anchor = $derived.by(() => {
     void projectionRevision;
-    return map.project([longitude, latitude]);
+    const { lat, lng } = marker.getLngLat();
+    return { lat, lng };
   });
+  const center = $derived(map.project(anchor));
   const paneSize = $derived.by(() => {
     void projectionRevision;
     const container = map.getContainer();
     return { width: container.clientWidth, height: container.clientHeight };
   });
   const projectedPoint = (bearing: number) =>
-    map.project(windCompassRimPoint(latitude, longitude, bearing)).sub(center);
+    map.project(windCompassRimPoint(anchor.lat, anchor.lng, bearing)).sub(center);
   const rim = $derived(Array.from({ length: 72 }, (_, i) => projectedPoint(i * 5)));
   const rimDistances = $derived(rim.map((point) => point.mag()));
   const compassScale = $derived.by(() => {
