@@ -439,13 +439,13 @@
 {/snippet}
 
 <div
-  class="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-slate-100"
+  class="relative flex h-dvh w-full flex-col overflow-hidden bg-slate-100 [@media(display-mode:standalone)]:h-svh"
   style="--map-controls-top-offset: {mapControlsTopOffset}; --initial-mobile-chart-max: {defaultPaneSizes.vertical}%; --mobile-pane-min: {mobilePaneMinSize}%;"
 >
   {#if showMapLoading || mapError}
     <div
       bind:offsetHeight={mapNoticeHeight}
-      class="pointer-events-none absolute inset-x-3 top-3 z-50 flex justify-center"
+      class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
     >
       {#if showMapLoading}
         <div
