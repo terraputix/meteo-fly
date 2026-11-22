@@ -39,7 +39,7 @@
   );
   let showChart = $state(true);
   let routerReady = $state(false);
-  let chartView: ChartView = $state(parameters.chartView ?? 'comparison');
+  let chartView: ChartView = $state(parameters.chartView ?? 'wind');
   const comparing = $derived(chartView === 'comparison');
   let selectedHour = $state(parameters.hour ?? 0);
   let pendingLastHourDay = $state<number | null>(null);
