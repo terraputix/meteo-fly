@@ -96,27 +96,30 @@
     <div
       bind:this={bodyElement}
       bind:offsetHeight={bodyHeight}
-      class="flex flex-col px-2 pt-3 pb-1 sm:min-h-full sm:px-4 sm:pt-4 sm:pb-0"
+      class="@container flex flex-col px-2 pt-3 pb-1 sm:min-h-full sm:px-4 sm:pt-4 sm:pb-0"
     >
-      <div class="relative mb-2 flex shrink-0 items-center justify-center">
+      <div class="mb-2 grid shrink-0 grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-x-1">
+        <div class="col-start-2 row-start-1 overflow-x-auto">
+          <div class="mx-auto flex w-max rounded-xl bg-slate-100 p-1">
+            {#each [{ id: 'wind', name: 'Wind Chart' }, { id: 'skewt', name: 'Skew-T' }, { id: 'comparison', name: 'Compare winds' }] as const as tab (tab.id)}
+              <button
+                type="button"
+                class="shrink-0 rounded-lg px-1.5 py-1.5 text-xs font-medium whitespace-nowrap text-slate-700 @min-[22rem]:px-3 @min-[22rem]:text-sm"
+                class:bg-white={chartView === tab.id}
+                class:shadow-sm={chartView === tab.id}
+                aria-pressed={chartView === tab.id}
+                onclick={() => (chartView = tab.id)}>{tab.name}</button
+              >
+            {/each}
+          </div>
+        </div>
         <button
           type="button"
           aria-label="Close chart panel"
           onclick={onClose}
-          class="absolute right-0 rounded-lg px-3 py-1 text-xl text-slate-500 hover:bg-slate-100">×</button
+          class="col-start-3 row-start-1 inline-flex size-9 items-center justify-center rounded-lg text-xl text-slate-500 hover:bg-slate-100"
+          >×</button
         >
-        <div class="inline-flex rounded-xl bg-slate-100 p-1">
-          {#each [{ id: 'wind', name: 'Wind Chart' }, { id: 'skewt', name: 'Skew-T' }, { id: 'comparison', name: 'Compare winds' }] as const as tab (tab.id)}
-            <button
-              type="button"
-              class="rounded-lg px-2 py-1.5 text-xs font-medium text-slate-700 sm:px-3 sm:text-sm"
-              class:bg-white={chartView === tab.id}
-              class:shadow-sm={chartView === tab.id}
-              aria-pressed={chartView === tab.id}
-              onclick={() => (chartView = tab.id)}>{tab.name}</button
-            >
-          {/each}
-        </div>
       </div>
 
       {#if chartView === 'comparison'}
