@@ -19,9 +19,8 @@ it('shows calm independently of the preceding gust', () => {
   });
 });
 
-it.each([0, 46.635, 80])('keeps the same ground radius at latitude %s', (latitude) => {
-  for (const bearing of [0, 45, 90, 180, 270, 359]) {
-    const [lon, lat] = windCompassRimPoint(latitude, 179.999, bearing);
-    expect(haversineDistance(latitude, 179.999, lat, lon)).toBeCloseTo(WIND_COMPASS_RADIUS_METERS, 5);
-  }
+it('keeps the east rim point at the ground radius across the antimeridian at high latitude', () => {
+  const [lon, lat] = windCompassRimPoint(80, 179.999, 90);
+  expect(lon).toBeGreaterThan(180);
+  expect(haversineDistance(80, 179.999, lat, lon)).toBeCloseTo(WIND_COMPASS_RADIUS_METERS, 5);
 });

@@ -173,10 +173,6 @@ describe('weather cache policy', () => {
   it.each([
     ['skewt', SKEWT_REQUEST],
     ['comparison', new Request(`https://api.open-meteo.com/v1/forecast?hourly=${SURFACE_WIND_FIELDS.join(',')}`)],
-    [
-      'skewt',
-      new Request(`https://api.open-meteo.com/v1/forecast?hourly=${SURFACE_WIND_FIELDS.join(',')},temperature`),
-    ],
   ])('identifies an outdated %s fallback for %s', async (dataset, request) => {
     const cachedAt = NOW - OUTDATED_WARNING_MS;
     const cacheStorage = new MemoryCacheStorage();

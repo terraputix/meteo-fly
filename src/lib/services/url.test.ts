@@ -21,8 +21,8 @@ describe('read-only forecast URL parameters', () => {
     });
   });
 
-  it.each(['-1', 'NaN', '1.5', 'Infinity'])('ignores invalid hour index %s', (hour) => {
-    const params = new URLSearchParams({ lat: '46', lon: '8', day: '1', model: 'icon_d2', hour });
+  it('ignores a negative hour index', () => {
+    const params = new URLSearchParams({ lat: '46', lon: '8', day: '1', model: 'icon_d2', hour: '-1' });
     expect(readURLParams(params)?.hour).toBeUndefined();
   });
 

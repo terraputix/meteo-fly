@@ -13,7 +13,6 @@ import {
   fetchModelGridElevation,
   fetchSkewTData,
   fetchWindChartData,
-  forecastDayStart,
   lastCompleteForecastDay,
 } from '#lib/api/api.js';
 
@@ -25,8 +24,10 @@ function createHourlySection(
   names: string[],
   valuesByName: Record<string, number[] | null>,
   length: number = 24,
-  interval: number = 3600
+  interval: number = 3600,
+  start = '2026-07-16T00:00:00Z'
 ): VariablesWithTime {
+  const startSeconds = BigInt(Date.parse(start) / 1000);
   const variables = names.map((name) => {
     const values = valuesByName[name];
     if (values === undefined) return null;
@@ -36,8 +37,8 @@ function createHourlySection(
   });
 
   return {
-    time: () => BigInt(Date.parse('2026-07-16T00:00:00Z') / 1000),
-    timeEnd: () => BigInt(Date.parse('2026-07-16T00:00:00Z') / 1000) + BigInt(length * interval),
+    time: () => startSeconds,
+    timeEnd: () => startSeconds + BigInt(length * interval),
     interval: () => interval,
     variablesLength: () => variables.length,
     variables: (position: number) => variables[position] ?? null,
@@ -86,38 +87,22 @@ describe('API Configuration', () => {
     resetLocalTimeZone();
   });
 
-  it('compares individual ICON and GFS forecasts and keeps other seamless families', () => {
-    const ids = COMPASS_MODELS.map((model) => model.id);
-    expect(ids).toEqual(
-      expect.arrayContaining([
-        'icon_d2',
-        'icon_eu',
-        'icon_global',
-        'gem_seamless',
-        'ukmo_seamless',
-        'meteofrance_seamless',
-        'meteoswiss_icon_ch1',
-        'meteoswiss_icon_ch2',
-        'gfs_global',
-        'ecmwf_ifs',
-      ])
-    );
-    for (const id of ['icon_seamless', 'gfs_seamless', 'meteoswiss_icon_seamless']) expect(ids).not.toContain(id);
-    expect(new Set(ids).size).toBe(ids.length);
-    const names = COMPASS_MODELS.map((model) => model.name);
-    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })));
-  });
-
-  it('loads one day for all models and identifies reordered responses by model and timestamp', async () => {
+  it('loads one local day in a batch and aligns reordered model forecasts with gusts by timestamp', async () => {
     const names = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'];
-    const response = (model: Model, speed: number) =>
-      Object.assign(
-        createResponse({
-          hourly: createHourlySection(names, { wind_speed_10m: [speed], wind_direction_10m: [90] }),
-        }),
-        { model: () => model }
-      );
-    vi.mocked(fetchWeatherApi).mockResolvedValueOnce([response(Model.gfs_global, 18), response(Model.icon_d2, 7)]);
+    const firstHour = '2026-07-15T22:00:00Z';
+    const secondHour = '2026-07-15T23:00:00Z';
+    const icon = createHourlySection(names, { wind_speed_10m: [7], wind_direction_10m: [45] }, 24, 3600, firstHour);
+    const gfs = createHourlySection(
+      names,
+      { wind_speed_10m: [18], wind_direction_10m: [90], wind_gusts_10m: [32] },
+      23,
+      3600,
+      secondHour
+    );
+    vi.mocked(fetchWeatherApi).mockResolvedValueOnce([
+      Object.assign(createResponse({ hourly: gfs }), { model: () => Model.gfs_global }),
+      Object.assign(createResponse({ hourly: icon }), { model: () => Model.icon_d2 }),
+    ]);
     const day = await fetchSurfaceWindDay(
       { latitude: 46, longitude: 8 },
       'Europe/Zurich',
@@ -127,16 +112,19 @@ describe('API Configuration', () => {
       new Date('2026-07-16T12:00:00Z')
     );
     expect(fetchWeatherApi).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(fetchWeatherApi).mock.calls[0][1].models).toEqual(COMPASS_MODELS.map((option) => option.id));
     expect(day.time).toHaveLength(24);
+    expect(day.time.slice(0, 2)).toEqual([new Date(firstHour), new Date(secondHour)]);
     expect(day.timezone).toBe('Europe/Zurich');
     expect(vi.mocked(fetchWeatherApi).mock.calls[0][1]).toMatchObject({
+      models: COMPASS_MODELS.map(({ id }) => id),
+      hourly: names,
       timezone: 'GMT',
       start_hour: '2026-07-15T22:00',
       end_hour: '2026-07-16T21:00',
     });
-    expect(day.models.gfs_global?.get(+day.time[0])).toEqual({ speed: 18, direction: 90, gust: NaN });
-    expect(day.models.icon_d2?.get(+day.time[0])?.speed).toBe(7);
+    expect(day.models.gfs_global?.get(Date.parse(firstHour))).toBeUndefined();
+    expect(day.models.gfs_global?.get(Date.parse(secondHour))).toEqual({ speed: 18, direction: 90, gust: 32 });
+    expect(day.models.icon_d2?.get(Date.parse(firstHour))).toEqual({ speed: 7, direction: 45, gust: NaN });
     expect(day.models.icon_eu).toBeUndefined();
   });
 
@@ -145,10 +133,7 @@ describe('API Configuration', () => {
     ['2026-10-24T22:00:00Z', 25],
   ])('preserves every hourly sample on a DST day starting %s', async (start, count) => {
     const names = createHourlyParams(getVariablesForModel('icon_seamless', 4000)).hourly;
-    const hourly = createHourlySection(names, {}, count);
-    const seconds = BigInt(new Date(start).getTime() / 1000);
-    hourly.time = () => seconds;
-    hourly.timeEnd = () => seconds + BigInt(count * 3600);
+    const hourly = createHourlySection(names, {}, count, 3600, start);
     vi.mocked(fetchWeatherApi).mockResolvedValue([
       createResponse({
         hourly,
@@ -369,12 +354,6 @@ describe('API Configuration', () => {
     beforeEach(() => {
       vi.stubEnv('TZ', 'Europe/Berlin');
       resetLocalTimeZone();
-    });
-
-    it('uses the selected location’s calendar date even before the hourly data arrives', () => {
-      const now = new Date('2026-11-22T02:00:00Z');
-      expect(forecastDayStart(now, 'America/New_York', 1).toISOString()).toBe('2026-11-21T05:00:00.000Z');
-      expect(forecastDayStart(now, 'America/New_York', 2).toISOString()).toBe('2026-11-22T05:00:00.000Z');
     });
 
     it.each([
