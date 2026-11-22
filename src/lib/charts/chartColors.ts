@@ -19,6 +19,7 @@ export const CHART_COLORS = {
   elevation: '#8B4513',
   modelGridElevation: '#556B2F',
   rain: 'rgba(30,100,220,0.80)',
+  snow: '#0b2339',
   cloudRect: `rgba(${CLOUD_RGB.join(',')},`,
   windCloudRgb: CLOUD_RGB,
   skewtElevation: '#A0785C',

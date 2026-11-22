@@ -18,6 +18,7 @@ describe('cloud chart data', () => {
         temperature_2m: new Float32Array(2),
         dewpoint_2m: new Float32Array(2),
         precipitation: new Float32Array(2),
+        snowfallWaterEquivalent: new Float32Array(2),
         relativeHumidity_2m: new Float32Array(2),
         cloudCoverLow: new Float32Array(2),
         cloudCoverMid: new Float32Array(2),

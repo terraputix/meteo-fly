@@ -27,7 +27,7 @@ const data: PreparedWindChart = {
     sunrise: time,
     sunset: time,
   },
-  rainCloudChartData: { cloudRects: [], rainDots: [] },
+  rainCloudChartData: { cloudRects: [], precipitation: [] },
   windData: [],
   lcl: [],
   elevation: 500,
@@ -144,6 +144,11 @@ describe('wind chart layout', () => {
 
   it('preserves rain thresholds and rejects missing rain', () => {
     expect([NaN, -1, 0, 0.1, 1, 1.1, 5, 5.1].map(rainDropCount)).toEqual([0, 0, 0, 1, 1, 2, 2, 3]);
+  });
+
+  it('ignores Float32 snowfall rounding when counting rain drops in mixed hours', () => {
+    expect(rainDropCount(Math.fround(1.1) - Math.fround(0.1))).toBe(1);
+    expect(rainDropCount(Math.fround(5.3) - Math.fround(0.3))).toBe(2);
   });
 
   it.each([

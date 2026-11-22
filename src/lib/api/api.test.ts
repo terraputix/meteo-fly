@@ -339,6 +339,7 @@ describe('API Configuration', () => {
   it('should generate correct parameters for ICON-D2 model', () => {
     const variables = getVariablesForModel('icon_d2');
     const params = createHourlyParams(variables);
+    expect(params.hourly.slice(0, 2)).toEqual(['precipitation', 'snowfall_water_equivalent']);
     expect(params.hourly).toContain('temperature_2m');
     expect(params.hourly).toContain('cloud_cover_1000hPa');
     expect(params.hourly).toContain('wind_speed_1000hPa');
@@ -503,6 +504,7 @@ describe('API Configuration', () => {
           createResponse({
             hourly: createHourlySection(names, {
               temperature_2m: [20],
+              snowfall_water_equivalent: [0.5],
               wind_speed_1000hPa: [10],
               wind_direction_1000hPa: null,
             }),
@@ -513,6 +515,7 @@ describe('API Configuration', () => {
       const result = await fetchWindChartData(location, 'icon_d2', start, 'UTC');
 
       expect(Array.from(result.hourly.temperature_2m)).toEqual([20, ...Array(23).fill(NaN)]);
+      expect(result.hourly.snowfallWaterEquivalent).toEqual(new Float32Array([0.5, ...Array(23).fill(NaN)]));
       expect(Array.from(result.hourly.windSpeedProfile._1000hPa ?? [])).toEqual([10, ...Array(23).fill(NaN)]);
       expect(result.hourly.windDirectionProfile._1000hPa).toBeUndefined();
       expect(Array.from(result.hourly.dewpoint_2m).every(Number.isNaN)).toBe(true);
@@ -588,6 +591,7 @@ describe('API Configuration', () => {
       const result = await fetchWindChartData(location, 'icon_d2', start, 'UTC');
 
       expect(Array.from(result.hourly.temperature_2m).every(Number.isNaN)).toBe(true);
+      expect(result.hourly.snowfallWaterEquivalent).toEqual(new Float32Array(result.hourly.time.length).fill(NaN));
       expect(result.hourly.windSpeedProfile).toEqual({});
     });
 

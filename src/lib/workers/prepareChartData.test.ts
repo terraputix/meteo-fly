@@ -14,6 +14,7 @@ function createData(): WindChartData {
       temperature_2m: new Float32Array([20, 21]),
       dewpoint_2m: new Float32Array([NaN, 15]),
       precipitation: new Float32Array([NaN, 1]),
+      snowfallWaterEquivalent: new Float32Array([NaN, NaN]),
       relativeHumidity_2m: new Float32Array([60, 65]),
       cloudCoverLow: new Float32Array([NaN, 40]),
       cloudCoverMid: new Float32Array([20, 30]),
@@ -26,6 +27,27 @@ function createData(): WindChartData {
 }
 
 describe('chart worker preparation', () => {
+  it('separates snowfall from total precipitation after daylight filtering', () => {
+    const windChartData = createData();
+    windChartData.hourly.time = [0, 10, 11].map((hour) => new Date(Date.UTC(2026, 6, 16, hour)));
+    windChartData.hourly.precipitation = new Float32Array([5, 1, 2]);
+    windChartData.hourly.snowfallWaterEquivalent = new Float32Array([5, 1, 1]);
+
+    const { rainCloudChartData } = prepareChartData({
+      windChartData,
+      maxAltitude: 4000,
+      model: 'icon_d2',
+      daylightOnly: true,
+    });
+    const [snowOnly, mixed] = rainCloudChartData.precipitation;
+    expect(rainCloudChartData.precipitation).toHaveLength(2);
+    expect(snowOnly.time).toEqual(windChartData.hourly.time[1]);
+    expect(snowOnly.rain).toBe(0);
+    expect(snowOnly.snow).toBeCloseTo(1);
+    expect(mixed.rain).toBeCloseTo(1);
+    expect(mixed.snow).toBeCloseTo(1);
+  });
+
   it('keeps unrelated chart data when LCL and wind values are missing', () => {
     const result = prepareChartData({
       windChartData: createData(),
@@ -35,9 +57,9 @@ describe('chart worker preparation', () => {
 
     expect(result.lcl[0].value).toBeNull();
     expect(result.temperatureChartData.temperatureData).toHaveLength(2);
-    expect(result.rainCloudChartData.rainDots).toEqual([
-      { time: new Date('2026-07-16T10:00:00Z'), rain: NaN },
-      { time: new Date('2026-07-16T11:00:00Z'), rain: 1 },
+    expect(result.rainCloudChartData.precipitation).toEqual([
+      { time: new Date('2026-07-16T10:00:00Z'), rain: NaN, snow: NaN },
+      { time: new Date('2026-07-16T11:00:00Z'), rain: 1, snow: NaN },
     ]);
     expect(result.rainCloudChartData.cloudRects).toHaveLength(6);
     expect(result.rainCloudChartData.cloudRects[0].cloudCover).toBeNaN();
@@ -47,6 +69,25 @@ describe('chart worker preparation', () => {
     });
     expect(result.windData).toEqual([]);
     expect(result.xDomain.every((date) => Number.isFinite(date.getTime()))).toBe(true);
+  });
+
+  it.each([
+    [-6.6, 0.75, 0, 1],
+    [-3, 0.75, 0.25, 0.75],
+    [NaN, 0.75, 0.25, 0.75],
+    [-6.6, NaN, 1, NaN],
+  ])('classifies leftover precipitation at %s °C with %s mm reported snow', (temperature, snow, rain, expectedSnow) => {
+    const windChartData = createData();
+    windChartData.hourly.temperature_2m[1] = temperature;
+    windChartData.hourly.snowfallWaterEquivalent[1] = snow;
+
+    const { rainCloudChartData } = prepareChartData({ windChartData, maxAltitude: 4000, model: 'icon_d2' });
+
+    expect(rainCloudChartData.precipitation[1]).toEqual({
+      time: windChartData.hourly.time[1],
+      rain,
+      snow: expectedSnow,
+    });
   });
 
   it.each(['sunrise', 'sunset', 'both'] as const)(

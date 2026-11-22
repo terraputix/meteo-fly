@@ -48,6 +48,7 @@ function filterDaylightHours(data: WindChartData, intervals: DaylightInterval[])
       windSpeedProfile: pickProfile(data.hourly.windSpeedProfile),
       windDirectionProfile: pickProfile(data.hourly.windDirectionProfile),
       precipitation: pickArray(data.hourly.precipitation),
+      snowfallWaterEquivalent: pickArray(data.hourly.snowfallWaterEquivalent),
       temperature_2m: pickArray(data.hourly.temperature_2m),
       dewpoint_2m: pickArray(data.hourly.dewpoint_2m),
       relativeHumidity_2m: pickArray(data.hourly.relativeHumidity_2m),
@@ -94,10 +95,16 @@ function prepareRainAndCloudData(data: WindChartData): RainCloudChartData {
 
   return {
     cloudRects,
-    rainDots: data.hourly.time.map((time, i) => ({
-      time,
-      rain: data.hourly.precipitation[i],
-    })),
+    precipitation: data.hourly.time.map((time, i) => {
+      const total = data.hourly.precipitation[i];
+      const snow = Math.max(0, data.hourly.snowfallWaterEquivalent[i]);
+      if (!Number.isFinite(snow)) return { time, rain: total, snow };
+
+      const rain = Math.max(0, total - snow);
+      // Temporary workaround for discrepancies between total precipitation and its reported components.
+      if (rain > 0 && data.hourly.temperature_2m[i] < -3) return { time, rain: 0, snow: total };
+      return { time, rain, snow };
+    }),
   };
 }
 

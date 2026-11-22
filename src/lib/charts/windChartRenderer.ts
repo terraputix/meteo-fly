@@ -215,7 +215,10 @@ export function renderWindChart(
     for (let i = 0; i < 3; i++)
       line(ctx, left, RAIN_TOP + (i * RAIN_HEIGHT_PX) / 3, right, RAIN_TOP + (i * RAIN_HEIGHT_PX) / 3, colors.gridLine);
     const cloudRects = data.rainCloudChartData.cloudRects;
+    const denseCloudTimesByBand = new Map<number, Set<number>>();
     for (const band of new Set(cloudRects.map((rect) => rect.y1))) {
+      const denseCloudTimes = new Set<number>();
+      denseCloudTimesByBand.set(band, denseCloudTimes);
       const samples = cloudRects.filter((rect) => rect.y1 === band).sort((a, b) => +a.x1 - +b.x1);
       let start = 0;
       while (start < samples.length) {
@@ -243,6 +246,7 @@ export function renderWindChart(
             const sample = samples[i];
             const time = (+sample.x1 + +sample.x2) / 2;
             const cover = Math.max(0, Math.min(100, sample.cloudCover));
+            if (cover >= 90) denseCloudTimes.add(time);
             points.push([x(time), center - ((cover / 100) * bandHeight) / 2]);
             fill.addColorStop((time - from) / (to - from), `${colors.cloudRect}${cover / 100})`);
           }
@@ -259,12 +263,26 @@ export function renderWindChart(
         start = end;
       }
     }
-    ctx.fillStyle = colors.rain;
-    for (const dot of data.rainCloudChartData.rainDots) {
-      for (let i = 0; i < rainDropCount(dot.rain); i++) {
+    const snowflake = '❄︎';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    const { actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(snowflake);
+    const snowflakeBaselineOffset = (actualBoundingBoxAscent - actualBoundingBoxDescent) / 2;
+    const hourWidth = x(+data.xDomain[0] + 3600000) - left;
+    const pairedScale = Math.min(1, hourWidth / 30);
+    const pairedMarkerOffset = 7 * pairedScale;
+    for (const { time, rain, snow } of data.rainCloudChartData.precipitation) {
+      const px = x(+time);
+      const rainCount = rainDropCount(rain);
+      const snowCount = rainDropCount(snow);
+      for (let i = 0; i < rainCount; i++) {
+        const paired = i < snowCount;
+        const scale = 0.8 * (paired ? pairedScale : 1);
         ctx.save();
-        ctx.translate(x(+dot.time), RAIN_TOP + (1 - (i + 0.5) / 3) * RAIN_HEIGHT_PX);
-        ctx.scale(0.8, 0.8);
+        ctx.fillStyle = colors.rain;
+        ctx.translate(px - (paired ? pairedMarkerOffset : 0), RAIN_TOP + (1 - (i + 0.5) / 3) * RAIN_HEIGHT_PX);
+        ctx.scale(scale, scale);
         ctx.beginPath();
         ctx.moveTo(0, -7);
         ctx.bezierCurveTo(3.5, -3.5, 5, 0.5, 5, 3);
@@ -272,6 +290,14 @@ export function renderWindChart(
         ctx.bezierCurveTo(-5, 0.5, -3.5, -3.5, 0, -7);
         ctx.fill();
         ctx.restore();
+      }
+      for (let i = 0; i < snowCount; i++) {
+        const paired = i < rainCount;
+        const scale = paired ? pairedScale : 1;
+        const py = RAIN_TOP + (1 - (i + 0.5) / 3) * RAIN_HEIGHT_PX;
+        ctx.font = `${16 * scale}px sans-serif`;
+        ctx.fillStyle = denseCloudTimesByBand.get(i / 3)?.has(+time) ? '#fff' : colors.snow;
+        ctx.fillText(snowflake, px + (paired ? pairedMarkerOffset : 0), py + snowflakeBaselineOffset * scale);
       }
     }
   });

@@ -1,7 +1,40 @@
 import { getDaylightIntervals } from '#lib/meteo/daylight.js';
 import { describe, expect, it, vi } from 'vitest';
-import { buildWindChartLayout, DAYLIGHT_CONTEXT_TOP, type PreparedWindChart } from '#lib/charts/windChartLayout.js';
+import { CHART_COLORS } from '#lib/charts/chartColors.js';
+import {
+  buildWindChartLayout,
+  DAYLIGHT_CONTEXT_TOP,
+  RAIN_TOP,
+  RAIN_HEIGHT_PX,
+  type PreparedWindChart,
+} from '#lib/charts/windChartLayout.js';
 import { drawSmoothLine, renderWindChart } from '#lib/charts/windChartRenderer.js';
+
+function createCanvasContext() {
+  return {
+    save: vi.fn(),
+    restore: vi.fn(),
+    clearRect: vi.fn(),
+    beginPath: vi.fn(),
+    closePath: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    setLineDash: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    bezierCurveTo: vi.fn(),
+    stroke: vi.fn(),
+    fill: vi.fn(),
+    fillStyle: '',
+    fillRect: vi.fn(),
+    fillText: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
+    arc: vi.fn(),
+    createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+    measureText: vi.fn(() => ({ width: 30, actualBoundingBoxAscent: 12, actualBoundingBoxDescent: 2 })),
+  };
+}
 
 describe('canvas curve drawing', () => {
   it('starts a new path after missing samples instead of bridging LCL or temperature gaps', () => {
@@ -75,27 +108,9 @@ describe('solar annotations', () => {
         sunrise,
         sunset,
       },
-      rainCloudChartData: { cloudRects: [], rainDots: [] },
+      rainCloudChartData: { cloudRects: [], precipitation: [] },
     };
-    const ctx = {
-      save: vi.fn(),
-      restore: vi.fn(),
-      clearRect: vi.fn(),
-      beginPath: vi.fn(),
-      rect: vi.fn(),
-      clip: vi.fn(),
-      setLineDash: vi.fn(),
-      moveTo: vi.fn(),
-      lineTo: vi.fn(),
-      stroke: vi.fn(),
-      fill: vi.fn(),
-      fillRect: vi.fn(),
-      fillText: vi.fn(),
-      translate: vi.fn(),
-      scale: vi.fn(),
-      arc: vi.fn(),
-      measureText: vi.fn(() => ({ width: 30 })),
-    };
+    const ctx = createCanvasContext();
     const layout = buildWindChartLayout(data, 800, 600, 4000, 'icon_d2');
     renderWindChart(ctx as unknown as CanvasRenderingContext2D, data, layout);
     const labels = ctx.fillText.mock.calls.filter(([, , y]) => y === DAYLIGHT_CONTEXT_TOP + 19);
@@ -121,5 +136,68 @@ describe('solar annotations', () => {
         return [from, 10, to - from, 130];
       })
     );
+  });
+});
+
+describe('cloud panel precipitation', () => {
+  it.each([800, 340])('pairs rain and snow and uses the cloud shading at a chart width of %i px', (width) => {
+    const start = new Date('2026-07-16T00:00Z');
+    const [rain, snow, mixed] = [9, 10, 11].map((hour) => new Date(+start + hour * 3600000));
+    const data: PreparedWindChart = {
+      cloudData: [],
+      cloudRaster: null,
+      windData: [],
+      lcl: [],
+      elevation: 0,
+      modelGridElevation: undefined,
+      timezone: 'UTC',
+      xDomain: [start, new Date(+start + 24 * 3600000)],
+      temperatureChartData: {
+        temperatureData: [],
+        dewpointData: [],
+        humidityData: [],
+        daylightIntervals: [],
+        sunrise: null,
+        sunset: null,
+      },
+      rainCloudChartData: {
+        cloudRects: [
+          { time: snow, y1: 0, y2: 1 / 3, cloudCover: 100 },
+          { time: mixed, y1: 0, y2: 1 / 3, cloudCover: 60 },
+          { time: mixed, y1: 1 / 3, y2: 2 / 3, cloudCover: 90 },
+        ].map(({ time, ...band }) => ({
+          x1: new Date(+time - 1800000),
+          x2: new Date(+time + 1800000),
+          ...band,
+        })),
+        precipitation: [
+          { time: rain, rain: 1, snow: 0 },
+          { time: snow, rain: 0, snow: 1 },
+          { time: mixed, rain: 0.1, snow: 1.2 },
+        ],
+      },
+    };
+    const ctx = createCanvasContext();
+    const snowflakeColors: string[] = [];
+    ctx.fillText.mockImplementation((label) => {
+      if (label === '❄︎') snowflakeColors.push(ctx.fillStyle);
+    });
+    const layout = buildWindChartLayout(data, width, 600, 4000, 'icon_d2');
+    renderWindChart(ctx as unknown as CanvasRenderingContext2D, data, layout);
+
+    const snowflakePositions = ctx.fillText.mock.calls.filter(([label]) => label === '❄︎');
+    const pairScale = Math.min(1, layout.plotWidth / 24 / 30);
+    const lowBandCenter = RAIN_TOP + (RAIN_HEIGHT_PX * 5) / 6;
+    const midBandCenter = RAIN_TOP + RAIN_HEIGHT_PX / 2;
+    expect(snowflakePositions).toEqual([
+      ['❄︎', layout.x(+snow), lowBandCenter + 5],
+      ['❄︎', expect.closeTo(layout.x(+mixed) + 7 * pairScale), expect.closeTo(lowBandCenter + 5 * pairScale)],
+      ['❄︎', layout.x(+mixed), midBandCenter + 5],
+    ]);
+    expect(snowflakeColors).toEqual(['#fff', CHART_COLORS.snow, '#fff']);
+    expect(ctx.translate.mock.calls).toEqual([
+      [layout.x(+rain), lowBandCenter],
+      [expect.closeTo(layout.x(+mixed) - 7 * pairScale), lowBandCenter],
+    ]);
   });
 });
