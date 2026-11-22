@@ -591,6 +591,7 @@ describe('API Configuration', () => {
       const result = await fetchWindChartData(location, 'icon_d2', start, 'UTC');
 
       expect(Array.from(result.hourly.temperature_2m).every(Number.isNaN)).toBe(true);
+      expect(result.hourly.snowfall).toEqual(new Float32Array(result.hourly.time.length).fill(NaN));
       expect(result.hourly.windSpeedProfile).toEqual({});
     });
 

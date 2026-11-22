@@ -14,6 +14,7 @@ function createData(): WindChartData {
       temperature_2m: new Float32Array([20, 21]),
       dewpoint_2m: new Float32Array([NaN, 15]),
       precipitation: new Float32Array([NaN, 1]),
+      snowfall: new Float32Array([NaN, NaN]),
       relativeHumidity_2m: new Float32Array([60, 65]),
       cloudCoverLow: new Float32Array([NaN, 40]),
       cloudCoverMid: new Float32Array([20, 30]),
