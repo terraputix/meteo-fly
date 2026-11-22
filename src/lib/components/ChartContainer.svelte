@@ -180,13 +180,13 @@
             hour={soundingHour}
             bind:maxAltitude
             {model}
-            isLoading={isSkewTLoading || (isWindChartLoading && !windChartData)}
+            isLoading={isSkewTLoading}
           />
           {#if skewTError}
             <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
               <ForecastError message={skewTError} retry={onRetrySkewT} class="w-full max-w-md flex-col text-center" />
             </div>
-          {:else if windChartData && !isSkewTLoading && soundingHour < 0}
+          {:else if skewTWeatherData && !isSkewTLoading && soundingHour < 0}
             <div class="absolute inset-0 flex items-center justify-center text-sm text-slate-500">
               No sounding data available
             </div>

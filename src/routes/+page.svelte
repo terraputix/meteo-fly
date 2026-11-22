@@ -19,21 +19,18 @@
   import { ResizablePaneGroup, ResizablePane, ResizableHandle } from '#lib/components/ui/resizable/index.js';
   import { getInitialParameters } from '#lib/services/defaults.js';
   import { type PageParameters, type ChartView } from '#lib/services/types.js';
-  import {
-    fetchSurfaceWindDay,
-    type SurfaceWindDay,
-    fetchWindChartData,
-    fetchModelGridElevation,
-    fetchSkewTData,
-    FORECAST_API_MAX_DAYS,
-    forecastDayStart,
-    lastCompleteForecastDay,
-  } from '#lib/api/api.js';
-  import type { Location, WindChartData, SkewTWeatherData } from '#lib/api/types.js';
+  import { FORECAST_API_MAX_DAYS, forecastDayStart, lastCompleteForecastDay } from '#lib/api/api.js';
+  import type { Location } from '#lib/api/types.js';
   import { resolveLocationTimezone } from '#lib/api/timezone.js';
+  import {
+    createSkewTForecast,
+    createWindComparison,
+    createWindForecast,
+    type ForecastDayRequest,
+    type ModelForecastRequest,
+  } from '#lib/services/forecastRequests.svelte.js';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { onDestroy, onMount, tick } from 'svelte';
-  import { createLatestRequest, isAbortError, type RequestHandle } from '#lib/services/latestRequest.js';
   import { isWeatherCacheOutdatedMessage } from '#lib/services/weatherCache.js';
   import type { PaneAPI } from 'paneforge';
 
@@ -46,28 +43,14 @@
   const comparing = $derived(chartView === 'comparison');
   let selectedHour = $state(parameters.hour ?? 0);
   let pendingLastHourDay = $state<number | null>(null);
-  let windChartData = $state.raw<WindChartData | null>(null);
-  let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
-  let isWindChartLoading = $state(true);
-  let isSkewTLoading = $state(false);
-  let windOutdatedCachedAt: number | null = $state(null);
-  let skewTOutdatedCachedAt: number | null = $state(null);
-
-  let comparison = $state.raw<SurfaceWindDay | null>(null);
   let inspectedModels = $state<CompassModel[]>([]);
   let highlighted = $state<CompassModel | null>(null);
-  let comparisonRequestFailed = $state(false);
-  let comparisonRetry = $state(0);
-  let comparisonCachedAt = $state<number | null>(null);
   const locationKey = $derived(`${parameters.location.latitude},${parameters.location.longitude}`);
   let timezoneResult = $state.raw<{ key: string; timezone: string | null }>();
   let timezoneRetry = $state(0);
   const locationTimezone = $derived(timezoneResult?.key === locationKey ? timezoneResult.timezone : undefined);
   const timezoneError = $derived(
     locationTimezone === null ? 'Could not determine the forecast location’s time zone.' : null
-  );
-  const comparisonError = $derived(
-    timezoneError ?? (comparisonRequestFailed ? 'Wind comparison could not load.' : null)
   );
   const referenceDate = $derived.by(() => {
     void locationKey;
@@ -89,39 +72,6 @@
     return () => controller.abort();
   });
 
-  $effect(() => {
-    void comparisonRetry;
-    comparison = null;
-    comparisonRequestFailed = false;
-    comparisonCachedAt = null;
-    const selectedDay = parameters.selectedDay;
-    if (!comparing || !locationTimezone || selectedDay > maxForecastDays) return;
-    const controller = new AbortController();
-    void fetchSurfaceWindDay(
-      { ...parameters.location },
-      locationTimezone,
-      selectedDay - 1,
-      parameters.cellSelection,
-      controller.signal,
-      referenceDate
-    )
-      .then((day) => {
-        if (controller.signal.aborted) return;
-        comparison = day;
-        resolveLoadedHour(selectedDay, day.time);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) comparisonRequestFailed = true;
-      });
-    return () => controller.abort();
-  });
-  const timeline = $derived(
-    comparing
-      ? (comparison?.time ?? [])
-      : chartView === 'skewt' && !isSkewTLoading
-        ? (skewTWeatherData?.hourly.time ?? [])
-        : []
-  );
   function resolveLoadedHour(day: number, times: Date[]) {
     if (!times.length) return;
     const useLastHour = pendingLastHourDay === day;
@@ -154,7 +104,6 @@
     parameters.selectedDay = next.selectedDay;
   }
 
-  let updateTimer: ReturnType<typeof setTimeout> | null = null;
   let panelTransitionTimer: ReturnType<typeof setTimeout> | null = null;
   let chartPane: PaneAPI | undefined;
   let renderChartPanel = $state(true);
@@ -167,32 +116,11 @@
   let chartContentHeight = $state(0);
   let cacheNoticeHeight = $state(0);
   let fitMobileChart = $state(true);
-  const windRequest = createLatestRequest();
-  const skewTRequest = createLatestRequest();
   const PANEL_TRANSITION_MS = 300;
   const chartPaneSizes: Record<'horizontal' | 'vertical', number> = {
     horizontal: 50,
     vertical: 77,
   };
-
-  type WeatherRequestParameters = {
-    location: Location;
-    model: PageParameters['selectedModel'];
-    referenceDate: Date;
-    timezone: string;
-    dayOffset: number;
-    maxAltitude: PageParameters['maxAltitude'];
-    cellSelection: PageParameters['cellSelection'];
-  };
-
-  type WeatherRequestFailure = {
-    message: string;
-    requestParameters: WeatherRequestParameters;
-  };
-
-  let windFailure = $state.raw<WeatherRequestFailure | null>(null);
-  let skewTFailure = $state.raw<WeatherRequestFailure | null>(null);
-  const windError = $derived(timezoneError ?? windFailure?.message ?? null);
 
   const paneDirection = $derived<'horizontal' | 'vertical'>($isMobile ? 'vertical' : 'horizontal');
   const startDate = $derived(
@@ -202,12 +130,55 @@
     const modelDays = comparing ? FORECAST_API_MAX_DAYS : MODEL_FORECAST_DAYS[parameters.selectedModel];
     return locationTimezone ? lastCompleteForecastDay(referenceDate, locationTimezone, modelDays) : modelDays;
   });
+  const dayRequest: ForecastDayRequest | null = $derived(
+    locationTimezone && parameters.selectedDay <= maxForecastDays
+      ? {
+          location: { ...parameters.location },
+          timezone: locationTimezone,
+          referenceDate,
+          dayOffset: parameters.selectedDay - 1,
+          cellSelection: parameters.cellSelection,
+        }
+      : null
+  );
+  const modelRequest: ModelForecastRequest | null = $derived(
+    dayRequest && !comparing
+      ? { ...dayRequest, model: parameters.selectedModel, maxAltitude: parameters.maxAltitude }
+      : null
+  );
+
+  const wind = createWindForecast(() => modelRequest);
+  const skewT = createSkewTForecast(
+    () => (showChart && chartView === 'skewt' ? modelRequest : null),
+    resolveLoadedHour
+  );
+  const windComparison = createWindComparison(() => (comparing ? dayRequest : null), resolveLoadedHour);
+  const windChartData = $derived(wind.data);
+  const skewTWeatherData = $derived(skewT.data);
+  const comparison = $derived(windComparison.data);
+  const isWindChartLoading = $derived(!comparing && (locationTimezone === undefined || wind.loading));
+  const isSkewTLoading = $derived(
+    showChart && chartView === 'skewt' && (locationTimezone === undefined || skewT.loading)
+  );
+  const timeline = $derived(
+    comparing
+      ? (comparison?.time ?? [])
+      : chartView === 'skewt' && !isSkewTLoading
+        ? (skewTWeatherData?.hourly.time ?? [])
+        : []
+  );
+  const windError = $derived(timezoneError ?? wind.error);
+  const skewTError = $derived(timezoneError ?? skewT.error);
+  const comparisonError = $derived(timezoneError ?? windComparison.error);
+  const retryWindChart = $derived(timezoneError ? retryTimezone : wind.retry);
+  const retrySkewT = $derived(timezoneError ? retryTimezone : skewT.retry);
+  const retryComparison = $derived(timezoneError ? retryTimezone : windComparison.retry);
   const mapForecastStatus = $derived(
     showChart
       ? null
       : comparing
         ? {
-            loading: !comparison && !comparisonError,
+            loading: locationTimezone === undefined || windComparison.loading,
             errorMessage: comparisonError,
             retry: retryComparison,
           }
@@ -229,11 +200,7 @@
   );
 
   const outdatedCachedAt = $derived(
-    chartView === 'comparison'
-      ? comparisonCachedAt
-      : chartView === 'wind'
-        ? windOutdatedCachedAt
-        : skewTOutdatedCachedAt
+    chartView === 'comparison' ? windComparison.cachedAt : chartView === 'wind' ? wind.cachedAt : skewT.cachedAt
   );
   const outdatedCachedAtLabel = $derived(
     outdatedCachedAt === null
@@ -350,9 +317,7 @@
       closeChartPanel();
     } else {
       void openChartPanel();
-      if (!comparing && locationTimezone && !windChartData && !isWindChartLoading) {
-        scheduleWindChartUpdate(getWeatherRequestParameters(locationTimezone));
-      }
+      if (!comparing && wind.error) wind.retry();
     }
   }
 
@@ -362,76 +327,11 @@
     if (!showChart && comparing && document.activeElement?.closest('.maplibregl-map')) {
       mapTimeSelector?.focus({ preventScroll: true });
     }
-
-    if (windChartData) {
-      windChartData = {
-        ...windChartData,
-        selectedGridCell: null,
-      };
-    }
-  }
-
-  function getWeatherRequestParameters(timezone: string): WeatherRequestParameters {
-    return {
-      location: {
-        latitude: parameters.location.latitude,
-        longitude: parameters.location.longitude,
-      },
-      model: parameters.selectedModel,
-      referenceDate,
-      timezone,
-      dayOffset: parameters.selectedDay - 1,
-      maxAltitude: parameters.maxAltitude,
-      cellSelection: parameters.cellSelection,
-    };
-  }
-
-  function scheduleWindChartUpdate(requestParameters: WeatherRequestParameters) {
-    clearTimeout(updateTimer ?? undefined);
-    const request = windRequest.start();
-    skewTRequest.cancel();
-    isWindChartLoading = true;
-    isSkewTLoading = false;
-    windFailure = null;
-    skewTFailure = null;
-    windOutdatedCachedAt = null;
-    skewTOutdatedCachedAt = null;
-    updateTimer = setTimeout(() => {
-      updateTimer = null;
-      void updateWindChart(requestParameters, request);
-    }, 5);
-  }
-
-  function scheduleSkewTUpdate(requestParameters: WeatherRequestParameters) {
-    const request = skewTRequest.start();
-    isSkewTLoading = true;
-    skewTFailure = null;
-    skewTOutdatedCachedAt = null;
-    void updateSkewTData(requestParameters, request);
   }
 
   function retryTimezone() {
     timezoneResult = undefined;
     timezoneRetry++;
-  }
-
-  function retryComparison() {
-    if (timezoneError) retryTimezone();
-    else comparisonRetry++;
-  }
-
-  function retryWindChart() {
-    if (timezoneError) {
-      retryTimezone();
-    } else if (windFailure) {
-      scheduleWindChartUpdate(windFailure.requestParameters);
-    }
-  }
-
-  function retrySkewT() {
-    if (skewTFailure) {
-      scheduleSkewTUpdate(skewTFailure.requestParameters);
-    }
   }
 
   function handleChartPaneResize(size: number) {
@@ -457,9 +357,7 @@
     clearPanelTransitionTimer();
     renderChartPanel = true;
     showChart = true;
-    if (!comparing && locationTimezone && !windChartData && !isWindChartLoading) {
-      scheduleWindChartUpdate(getWeatherRequestParameters(locationTimezone));
-    }
+    if (!comparing && wind.error) wind.retry();
   }
 
   function handleChartPaneTransitionEnd(event: TransitionEvent) {
@@ -469,21 +367,10 @@
   }
 
   $effect(() => {
-    const maxDay = maxForecastDays;
-    if (parameters.selectedDay > maxDay) {
+    if (parameters.selectedDay > maxForecastDays) {
       pendingLastHourDay = null;
-      parameters.selectedDay = maxDay;
-      return;
+      parameters.selectedDay = maxForecastDays;
     }
-    if (comparing || !locationTimezone) {
-      windRequest.cancel();
-      clearTimeout(updateTimer ?? undefined);
-      windChartData = null;
-      isWindChartLoading = !comparing && locationTimezone === undefined;
-      windFailure = null;
-      return;
-    }
-    scheduleWindChartUpdate(getWeatherRequestParameters(locationTimezone));
   });
 
   $effect(() => {
@@ -491,97 +378,6 @@
       resizeChartPanel();
     }
   });
-
-  $effect(() => {
-    if (!showChart || chartView !== 'skewt' || !locationTimezone) {
-      skewTRequest.cancel();
-      isSkewTLoading = showChart && chartView === 'skewt' && locationTimezone === undefined;
-      if (!locationTimezone) {
-        skewTWeatherData = null;
-        skewTFailure = null;
-      }
-      return;
-    }
-
-    if (parameters.selectedDay <= maxForecastDays) scheduleSkewTUpdate(getWeatherRequestParameters(locationTimezone));
-  });
-
-  async function updateWindChart(requestParameters: WeatherRequestParameters, request: RequestHandle) {
-    try {
-      const result = await fetchWindChartData(
-        requestParameters.location,
-        requestParameters.model,
-        requestParameters.referenceDate,
-        requestParameters.timezone,
-        1,
-        requestParameters.maxAltitude,
-        requestParameters.cellSelection,
-        request.signal,
-        requestParameters.dayOffset
-      );
-      if (!windRequest.isCurrent(request)) return;
-
-      const modelGridElevation = result.selectedGridCell
-        ? await fetchModelGridElevation(
-            result.selectedGridCell,
-            requestParameters.model,
-            requestParameters.cellSelection,
-            request.signal
-          ).catch((err: unknown) => {
-            if (isAbortError(err)) throw err;
-            return undefined;
-          })
-        : undefined;
-      if (!windRequest.isCurrent(request)) return;
-
-      windChartData = { ...result, modelGridElevation };
-    } catch (err) {
-      if (!windRequest.isCurrent(request) || isAbortError(err)) return;
-      console.error(err);
-      windChartData = null;
-      skewTWeatherData = null;
-      windFailure = {
-        message: 'Failed to fetch wind forecast. Check your connection and try again.',
-        requestParameters,
-      };
-    } finally {
-      if (windRequest.isCurrent(request)) {
-        isWindChartLoading = false;
-        windRequest.finish(request);
-      }
-    }
-  }
-
-  async function updateSkewTData(requestParameters: WeatherRequestParameters, request: RequestHandle) {
-    try {
-      const result = await fetchSkewTData(
-        requestParameters.location,
-        requestParameters.model,
-        requestParameters.referenceDate,
-        requestParameters.timezone,
-        requestParameters.maxAltitude,
-        requestParameters.cellSelection,
-        request.signal,
-        requestParameters.dayOffset
-      );
-      if (!skewTRequest.isCurrent(request)) return;
-      skewTWeatherData = result;
-      resolveLoadedHour(requestParameters.dayOffset + 1, result.hourly.time);
-    } catch (err) {
-      if (!skewTRequest.isCurrent(request) || isAbortError(err)) return;
-      console.error(err);
-      skewTWeatherData = null;
-      skewTFailure = {
-        message: 'Failed to fetch sounding data. Check your connection and try again.',
-        requestParameters,
-      };
-    } finally {
-      if (skewTRequest.isCurrent(request)) {
-        isSkewTLoading = false;
-        skewTRequest.finish(request);
-      }
-    }
-  }
 
   onMount(() => {
     viewportHeight = pageElement.clientHeight;
@@ -592,28 +388,17 @@
     if (!('serviceWorker' in navigator)) return;
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
-      if (!isWeatherCacheOutdatedMessage(event.data)) return;
-      if (event.data.dataset === 'wind') {
-        windOutdatedCachedAt =
-          windOutdatedCachedAt === null ? event.data.cachedAt : Math.min(windOutdatedCachedAt, event.data.cachedAt);
-      } else if (event.data.dataset === 'comparison') {
-        comparisonCachedAt = event.data.cachedAt;
-      } else {
-        skewTOutdatedCachedAt =
-          skewTOutdatedCachedAt === null ? event.data.cachedAt : Math.min(skewTOutdatedCachedAt, event.data.cachedAt);
-      }
+      const message: unknown = event.data;
+      if (!isWeatherCacheOutdatedMessage(message)) return;
+      const forecast = message.dataset === 'wind' ? wind : message.dataset === 'comparison' ? windComparison : skewT;
+      forecast.markCached(message.cachedAt);
     };
 
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
     return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
   });
 
-  onDestroy(() => {
-    clearTimeout(updateTimer ?? undefined);
-    clearPanelTransitionTimer();
-    windRequest.cancel();
-    skewTRequest.cancel();
-  });
+  onDestroy(clearPanelTransitionTimer);
 </script>
 
 <svelte:head>
@@ -755,7 +540,7 @@
               {skewTWeatherData}
               {isWindChartLoading}
               {isSkewTLoading}
-              skewTError={skewTFailure?.message ?? null}
+              {skewTError}
               onRetrySkewT={retrySkewT}
               bind:maxAltitude={parameters.maxAltitude}
               bind:model={parameters.selectedModel}
@@ -780,7 +565,7 @@
                 />
               {/snippet}
             </ChartContainer>
-            {#if windError && !comparing}
+            {#if windError && chartView === 'wind'}
               <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
                 <ForecastError message={windError} retry={retryWindChart} class="max-w-md flex-col text-center" />
               </div>
@@ -796,9 +581,9 @@
       tabindex="-1"
       class="shrink-0 border-t border-slate-200 bg-white px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]"
     >
-      {#if comparisonCachedAt !== null}
+      {#if windComparison.cachedAt !== null}
         <p class="mb-1 text-center text-xs text-amber-800">
-          Showing cached wind forecast from {new Date(comparisonCachedAt).toLocaleString()}.
+          Showing cached wind forecast from {new Date(windComparison.cachedAt).toLocaleString()}.
         </p>
       {/if}
       {@render timeSelector()}
