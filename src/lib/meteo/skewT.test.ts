@@ -9,6 +9,7 @@ function createMockSkewTData(): SkewTWeatherData {
   const dewpoints2m = new Float32Array([15, 16, 17]);
 
   return {
+    selectedGridCell: { latitude: 46.8, longitude: 8.2 },
     hourly: {
       time: times,
       temperature_2m: temps2m,

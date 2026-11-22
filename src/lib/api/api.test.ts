@@ -555,6 +555,7 @@ describe('API Configuration', () => {
 
       const result = await fetchSkewTData(location, 'icon_d2', start, 'UTC');
 
+      expect(result.selectedGridCell).toEqual({ latitude: 46.8, longitude: 8.2 });
       expect(result.hourly.temperatureProfile._1000hPa).toEqual(new Float32Array([18, 19, 20, ...Array(21).fill(NaN)]));
       expect(result.hourly.dewpointProfile._1000hPa).toBeUndefined();
       expect(Array.from(result.hourly.temperature_2m).every(Number.isNaN)).toBe(true);

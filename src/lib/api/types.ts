@@ -76,6 +76,8 @@ export interface SkewTWeatherData {
     dewpoint_2m: Float32Array;
   };
   elevation: number;
+  selectedGridCell: Location;
+  modelGridElevation?: number;
   timezone: string;
 }
 

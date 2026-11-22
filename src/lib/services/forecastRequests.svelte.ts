@@ -1,56 +1,140 @@
-import { fetchModelGridElevation, fetchSkewTData, fetchSurfaceWindDay, fetchWindChartData } from '#lib/api/api.js';
-import type { Location } from '#lib/api/types.js';
-import { createLatestRequest, isAbortError, type RequestHandle } from '#lib/services/latestRequest.js';
-import type { PageParameters } from '#lib/services/types.js';
+import { onMount } from 'svelte';
+import { SvelteDate } from 'svelte/reactivity';
+import {
+  FORECAST_API_MAX_DAYS,
+  fetchModelGridElevation,
+  fetchSkewTData,
+  fetchSurfaceWindDay,
+  fetchWindChartData,
+  forecastDayStart,
+  lastCompleteForecastDay,
+  type SurfaceWindDay,
+} from '#lib/api/api.js';
+import { MODEL_FORECAST_DAYS } from '#lib/api/models.js';
+import { resolveLocationTimezone } from '#lib/api/timezone.js';
+import type { SkewTWeatherData, WindChartData } from '#lib/api/types.js';
+import { createLatestRequest, type RequestHandle } from '#lib/services/latestRequest.js';
+import type { ChartView, PageParameters } from '#lib/services/types.js';
+import { isWeatherCacheOutdatedMessage } from '#lib/services/weatherCache.js';
 
-export type ForecastDayRequest = {
-  location: Location;
-  timezone: string;
-  referenceDate: Date;
-  dayOffset: number;
-  cellSelection: PageParameters['cellSelection'];
+type ForecastSelection = Pick<PageParameters, 'location' | 'selectedDay' | 'cellSelection'> &
+  ({ view: 'comparison' } | ({ view: 'wind' | 'skewt' } & Pick<PageParameters, 'selectedModel' | 'maxAltitude'>));
+
+export type ForecastData =
+  | { view: 'wind'; weather: WindChartData }
+  | { view: 'skewt'; weather: SkewTWeatherData }
+  | { view: 'comparison'; weather: SurfaceWindDay };
+
+const loadErrors: Record<ChartView, string> = {
+  wind: 'Failed to fetch wind forecast. Check your connection and try again.',
+  skewt: 'Failed to fetch sounding data. Check your connection and try again.',
+  comparison: 'Wind comparison could not load.',
 };
 
-export type ModelForecastRequest = ForecastDayRequest & {
-  model: PageParameters['selectedModel'];
-  maxAltitude: PageParameters['maxAltitude'];
-};
-
-type ResolveHour = (day: number, times: Date[]) => void;
-
-function createForecastRequest<Request, Data>(
-  getRequest: () => Request | null,
-  load: (request: Request, signal: AbortSignal) => Promise<Data>,
-  errorMessage: string,
-  options: { retainData?: boolean; onLoaded?: (data: Data, request: Request) => void } = {}
+export function createForecastRequest(
+  getSelection: () => ForecastSelection,
+  resolveHour: (day: number, times: Date[]) => void
 ) {
-  let data = $state.raw<Data | null>(null);
-  let loading = $state(false);
+  const selection = $derived(getSelection());
+  const locationKey = $derived(`${selection.location.latitude},${selection.location.longitude}`);
+  const day = $derived(selection.selectedDay);
+  const referenceDate = $derived.by(() => {
+    void locationKey;
+    void day;
+    return new SvelteDate();
+  });
+  let resolvedTimezone = $state.raw<{ key: string; value: string }>();
+  const timezone = $derived(resolvedTimezone?.key === locationKey ? resolvedTimezone.value : undefined);
+  const modelDays = $derived(
+    selection.view === 'comparison' ? FORECAST_API_MAX_DAYS : MODEL_FORECAST_DAYS[selection.selectedModel]
+  );
+  const maxDays = $derived(timezone ? lastCompleteForecastDay(referenceDate, timezone, modelDays) : modelDays);
+  const date = $derived(timezone ? forecastDayStart(referenceDate, timezone, day) : undefined);
+
+  let data = $state.raw<ForecastData | null>(null);
+  let loading = $state(true);
   let error = $state<string | null>(null);
   let cachedAt = $state<number | null>(null);
   let retries = $state(0);
   const latest = createLatestRequest();
 
   $effect(() => {
-    const request = getRequest();
     void retries;
+    data = null;
     error = null;
     cachedAt = null;
-    if (!request || !options.retainData) data = null;
-    loading = request !== null;
-    if (!request) return;
-    void update(request, latest.start());
+    loading = true;
+    void load(selection, locationKey, referenceDate, latest.start());
     return latest.cancel;
   });
 
-  async function update(request: Request, handle: RequestHandle) {
+  async function load(input: ForecastSelection, key: string, reference: Date, handle: RequestHandle) {
+    const { location, selectedDay, cellSelection, view } = input;
+    const { signal } = handle;
+    let errorMessage = 'Could not determine the forecast location’s time zone.';
+
     try {
-      const result = await load(request, handle.signal);
+      const zone = await resolveLocationTimezone(location, signal);
       if (!latest.isCurrent(handle)) return;
-      data = result;
-      options.onLoaded?.(result, request);
+      resolvedTimezone = { key, value: zone };
+      if (selectedDay > maxDays) return;
+
+      errorMessage = loadErrors[view];
+      const offset = selectedDay - 1;
+      if (input.view === 'comparison') {
+        const weather = await fetchSurfaceWindDay(location, zone, offset, cellSelection, signal, reference);
+        if (!latest.isCurrent(handle)) return;
+        data = { view: 'comparison', weather };
+        resolveHour(selectedDay, weather.time);
+        return;
+      }
+
+      const { selectedModel: model, maxAltitude } = input;
+      if (input.view === 'wind') {
+        const weather = await fetchWindChartData(
+          location,
+          model,
+          reference,
+          zone,
+          1,
+          maxAltitude,
+          cellSelection,
+          signal,
+          offset
+        );
+        if (!latest.isCurrent(handle)) return;
+        data = { view: 'wind', weather };
+      } else {
+        const weather = await fetchSkewTData(
+          location,
+          model,
+          reference,
+          zone,
+          maxAltitude,
+          cellSelection,
+          signal,
+          offset
+        );
+        if (!latest.isCurrent(handle)) return;
+        data = { view: 'skewt', weather };
+        resolveHour(selectedDay, weather.hourly.time);
+      }
+
+      loading = false;
+      const forecast = data;
+      if (!forecast.weather.selectedGridCell) return;
+      const modelGridElevation = await fetchModelGridElevation(
+        forecast.weather.selectedGridCell,
+        model,
+        cellSelection,
+        signal
+      ).catch(() => undefined);
+      if (latest.isCurrent(handle) && modelGridElevation !== undefined) {
+        if (forecast.view === 'wind') data = { view: 'wind', weather: { ...forecast.weather, modelGridElevation } };
+        else data = { view: 'skewt', weather: { ...forecast.weather, modelGridElevation } };
+      }
     } catch (cause) {
-      if (!latest.isCurrent(handle) || isAbortError(cause)) return;
+      if (!latest.isCurrent(handle)) return;
       console.error(cause);
       data = null;
       error = errorMessage;
@@ -58,6 +142,18 @@ function createForecastRequest<Request, Data>(
       if (latest.finish(handle)) loading = false;
     }
   }
+
+  onMount(() => {
+    const worker = navigator.serviceWorker;
+    if (!worker) return;
+    const handleCacheNotice = (event: MessageEvent<unknown>) => {
+      const message = event.data;
+      if (!isWeatherCacheOutdatedMessage(message) || message.dataset !== selection.view) return;
+      cachedAt = cachedAt === null ? message.cachedAt : Math.min(cachedAt, message.cachedAt);
+    };
+    worker.addEventListener('message', handleCacheNotice);
+    return () => worker.removeEventListener('message', handleCacheNotice);
+  });
 
   return {
     get data() {
@@ -72,63 +168,17 @@ function createForecastRequest<Request, Data>(
     get cachedAt() {
       return cachedAt;
     },
+    get timezone() {
+      return timezone;
+    },
+    get date() {
+      return date;
+    },
+    get maxDays() {
+      return maxDays;
+    },
     retry() {
       retries++;
     },
-    markCached(timestamp: number) {
-      cachedAt = cachedAt === null ? timestamp : Math.min(cachedAt, timestamp);
-    },
   };
-}
-
-export function createWindForecast(getRequest: () => ModelForecastRequest | null) {
-  return createForecastRequest(
-    getRequest,
-    async ({ location, model, referenceDate, timezone, maxAltitude, cellSelection, dayOffset }, signal) => {
-      const result = await fetchWindChartData(
-        location,
-        model,
-        referenceDate,
-        timezone,
-        1,
-        maxAltitude,
-        cellSelection,
-        signal,
-        dayOffset
-      );
-      signal.throwIfAborted();
-
-      const modelGridElevation = result.selectedGridCell
-        ? await fetchModelGridElevation(result.selectedGridCell, model, cellSelection, signal).catch(
-            (cause: unknown) => {
-              if (isAbortError(cause)) throw cause;
-              return undefined;
-            }
-          )
-        : undefined;
-      return { ...result, modelGridElevation };
-    },
-    'Failed to fetch wind forecast. Check your connection and try again.',
-    { retainData: true }
-  );
-}
-
-export function createSkewTForecast(getRequest: () => ModelForecastRequest | null, resolveHour: ResolveHour) {
-  return createForecastRequest(
-    getRequest,
-    ({ location, model, referenceDate, timezone, maxAltitude, cellSelection, dayOffset }, signal) =>
-      fetchSkewTData(location, model, referenceDate, timezone, maxAltitude, cellSelection, signal, dayOffset),
-    'Failed to fetch sounding data. Check your connection and try again.',
-    { onLoaded: (result, request) => resolveHour(request.dayOffset + 1, result.hourly.time) }
-  );
-}
-
-export function createWindComparison(getRequest: () => ForecastDayRequest | null, resolveHour: ResolveHour) {
-  return createForecastRequest(
-    getRequest,
-    ({ location, timezone, dayOffset, cellSelection, referenceDate }, signal) =>
-      fetchSurfaceWindDay(location, timezone, dayOffset, cellSelection, signal, referenceDate),
-    'Wind comparison could not load.',
-    { onLoaded: (result, request) => resolveHour(request.dayOffset + 1, result.time) }
-  );
 }

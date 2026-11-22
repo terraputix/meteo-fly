@@ -2,23 +2,20 @@
   import type { Snippet } from 'svelte';
   import { units } from '#lib/stores/units.js';
   import { windSpeed } from '#lib/utils/units.js';
-  import type { WindChartData, WeatherModel, SkewTWeatherData } from '#lib/api/types.js';
+  import type { WeatherModel } from '#lib/api/types.js';
   import WindChart from './WindChart.svelte';
   import SkewTChart from './SkewTChart.svelte';
   import Footer from './Footer.svelte';
-  import ForecastError from '#lib/components/ForecastError.svelte';
   import { windColors, windMaxSpeed } from '#lib/charts/scales.js';
   import { CHART_COLORS, WIND_CLOUD_BANDS, WIND_CLOUD_EDGE_ALPHA } from '#lib/charts/chartColors.js';
   import { buildSkewTData } from '#lib/meteo/skewT.js';
   import type { MaxAltitude } from '#lib/meteo/types.js';
   import type { ChartView } from '#lib/services/types.js';
+  import type { ForecastData } from '#lib/services/forecastRequests.svelte.js';
 
   let {
-    windChartData,
-    skewTWeatherData = null,
-    isWindChartLoading = false,
-    isSkewTLoading = false,
-    skewTError = null,
+    forecastData,
+    isLoading,
     maxAltitude = $bindable(4000),
     model = $bindable<WeatherModel>('icon_seamless'),
     chartView = $bindable<ChartView>('wind'),
@@ -27,14 +24,10 @@
     timestepControls,
     daylightOnly = $bindable(false),
     onContentHeightChange,
-    onRetrySkewT,
     onClose,
   }: {
-    windChartData: WindChartData | null;
-    skewTWeatherData?: SkewTWeatherData | null;
-    isWindChartLoading?: boolean;
-    isSkewTLoading?: boolean;
-    skewTError?: string | null;
+    forecastData: ForecastData | null;
+    isLoading: boolean;
     maxAltitude?: MaxAltitude;
     model?: WeatherModel;
     chartView?: ChartView;
@@ -43,13 +36,13 @@
     timestepControls: Snippet;
     daylightOnly?: boolean;
     onContentHeightChange?: (height: number) => void;
-    onRetrySkewT?: () => void;
     onClose?: () => void;
   } = $props();
 
-  let skewTData = $derived.by(() => {
-    if (!skewTWeatherData || chartView !== 'skewt') return null;
-    return buildSkewTData(skewTWeatherData, model, maxAltitude, windChartData?.modelGridElevation);
+  const skewTData = $derived.by(() => {
+    if (forecastData?.view !== 'skewt' || chartView !== 'skewt') return null;
+    const { weather } = forecastData;
+    return buildSkewTData(weather, model, maxAltitude, weather.modelGridElevation);
   });
   let traceHours = $derived(skewTData?.traces.map((t) => t.time) ?? []);
   let legendOpen = $state(false);
@@ -125,7 +118,13 @@
       {#if chartView === 'comparison'}
         {@render comparisonGrid()}
       {:else if chartView === 'wind'}
-        <WindChart {windChartData} bind:maxAltitude {model} bind:daylightOnly isLoading={isWindChartLoading} />
+        <WindChart
+          windChartData={forecastData?.view === 'wind' ? forecastData.weather : null}
+          bind:maxAltitude
+          {model}
+          bind:daylightOnly
+          {isLoading}
+        />
         <Footer>
           {#snippet heading()}
             <button
@@ -180,13 +179,9 @@
             hour={soundingHour}
             bind:maxAltitude
             {model}
-            isLoading={isSkewTLoading}
+            {isLoading}
           />
-          {#if skewTError}
-            <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
-              <ForecastError message={skewTError} retry={onRetrySkewT} class="w-full max-w-md flex-col text-center" />
-            </div>
-          {:else if skewTWeatherData && !isSkewTLoading && soundingHour < 0}
+          {#if skewTData && !isLoading && soundingHour < 0}
             <div class="absolute inset-0 flex items-center justify-center text-sm text-slate-500">
               No sounding data available
             </div>

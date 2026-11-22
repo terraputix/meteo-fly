@@ -386,6 +386,7 @@ export async function fetchSkewTData(
   return {
     hourly: result,
     elevation,
+    selectedGridCell: { latitude: response.latitude(), longitude: response.longitude() },
     timezone,
   };
 }
