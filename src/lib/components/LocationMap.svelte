@@ -782,7 +782,7 @@
   {#if bottomControls}
     <div
       bind:offsetHeight={bottomControlsHeight}
-      class="pointer-events-none absolute inset-x-11 bottom-[max(calc(env(safe-area-inset-bottom,0px)+0.375rem),var(--hike-fly-controls-offset))] z-20 flex justify-center max-[359px]:left-2"
+      class="pointer-events-none absolute inset-x-2 bottom-[max(calc(env(safe-area-inset-bottom,0px)+0.375rem),var(--hike-fly-controls-offset))] z-20 flex justify-center sm:inset-x-11"
       style:--hike-fly-controls-offset={hikeFlyActive ? `calc(${hikeFlyControlsHeight}px + 1rem)` : '0px'}
     >
       {@render bottomControls()}
@@ -793,6 +793,12 @@
 <style>
   .has-bottom-controls :global(.maplibregl-ctrl-bottom-right:has(.maplibregl-compact-show)) {
     bottom: calc(env(safe-area-inset-bottom, 0px) + var(--map-bottom-controls-height));
+  }
+
+  @media (width < 40rem) {
+    .has-bottom-controls :global(.maplibregl-ctrl-bottom-right) {
+      bottom: calc(env(safe-area-inset-bottom, 0px) + var(--map-bottom-controls-height));
+    }
   }
 
   :global(.maplibregl-ctrl-top-left) {
