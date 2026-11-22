@@ -9,7 +9,7 @@
   import { browser } from '$app/env';
   import { page } from '$app/state';
   import { afterNavigate, goto } from '$app/navigation';
-  import { isMobile } from '#lib/stores/media.js';
+  import { isMobile, matchesMobileViewport } from '#lib/stores/media.js';
   import WindComparisonGrid from '#lib/components/WindComparisonGrid.svelte';
   import ForecastTimeSelector from '#lib/components/ForecastTimeSelector.svelte';
   import {
@@ -28,7 +28,7 @@
   import type { Location } from '#lib/api/types.js';
   import { createForecastRequest } from '#lib/services/forecastRequests.svelte.js';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
-  import { onDestroy, onMount, tick } from 'svelte';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
   import type { PaneAPI } from 'paneforge';
 
   let parameters: PageParameters = $state(
@@ -104,7 +104,8 @@
   let chartContentHeight = $state(0);
   let cacheNoticeHeight = $state(0);
   let preferredPaneSizes = $state<Partial<Record<ChartPaneDirection, number>>>({});
-  let pendingDragSize: { direction: ChartPaneDirection; size: number } | undefined;
+  let paneDrag: { direction: ChartPaneDirection; startSize?: number } | undefined;
+  let dragClosedPane: { direction: ChartPaneDirection; size: number } | undefined;
   const PANEL_TRANSITION_MS = 300;
   const mobilePaneMinSize = 10;
   const defaultPaneSizes: Record<ChartPaneDirection, number> = {
@@ -114,6 +115,11 @@
 
   const paneDirection = $derived<ChartPaneDirection>($isMobile ? 'vertical' : 'horizontal');
   const preferredPaneSize = $derived(preferredPaneSizes[paneDirection]);
+  const paneDefaultSize = $derived.by(() => {
+    const direction = paneDirection;
+    // Paneforge resets the live layout when its defaults change.
+    return untrack(() => preferredPaneSizes[direction] ?? 50);
+  });
   const initialChartLayout = $derived(showChart && !chartPanelReady);
   const paneResizeTransition = $derived(
     hasClosedChartPanel &&
@@ -204,7 +210,12 @@
 
     await tick();
     chartContentHeight = chartContainer?.measureContentHeight() ?? 0;
-    resizeChartPanel();
+    if (dragClosedPane?.direction === paneDirection) {
+      chartPane?.resize(dragClosedPane.size);
+    } else {
+      resizeChartPanel();
+    }
+    dragClosedPane = undefined;
     await tick();
     showChart = true;
     chartPanelReady = true;
@@ -250,10 +261,8 @@
     }
   }
 
-  function handleChartPaneResize(size: number) {
-    if (showChart && size > 0 && isChartPaneDragging) {
-      pendingDragSize = { direction: paneDirection, size };
-    }
+  function getViewportPaneDirection(): ChartPaneDirection {
+    return matchesMobileViewport() ? 'vertical' : 'horizontal';
   }
 
   function rememberPaneSize(direction: ChartPaneDirection, size: number) {
@@ -262,10 +271,23 @@
   }
 
   function handleChartPaneDraggingChange(dragging: boolean) {
+    const wasDragging = isChartPaneDragging;
     isChartPaneDragging = dragging;
-    if (!dragging && pendingDragSize) {
-      rememberPaneSize(pendingDragSize.direction, pendingDragSize.size);
-      pendingDragSize = undefined;
+    if (dragging) {
+      paneDrag = { direction: paneDirection, startSize: chartPane?.getSize() };
+    } else if (wasDragging) {
+      const drag = paneDrag;
+      paneDrag = undefined;
+      if (drag?.direction === getViewportPaneDirection()) {
+        const size = chartPane?.getSize();
+        if (showChart && size && size !== drag.startSize) {
+          rememberPaneSize(drag.direction, size);
+        } else if (!showChart && drag.startSize) {
+          dragClosedPane = { direction: drag.direction, size: drag.startSize };
+        }
+      } else if (showChart) {
+        resizeChartPanel();
+      }
     }
   }
 
@@ -281,13 +303,13 @@
   }
 
   function handleChartPaneCollapse() {
-    if (showChart) {
+    if (showChart && (!isChartPaneDragging || paneDrag?.direction === getViewportPaneDirection())) {
       closeChartPanel();
     }
   }
 
   function handleChartPaneExpand() {
-    if (!isChartPaneDragging || showChart) return;
+    if (paneDrag?.direction !== getViewportPaneDirection() || showChart) return;
 
     clearPanelTransitionTimer();
     renderChartPanel = true;
@@ -308,8 +330,17 @@
     }
   });
 
+  $effect.pre(() => {
+    if (paneDirection !== paneDrag?.direction) paneDrag = undefined;
+  });
+
   $effect(() => {
-    if (showChart && chartPanelReady && chartPane && !isChartPaneDragging && !($isMobile && comparing)) {
+    if (!chartPanelReady || !chartPane) return;
+
+    if (!showChart) {
+      const canDragOpen = isChartPaneDragging && paneDrag?.direction === paneDirection;
+      if (!canDragOpen && chartPane.isExpanded()) chartPane.collapse();
+    } else if (!isChartPaneDragging && !($isMobile && comparing)) {
       resizeChartPanel();
     }
   });
@@ -388,7 +419,7 @@
   <div bind:this={pageElement} bind:clientHeight={viewportHeight} class="relative min-h-0 flex-1">
     <ResizablePaneGroup direction={paneDirection} class="flex-col! sm:flex-row!">
       <ResizablePane
-        defaultSize={100 - (preferredPaneSize ?? 50)}
+        defaultSize={100 - paneDefaultSize}
         minSize={$isMobile ? mobilePaneMinSize : 30}
         class={[initialChartLayout && 'initial-map-pane', paneResizeTransition]}
       >
@@ -426,13 +457,12 @@
       />
       <ResizablePane
         bind:this={chartPane}
-        defaultSize={preferredPaneSize ?? 50}
+        defaultSize={paneDefaultSize}
         minSize={$isMobile ? mobilePaneMinSize : 30}
         collapsedSize={0}
         collapsible
         onCollapse={handleChartPaneCollapse}
         onExpand={handleChartPaneExpand}
-        onResize={handleChartPaneResize}
         ontransitionend={handleChartPaneTransitionEnd}
         class={[initialChartLayout && 'initial-chart-pane', paneResizeTransition]}
       >
