@@ -34,6 +34,7 @@ export const MODEL_FORECAST_DAYS: Record<WeatherModel, number> = {
   ecmwf_aifs025_single: 15,
 };
 
+/// these models to not proovide PL data with sufficient PL resolution
 const comparisonOnlyModels = [
   { id: 'meteoswiss_icon_ch1', name: 'ICON CH1', regional: true },
   { id: 'meteoswiss_icon_ch2', name: 'ICON CH2', regional: true },
