@@ -26,6 +26,27 @@ function createData(): WindChartData {
 }
 
 describe('chart worker preparation', () => {
+  it('separates snowfall from total precipitation after daylight filtering', () => {
+    const windChartData = createData();
+    windChartData.hourly.time = [0, 10, 11].map((hour) => new Date(Date.UTC(2026, 6, 16, hour)));
+    windChartData.hourly.precipitation = new Float32Array([5, 1, 2]);
+    windChartData.hourly.snowfall = new Float32Array([3.5, 0.7, 0.7]);
+
+    const { rainCloudChartData } = prepareChartData({
+      windChartData,
+      maxAltitude: 4000,
+      model: 'icon_d2',
+      daylightOnly: true,
+    });
+    const [snowOnly, mixed] = rainCloudChartData.precipitation;
+    expect(rainCloudChartData.precipitation).toHaveLength(2);
+    expect(snowOnly.time).toEqual(windChartData.hourly.time[1]);
+    expect(snowOnly.rain).toBe(0);
+    expect(snowOnly.snow).toBeCloseTo(1);
+    expect(mixed.rain).toBeCloseTo(1);
+    expect(mixed.snow).toBeCloseTo(1);
+  });
+
   it('keeps unrelated chart data when LCL and wind values are missing', () => {
     const result = prepareChartData({
       windChartData: createData(),
@@ -35,9 +56,9 @@ describe('chart worker preparation', () => {
 
     expect(result.lcl[0].value).toBeNull();
     expect(result.temperatureChartData.temperatureData).toHaveLength(2);
-    expect(result.rainCloudChartData.rainDots).toEqual([
-      { time: new Date('2026-07-16T10:00:00Z'), rain: NaN },
-      { time: new Date('2026-07-16T11:00:00Z'), rain: 1 },
+    expect(result.rainCloudChartData.precipitation).toEqual([
+      { time: new Date('2026-07-16T10:00:00Z'), rain: NaN, snow: NaN },
+      { time: new Date('2026-07-16T11:00:00Z'), rain: 1, snow: NaN },
     ]);
     expect(result.rainCloudChartData.cloudRects).toHaveLength(6);
     expect(result.rainCloudChartData.cloudRects[0].cloudCover).toBeNaN();

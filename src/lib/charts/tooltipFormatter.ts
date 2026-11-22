@@ -20,7 +20,7 @@ import { createCloudCoverSampler, type CloudCoverData } from '#lib/charts/clouds
 export interface TooltipStore {
   sortedTimes: number[];
   tempByTime: Map<number, { temp: number; dew: number; hum: number }>;
-  rainByTime: Map<number, number>;
+  precipitationByTime: Map<number, RainCloudChartData['precipitation'][number]>;
   cloudLowByTime: Map<number, number>;
   cloudMidByTime: Map<number, number>;
   cloudHighByTime: Map<number, number>;
@@ -47,8 +47,7 @@ export function buildTooltipStore(
     });
   });
 
-  const rainByTime = new Map<number, number>();
-  rainData.rainDots.forEach((d) => rainByTime.set(d.time.getTime(), d.rain));
+  const precipitationByTime = new Map(rainData.precipitation.map((sample) => [+sample.time, sample]));
 
   const cloudLowByTime = new Map<number, number>();
   const cloudMidByTime = new Map<number, number>();
@@ -80,7 +79,7 @@ export function buildTooltipStore(
   return {
     sortedTimes: Array.from(tempByTime.keys()).sort((a, b) => a - b),
     tempByTime,
-    rainByTime,
+    precipitationByTime,
     cloudLowByTime,
     cloudMidByTime,
     cloudHighByTime,
@@ -155,7 +154,7 @@ export function formatTooltip(
   const timeStr = fmtTime(new Date(snap), timezone, true);
   const { gridIndex, hoveredWindPressure } = active;
   const panelLabel =
-    gridIndex === 0 ? 'Surface' : gridIndex === 1 ? 'Clouds & rain' : gridIndex === 2 ? 'Wind' : 'Forecast';
+    gridIndex === 0 ? 'Surface' : gridIndex === 1 ? 'Clouds & precipitation' : gridIndex === 2 ? 'Wind' : 'Forecast';
   let html = `<div class="mb-1 flex items-center justify-between gap-3 border-b border-slate-100 pb-1">
     <span class="font-semibold text-slate-900">${timeStr}</span>
     <span class="text-[10px] font-medium text-slate-500">${panelLabel}</span>
@@ -187,9 +186,16 @@ export function formatTooltip(
       const cover = values.get(snap);
       if (cover != null) html += metricRow(label, measurement(cover, '%', 0));
     }
-    const rain = store.rainByTime.get(snap);
-    if (rain != null) {
-      html += `<div class="mt-1 border-t border-slate-100 pt-1">${metricRow('Rain', measurement(convertRain(rain, units), `${units.rain}/h`, units.rain === 'in' ? 2 : 1), CHART_COLORS.rain)}</div>`;
+    const precipitation = store.precipitationByTime.get(snap);
+    if (precipitation) {
+      const { rain, snow } = precipitation;
+      const rainLabel = Number.isFinite(snow) ? 'Rain' : 'Precipitation';
+      const rate = (value: number) =>
+        measurement(convertRain(value, units), `${units.rain}/h`, units.rain === 'in' ? 2 : 1);
+      html += '<div class="mt-1 border-t border-slate-100 pt-1">';
+      if (!(snow > 0) || rain > 0) html += metricRow(rainLabel, rate(rain), CHART_COLORS.rain);
+      if (snow > 0) html += metricRow('Snow (water equivalent)', rate(snow), CHART_COLORS.snow);
+      html += '</div>';
     }
   }
 

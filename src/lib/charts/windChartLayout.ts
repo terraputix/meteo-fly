@@ -82,7 +82,10 @@ export function temperatureRange(values: number[]): [number, number] {
 }
 
 export function rainDropCount(rain: number): number {
-  return !Number.isFinite(rain) || rain <= 0 ? 0 : rain > 5 ? 3 : rain > 1 ? 2 : 1;
+  if (!Number.isFinite(rain) || rain <= 0) return 0;
+  // Subtracting Float32 snowfall can leave a residual just above an icon threshold.
+  const thresholdScale = 1 + 1e-6;
+  return rain > 5 * thresholdScale ? 3 : rain > thresholdScale ? 2 : 1;
 }
 
 // Meteorological bearings name the source. Arrows show flow, so a north wind points south.

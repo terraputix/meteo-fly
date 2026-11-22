@@ -35,9 +35,10 @@ export interface RainCloudChartData {
     y2: number;
     cloudCover: number;
   }>;
-  rainDots: Array<{
+  precipitation: Array<{
     time: Date;
     rain: number;
+    snow: number;
   }>;
 }
 

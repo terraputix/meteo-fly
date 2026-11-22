@@ -17,7 +17,7 @@ describe('wind tooltip pressure coordinate', () => {
       { time, height: 111, pressure: 1000, speed: 10, direction: 180, source: 'model' as const },
       { time, height: 988, pressure: 900, speed: 20, direction: 270, source: 'model' as const },
     ];
-    const store = buildTooltipStore(temperatureData, { cloudRects: [], rainDots: [] }, windData, []);
+    const store = buildTooltipStore(temperatureData, { cloudRects: [], precipitation: [] }, windData, []);
     const active = createActiveState();
     active.gridIndex = 2;
     active.hoveredWindPressure = 910;
@@ -54,7 +54,7 @@ describe('wind tooltip pressure coordinate', () => {
             cloudCover: 35,
           },
         ],
-        rainDots: [{ time, rain: 1.5 }],
+        precipitation: [{ time, rain: 1.5, snow: 0 }],
       },
       [],
       []
@@ -84,7 +84,7 @@ describe('canvas tooltip selection', () => {
     temperature,
     {
       cloudRects: [{ x1: new Date(+time - 1800000), x2: new Date(+time + 1800000), y1: 0, y2: 1 / 3, cloudCover: 35 }],
-      rainDots: [{ time, rain: 2 }],
+      precipitation: [{ time, rain: 2, snow: 0 }],
     },
     windData,
     [{ time, value: 1800 }],
@@ -131,10 +131,25 @@ describe('canvas tooltip selection', () => {
     expect(formatTooltip(store, { gridIndex: 2, hoveredWindPressure: 910 }, 'UTC', +time)).not.toContain('LCL');
   });
 
+  it('shows liquid precipitation and the water equivalent of snow for a mixed hour', () => {
+    const mixed = buildTooltipStore(
+      temperature,
+      { cloudRects: [], precipitation: [{ time, rain: 2, snow: 1 }] },
+      [],
+      []
+    );
+    const html = formatTooltip(mixed, { gridIndex: 1, hoveredWindPressure: null }, 'UTC', +time);
+
+    expect(html).toContain('Rain');
+    expect(html).toContain('2.0&nbsp;mm/h');
+    expect(html).toContain('Snow (water equivalent)');
+    expect(html).toContain('1.0&nbsp;mm/h');
+  });
+
   it.each([0, 4, 100])('shows %i percent cloud cover', (cover) => {
     const cloudStore = buildTooltipStore(
       temperature,
-      { cloudRects: [], rainDots: [] },
+      { cloudRects: [], precipitation: [] },
       windData,
       [],
       [{ time, pressure: 900, value: cover }]
@@ -146,7 +161,7 @@ describe('canvas tooltip selection', () => {
   it('interpolates cloud cover at the hovered pressure rather than snapping to a cloud level', () => {
     const cloudStore = buildTooltipStore(
       temperature,
-      { cloudRects: [], rainDots: [] },
+      { cloudRects: [], precipitation: [] },
       windData,
       [],
       [
@@ -164,7 +179,7 @@ describe('canvas tooltip selection', () => {
   it('shows missing cloud data without substituting another hour', () => {
     const cloudStore = buildTooltipStore(
       temperature,
-      { cloudRects: [], rainDots: [] },
+      { cloudRects: [], precipitation: [] },
       windData,
       [],
       [{ time: new Date(+time + 3600000), pressure: 900, value: 72 }]
@@ -178,7 +193,7 @@ describe('canvas tooltip selection', () => {
   it('returns no tooltip when the hourly timeline is empty', () => {
     const empty = buildTooltipStore(
       { ...temperature, temperatureData: [], dewpointData: [], humidityData: [] },
-      { cloudRects: [], rainDots: [] },
+      { cloudRects: [], precipitation: [] },
       [],
       []
     );

@@ -47,6 +47,7 @@ export interface HourlyData {
   windSpeedProfile: VerticalProfile;
   windDirectionProfile: VerticalProfile;
   precipitation: Float32Array;
+  snowfall?: Float32Array;
   temperature_2m: Float32Array;
   dewpoint_2m: Float32Array;
   relativeHumidity_2m: Float32Array;

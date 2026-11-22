@@ -22,6 +22,7 @@ export function getVariablesForModel(
 ): (ProfileVariables | FlatVariable)[] {
   const flatVars: FlatVariable[] = [
     { apiName: 'precipitation', type: 'Flat', key: 'precipitation' },
+    { apiName: 'snowfall', type: 'Flat', key: 'snowfall' },
     { apiName: 'temperature_2m', type: 'Flat', key: 'temperature_2m' },
     { apiName: 'dew_point_2m', type: 'Flat', key: 'dewpoint_2m' },
     { apiName: 'relative_humidity_2m', type: 'Flat', key: 'relativeHumidity_2m' },

@@ -406,7 +406,7 @@
     >
       <canvas
         class="h-full w-full touch-pan-y touch-pinch-zoom cursor-crosshair"
-        aria-label="Weather meteogram: temperature, humidity, rain, clouds and wind by altitude"
+        aria-label="Weather meteogram: temperature, humidity, precipitation, clouds and wind by altitude"
       ></canvas>
       <canvas data-overlay class="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true"></canvas>
       <div
