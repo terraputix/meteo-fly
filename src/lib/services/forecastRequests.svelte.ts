@@ -12,6 +12,7 @@ import {
 } from '#lib/api/api.js';
 import { MODEL_FORECAST_DAYS } from '#lib/api/models.js';
 import { resolveLocationTimezone } from '#lib/api/timezone.js';
+import { describeForecastFailure, type ForecastFailure } from '#lib/api/forecastFailure.js';
 import type { SkewTWeatherData, WindChartData } from '#lib/api/types.js';
 import { createLatestRequest, type RequestHandle } from '#lib/services/latestRequest.js';
 import type { ChartView, PageParameters } from '#lib/services/types.js';
@@ -26,8 +27,8 @@ export type ForecastData =
   | { view: 'comparison'; weather: SurfaceWindDay };
 
 const loadErrors: Record<ChartView, string> = {
-  wind: 'Failed to fetch wind forecast. Check your connection and try again.',
-  skewt: 'Failed to fetch sounding data. Check your connection and try again.',
+  wind: 'The wind forecast could not load.',
+  skewt: 'The sounding forecast could not load.',
   comparison: 'Wind comparison could not load.',
 };
 
@@ -53,7 +54,7 @@ export function createForecastRequest(
 
   let data = $state.raw<ForecastData | null>(null);
   let loading = $state(true);
-  let error = $state<string | null>(null);
+  let error = $state<ForecastFailure | null>(null);
   let cachedAt = $state<number | null>(null);
   let retries = $state(0);
   const latest = createLatestRequest();
@@ -137,7 +138,7 @@ export function createForecastRequest(
       if (!latest.isCurrent(handle)) return;
       console.error(cause);
       data = null;
-      error = errorMessage;
+      error = describeForecastFailure(cause, errorMessage, navigator.onLine);
     } finally {
       if (latest.finish(handle)) loading = false;
     }

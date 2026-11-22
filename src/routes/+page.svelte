@@ -1,9 +1,17 @@
 <script lang="ts">
-  import { buildVisitedURL, saveLastVisitedURL } from '#lib/services/storage.js';
+  import {
+    buildVisitedURL,
+    getInitialChartPaneOpen,
+    getInitialChartPaneSize,
+    saveChartPaneOpen,
+    saveChartPaneSize,
+    saveLastVisitedURL,
+    type ChartPaneDirection,
+  } from '#lib/services/storage.js';
   import { browser } from '$app/env';
   import { page } from '$app/state';
   import { afterNavigate, goto } from '$app/navigation';
-  import { isMobile } from '#lib/stores/media.js';
+  import { isMobile, matchesMobileViewport } from '#lib/stores/media.js';
   import WindComparisonGrid from '#lib/components/WindComparisonGrid.svelte';
   import ForecastTimeSelector from '#lib/components/ForecastTimeSelector.svelte';
   import {
@@ -22,7 +30,7 @@
   import type { Location } from '#lib/api/types.js';
   import { createForecastRequest } from '#lib/services/forecastRequests.svelte.js';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
-  import { onDestroy, onMount, tick } from 'svelte';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
   import type { PaneAPI } from 'paneforge';
 
   let parameters: PageParameters = $state(
@@ -89,6 +97,7 @@
   let chartPane: PaneAPI | undefined;
   let renderChartPanel = $state(true);
   let chartPanelReady = $state(false);
+  let hasClosedChartPanel = $state(false);
   let chartContainer = $state<ChartContainer>();
   let mapTimeSelector = $state<HTMLDivElement>();
   let pageElement: HTMLDivElement;
@@ -96,18 +105,34 @@
   let viewportHeight = $state(0);
   let chartContentHeight = $state(0);
   let cacheNoticeHeight = $state(0);
-  let fitMobileChart = $state(true);
+  let mapNoticeHeight = $state(0);
+  let preferredPaneSizes = $state<Partial<Record<ChartPaneDirection, number>>>({});
+  let paneDrag: { direction: ChartPaneDirection; startSize?: number } | undefined;
+  let dragClosedPane: { direction: ChartPaneDirection; size: number } | undefined;
   const PANEL_TRANSITION_MS = 300;
-  const chartPaneSizes: Record<'horizontal' | 'vertical', number> = {
+  const mobilePaneMinSize = 10;
+  const defaultPaneSizes: Record<ChartPaneDirection, number> = {
     horizontal: 50,
     vertical: 77,
   };
 
-  const paneDirection = $derived<'horizontal' | 'vertical'>($isMobile ? 'vertical' : 'horizontal');
+  const paneDirection = $derived<ChartPaneDirection>($isMobile ? 'vertical' : 'horizontal');
+  const preferredPaneSize = $derived(preferredPaneSizes[paneDirection]);
+  const paneDefaultSize = $derived.by(() => {
+    const direction = paneDirection;
+    // Paneforge resets the live layout when its defaults change.
+    return untrack(() => preferredPaneSizes[direction] ?? 50);
+  });
+  const initialChartLayout = $derived(showChart && !chartPanelReady);
+  const paneResizeTransition = $derived(
+    hasClosedChartPanel &&
+      !isChartPaneDragging &&
+      'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'
+  );
   const showMapLoading = $derived(!showChart && forecast.loading);
   const mapError = $derived(showChart ? null : forecast.error);
   const mapControlsTopOffset = $derived(
-    $isMobile && mapError ? '7.5rem' : $isMobile && showMapLoading ? '3.75rem' : '0.75rem'
+    $isMobile && (mapError || showMapLoading) ? `calc(1.5rem + ${mapNoticeHeight}px)` : '0.75rem'
   );
 
   const outdatedCachedAtLabel = $derived(
@@ -184,20 +209,25 @@
     clearPanelTransitionTimer();
     renderChartPanel = true;
     if (showChart) return;
-    fitMobileChart = true;
     chartPanelReady = false;
 
     await tick();
     chartContentHeight = chartContainer?.measureContentHeight() ?? 0;
-    resizeChartPanel();
+    if (dragClosedPane?.direction === paneDirection) {
+      chartPane?.resize(dragClosedPane.size);
+    } else {
+      resizeChartPanel();
+    }
+    dragClosedPane = undefined;
     await tick();
     showChart = true;
     chartPanelReady = true;
+    saveChartPaneOpen(true);
   }
 
   function resizeChartPanel() {
-    let size = chartPaneSizes[paneDirection];
-    if ($isMobile && fitMobileChart && chartContentHeight > 0 && viewportHeight > 0) {
+    let size = preferredPaneSize ?? defaultPaneSizes[paneDirection];
+    if ($isMobile && preferredPaneSize === undefined && !comparing && chartContentHeight > 0 && viewportHeight > 0) {
       const noticeHeight = forecast.cachedAt !== null ? cacheNoticeHeight : 0;
       size = Math.min(size, ((chartContentHeight + noticeHeight + 1) / viewportHeight) * 100);
     }
@@ -205,11 +235,10 @@
   }
 
   function closeChartPanel() {
-    if (chartPane?.isExpanded() && !($isMobile && fitMobileChart)) {
-      chartPaneSizes[paneDirection] = chartPane.getSize();
-    }
+    hasClosedChartPanel = true;
     showChart = false;
     chartPane?.collapse();
+    if (!isChartPaneDragging) saveChartPaneOpen(false);
 
     if (!chartPane || prefersReducedMotion()) {
       finishClosingChartPanel();
@@ -237,25 +266,56 @@
     }
   }
 
-  function handleChartPaneResize(size: number) {
-    if (showChart && size > 0 && isChartPaneDragging) {
-      chartPaneSizes[paneDirection] = size;
-    }
+  function getViewportPaneDirection(): ChartPaneDirection {
+    return matchesMobileViewport() ? 'vertical' : 'horizontal';
+  }
+
+  function rememberPaneSize(direction: ChartPaneDirection, size: number) {
+    preferredPaneSizes[direction] = size;
+    saveChartPaneSize(direction, size);
   }
 
   function handleChartPaneDraggingChange(dragging: boolean) {
-    if (dragging) fitMobileChart = false;
+    const wasDragging = isChartPaneDragging;
     isChartPaneDragging = dragging;
+    if (dragging) {
+      paneDrag = { direction: paneDirection, startSize: chartPane?.getSize() };
+    } else if (wasDragging) {
+      const drag = paneDrag;
+      paneDrag = undefined;
+      if (!showChart) saveChartPaneOpen(false);
+      if (drag?.direction === getViewportPaneDirection()) {
+        const size = chartPane?.getSize();
+        if (showChart && size && size !== drag.startSize) {
+          rememberPaneSize(drag.direction, size);
+        } else if (!showChart && drag.startSize) {
+          dragClosedPane = { direction: drag.direction, size: drag.startSize };
+        }
+      } else if (showChart) {
+        resizeChartPanel();
+      }
+    }
+  }
+
+  function handleChartPaneKeydown(event: KeyboardEvent) {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+
+    const direction = paneDirection;
+    const previousSize = chartPane?.getSize();
+    queueMicrotask(() => {
+      const size = chartPane?.getSize();
+      if (size && size !== previousSize && paneDirection === direction) rememberPaneSize(direction, size);
+    });
   }
 
   function handleChartPaneCollapse() {
-    if (showChart) {
+    if (showChart && (!isChartPaneDragging || paneDrag?.direction === getViewportPaneDirection())) {
       closeChartPanel();
     }
   }
 
   function handleChartPaneExpand() {
-    if (!isChartPaneDragging || showChart) return;
+    if (paneDrag?.direction !== getViewportPaneDirection() || showChart) return;
 
     clearPanelTransitionTimer();
     renderChartPanel = true;
@@ -276,16 +336,35 @@
     }
   });
 
+  $effect.pre(() => {
+    if (paneDirection !== paneDrag?.direction) paneDrag = undefined;
+  });
+
   $effect(() => {
-    if (showChart && chartPanelReady && chartPane && !isChartPaneDragging) {
+    if (!chartPanelReady || !chartPane) return;
+
+    if (!showChart) {
+      const canDragOpen = isChartPaneDragging && paneDrag?.direction === paneDirection;
+      if (!canDragOpen && chartPane.isExpanded()) chartPane.collapse();
+    } else if (!isChartPaneDragging && !($isMobile && comparing)) {
       resizeChartPanel();
     }
   });
 
   onMount(() => {
+    preferredPaneSizes = {
+      horizontal: getInitialChartPaneSize('horizontal'),
+      vertical: getInitialChartPaneSize('vertical'),
+    };
     viewportHeight = pageElement.clientHeight;
-    chartContentHeight = chartContainer?.measureContentHeight() ?? 0;
-    resizeChartPanel();
+    if (getInitialChartPaneOpen()) {
+      chartContentHeight = chartContainer?.measureContentHeight() ?? 0;
+      resizeChartPanel();
+    } else {
+      showChart = false;
+      renderChartPanel = false;
+      chartPane?.collapse();
+    }
     chartPanelReady = true;
   });
 
@@ -293,6 +372,22 @@
 </script>
 
 <svelte:head>
+  <script>
+    try {
+      document.documentElement.toggleAttribute(
+        'data-chart-pane-closed',
+        localStorage.getItem('meteo-fly-chart-pane-closed') === 'true'
+      );
+      for (const [direction, minimum] of Object.entries({ horizontal: 30, vertical: 10 })) {
+        const size = Number(localStorage.getItem(`meteo-fly-chart-pane-${direction}`));
+        if (size >= minimum && size <= 100 - minimum) {
+          document.documentElement.style.setProperty(`--saved-chart-pane-${direction}`, size);
+        }
+      }
+    } catch {
+      // The first paint uses the default layout when storage is unavailable.
+    }
+  </script>
   <title>Meteo-Fly - Wind & Weather Forecast for Paragliding & Hang Gliding</title>
   <link rel="canonical" href="https://meteo-fly.com/" />
   <meta
@@ -328,41 +423,59 @@
   />
 {/snippet}
 
+{#snippet mapTimeControls()}
+  <div
+    bind:this={mapTimeSelector}
+    tabindex="-1"
+    class="pointer-events-auto min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-white/92 p-1.5 shadow-lg backdrop-blur-md"
+  >
+    {#if forecast.cachedAt !== null}
+      <p class="mb-1 text-center text-xs text-amber-800">
+        Showing cached wind forecast from {new Date(forecast.cachedAt).toLocaleString()}.
+      </p>
+    {/if}
+    {@render timeSelector()}
+  </div>
+{/snippet}
+
 <div
   class="relative flex flex-col h-dvh w-full overflow-hidden bg-slate-100"
-  style="--map-controls-top-offset: {mapControlsTopOffset};"
+  style="--map-controls-top-offset: {mapControlsTopOffset}; --initial-mobile-chart-max: {defaultPaneSizes.vertical}%; --mobile-pane-min: {mobilePaneMinSize}%;"
 >
-  {#if showMapLoading}
+  {#if showMapLoading || mapError}
     <div
-      class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
-      role="status"
-    >
-      <div class="rounded-md bg-white/95 px-4 py-2 text-sm text-slate-600 shadow-md ring-1 ring-slate-200">
-        Loading weather data…
-      </div>
-    </div>
-  {:else if mapError}
-    <div
+      bind:offsetHeight={mapNoticeHeight}
       class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
     >
-      <ForecastError message={mapError} retry={forecast.retry} class="max-w-lg shadow-md" />
+      {#if showMapLoading}
+        <div
+          role="status"
+          class="rounded-md bg-white/95 px-4 py-2 text-sm text-slate-600 shadow-md ring-1 ring-slate-200"
+        >
+          Loading weather data…
+        </div>
+      {:else if mapError}
+        <ForecastError failure={mapError} retry={forecast.retry} class="max-w-lg shadow-md" />
+      {/if}
     </div>
   {/if}
 
   <div bind:this={pageElement} bind:clientHeight={viewportHeight} class="relative min-h-0 flex-1">
-    <ResizablePaneGroup direction={paneDirection}>
+    <ResizablePaneGroup
+      direction={paneDirection}
+      class={['flex-col! sm:flex-row!', !chartPanelReady && 'initial-pane-group']}
+    >
       <ResizablePane
-        defaultSize={50}
-        minSize={$isMobile ? 10 : 30}
-        class={isChartPaneDragging
-          ? ''
-          : 'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'}
+        defaultSize={100 - paneDefaultSize}
+        minSize={$isMobile ? mobilePaneMinSize : 30}
+        class={[initialChartLayout && 'initial-map-pane', paneResizeTransition]}
       >
         <div class="relative h-full w-full overflow-hidden bg-slate-200">
           <LocationMap
             {comparison}
             {comparing}
             {highlighted}
+            bottomControls={!showChart && comparing ? mapTimeControls : undefined}
             onInspectModels={(models) => (inspectedModels = models)}
             selectedTime={timeline[selectedHour]}
             latitude={parameters.location.latitude}
@@ -385,23 +498,21 @@
         disabled={!showChart && !isChartPaneDragging}
         tabindex={showChart ? 0 : -1}
         onDraggingChange={handleChartPaneDraggingChange}
-        class="transition-opacity duration-200 motion-reduce:transition-none {showChart
+        onkeydown={handleChartPaneKeydown}
+        class="transition-opacity duration-200 motion-reduce:transition-none max-sm:h-px max-sm:w-full max-sm:after:left-0 max-sm:after:h-1 max-sm:after:w-full max-sm:after:translate-x-0 max-sm:after:-translate-y-1/2 max-sm:[&>div]:rotate-90 {showChart
           ? 'opacity-100'
           : 'pointer-events-none opacity-0'}"
       />
       <ResizablePane
         bind:this={chartPane}
-        defaultSize={50}
-        minSize={$isMobile ? 10 : 30}
+        defaultSize={paneDefaultSize}
+        minSize={$isMobile ? mobilePaneMinSize : 30}
         collapsedSize={0}
         collapsible
         onCollapse={handleChartPaneCollapse}
         onExpand={handleChartPaneExpand}
-        onResize={handleChartPaneResize}
         ontransitionend={handleChartPaneTransitionEnd}
-        class={isChartPaneDragging
-          ? ''
-          : 'transition-[flex-grow] duration-300 ease-in-out motion-reduce:transition-none'}
+        class={[initialChartLayout && 'initial-chart-pane', paneResizeTransition]}
       >
         {#if renderChartPanel}
           <div
@@ -450,7 +561,7 @@
             </ChartContainer>
             {#if forecast.error && !comparing}
               <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
-                <ForecastError message={forecast.error} retry={forecast.retry} class="max-w-md flex-col text-center" />
+                <ForecastError failure={forecast.error} retry={forecast.retry} class="max-w-md flex-col text-center" />
               </div>
             {/if}
           </div>
@@ -458,18 +569,4 @@
       </ResizablePane>
     </ResizablePaneGroup>
   </div>
-  {#if !showChart && comparing}
-    <div
-      bind:this={mapTimeSelector}
-      tabindex="-1"
-      class="shrink-0 border-t border-slate-200 bg-white px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]"
-    >
-      {#if forecast.cachedAt !== null}
-        <p class="mb-1 text-center text-xs text-amber-800">
-          Showing cached wind forecast from {new Date(forecast.cachedAt).toLocaleString()}.
-        </p>
-      {/if}
-      {@render timeSelector()}
-    </div>
-  {/if}
 </div>
