@@ -11,6 +11,7 @@
   let {
     map,
     active = $bindable(),
+    controlsHeight = $bindable(0),
     takeoff = $bindable<{ latitude: number; longitude: number; elevation: number } | null>(null),
     glideRatio = $bindable<number>(HIKE_FLY_DEFAULT_GLIDE_RATIO as number),
     stepMeters = $bindable<number>(HIKE_FLY_DEFAULT_STEP_M as number),
@@ -216,6 +217,7 @@
 
 {#if active}
   <div
+    bind:offsetHeight={controlsHeight}
     class="pointer-events-auto absolute z-20 flex flex-col rounded-xl border border-slate-200/80 bg-white/92 text-xs shadow-lg backdrop-blur-md
       {$isMobile
       ? 'bottom-0 left-0 right-0 rounded-none rounded-t-xl border-b-0 px-4 py-3 gap-2'

@@ -1,6 +1,24 @@
 const LAST_URL_KEY = 'last-url';
+const CHART_PANE_CLOSED_KEY = 'meteo-fly-chart-pane-closed';
 
 export type ChartPaneDirection = 'horizontal' | 'vertical';
+
+export function getInitialChartPaneOpen(): boolean {
+  try {
+    return localStorage.getItem(CHART_PANE_CLOSED_KEY) !== 'true';
+  } catch {
+    return true;
+  }
+}
+
+export function saveChartPaneOpen(open: boolean) {
+  document.documentElement.toggleAttribute('data-chart-pane-closed', !open);
+  try {
+    localStorage.setItem(CHART_PANE_CLOSED_KEY, String(!open));
+  } catch {
+    // The current page keeps the open state when storage is unavailable.
+  }
+}
 
 export function getInitialChartPaneSize(direction: ChartPaneDirection): number | undefined {
   const size = document.documentElement.style.getPropertyValue(`--saved-chart-pane-${direction}`);

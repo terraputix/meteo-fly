@@ -3,6 +3,33 @@ import { locationActions } from '#lib/services/location/store.js';
 import type { LocationState } from '#lib/services/location/store.js';
 import type { Location } from '#lib/api/types.js';
 
+export function autoCollapseAttribution(mapContainer: HTMLElement) {
+  const attribution = mapContainer.querySelector('.maplibregl-ctrl-attrib');
+  const toggle = attribution?.querySelector('summary');
+  const credits = attribution?.querySelector('.maplibregl-ctrl-attrib-inner');
+  if (!attribution || !toggle || !credits) return;
+
+  let timer: ReturnType<typeof setTimeout>;
+  const scheduleCollapse = () => {
+    clearTimeout(timer);
+    if (!attribution.classList.contains('maplibregl-compact-show')) return;
+
+    timer = setTimeout(() => {
+      if (credits.matches(':hover, :focus-within')) scheduleCollapse();
+      else toggle.dispatchEvent(new MouseEvent('click', { cancelable: true }));
+    }, 5000);
+  };
+
+  const observer = new MutationObserver(scheduleCollapse);
+  observer.observe(attribution, { attributes: true, attributeFilter: ['class'] });
+  scheduleCollapse();
+
+  return () => {
+    observer.disconnect();
+    clearTimeout(timer);
+  };
+}
+
 interface BaseControlOptions {
   title: string;
   className: string;

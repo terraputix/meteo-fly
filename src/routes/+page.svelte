@@ -1,7 +1,9 @@
 <script lang="ts">
   import {
     buildVisitedURL,
+    getInitialChartPaneOpen,
     getInitialChartPaneSize,
+    saveChartPaneOpen,
     saveChartPaneSize,
     saveLastVisitedURL,
     type ChartPaneDirection,
@@ -219,6 +221,7 @@
     await tick();
     showChart = true;
     chartPanelReady = true;
+    saveChartPaneOpen(true);
   }
 
   function resizeChartPanel() {
@@ -234,6 +237,7 @@
     hasClosedChartPanel = true;
     showChart = false;
     chartPane?.collapse();
+    if (!isChartPaneDragging) saveChartPaneOpen(false);
 
     if (!chartPane || prefersReducedMotion()) {
       finishClosingChartPanel();
@@ -278,6 +282,7 @@
     } else if (wasDragging) {
       const drag = paneDrag;
       paneDrag = undefined;
+      if (!showChart) saveChartPaneOpen(false);
       if (drag?.direction === getViewportPaneDirection()) {
         const size = chartPane?.getSize();
         if (showChart && size && size !== drag.startSize) {
@@ -351,8 +356,14 @@
       vertical: getInitialChartPaneSize('vertical'),
     };
     viewportHeight = pageElement.clientHeight;
-    chartContentHeight = chartContainer?.measureContentHeight() ?? 0;
-    resizeChartPanel();
+    if (getInitialChartPaneOpen()) {
+      chartContentHeight = chartContainer?.measureContentHeight() ?? 0;
+      resizeChartPanel();
+    } else {
+      showChart = false;
+      renderChartPanel = false;
+      chartPane?.collapse();
+    }
     chartPanelReady = true;
   });
 
@@ -362,6 +373,10 @@
 <svelte:head>
   <script>
     try {
+      document.documentElement.toggleAttribute(
+        'data-chart-pane-closed',
+        localStorage.getItem('meteo-fly-chart-pane-closed') === 'true'
+      );
       for (const [direction, minimum] of Object.entries({ horizontal: 30, vertical: 10 })) {
         const size = Number(localStorage.getItem(`meteo-fly-chart-pane-${direction}`));
         if (size >= minimum && size <= 100 - minimum) {
@@ -407,6 +422,21 @@
   />
 {/snippet}
 
+{#snippet mapTimeControls()}
+  <div
+    bind:this={mapTimeSelector}
+    tabindex="-1"
+    class="pointer-events-auto min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-white/92 p-1.5 shadow-lg backdrop-blur-md"
+  >
+    {#if forecast.cachedAt !== null}
+      <p class="mb-1 text-center text-xs text-amber-800">
+        Showing cached wind forecast from {new Date(forecast.cachedAt).toLocaleString()}.
+      </p>
+    {/if}
+    {@render timeSelector()}
+  </div>
+{/snippet}
+
 <div
   class="relative flex flex-col h-dvh w-full overflow-hidden bg-slate-100"
   style="--map-controls-top-offset: {mapControlsTopOffset}; --initial-mobile-chart-max: {defaultPaneSizes.vertical}%; --mobile-pane-min: {mobilePaneMinSize}%;"
@@ -429,7 +459,10 @@
   {/if}
 
   <div bind:this={pageElement} bind:clientHeight={viewportHeight} class="relative min-h-0 flex-1">
-    <ResizablePaneGroup direction={paneDirection} class="flex-col! sm:flex-row!">
+    <ResizablePaneGroup
+      direction={paneDirection}
+      class={['flex-col! sm:flex-row!', !chartPanelReady && 'initial-pane-group']}
+    >
       <ResizablePane
         defaultSize={100 - paneDefaultSize}
         minSize={$isMobile ? mobilePaneMinSize : 30}
@@ -440,6 +473,7 @@
             {comparison}
             {comparing}
             {highlighted}
+            bottomControls={!showChart && comparing ? mapTimeControls : undefined}
             onInspectModels={(models) => (inspectedModels = models)}
             selectedTime={timeline[selectedHour]}
             latitude={parameters.location.latitude}
@@ -533,18 +567,4 @@
       </ResizablePane>
     </ResizablePaneGroup>
   </div>
-  {#if !showChart && comparing}
-    <div
-      bind:this={mapTimeSelector}
-      tabindex="-1"
-      class="shrink-0 border-t border-slate-200 bg-white px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]"
-    >
-      {#if forecast.cachedAt !== null}
-        <p class="mb-1 text-center text-xs text-amber-800">
-          Showing cached wind forecast from {new Date(forecast.cachedAt).toLocaleString()}.
-        </p>
-      {/if}
-      {@render timeSelector()}
-    </div>
-  {/if}
 </div>

@@ -4,6 +4,19 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@utility initial-pane-group {
+  [data-chart-pane-closed] & {
+    > [data-pane] {
+      flex: 1 !important;
+    }
+
+    > [data-pane-resizer],
+    > [data-pane]:last-child {
+      display: none;
+    }
+  }
+}
+
 @utility initial-map-pane {
   flex-grow: calc(100 - var(--saved-chart-pane-horizontal, 50)) !important;
 

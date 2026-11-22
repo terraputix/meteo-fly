@@ -5,7 +5,7 @@
   import { windBearing } from '#lib/meteo/surfaceWind.js';
   import { units } from '#lib/stores/units.js';
   import { formatAltitude } from '#lib/utils/units.js';
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, type Snippet } from 'svelte';
   import {
     GPUInitializationError,
     Map,
@@ -24,7 +24,7 @@
   import { locationStore, type LocationState } from '#lib/services/location/store.js';
 
   import { isMobile } from '#lib/stores/media.js';
-  import { LocationControlManager, TerrainControl } from './Controls';
+  import { autoCollapseAttribution, LocationControlManager, TerrainControl } from './Controls';
   import ModelSelector from './ModelSelector.svelte';
   import ChartSettingsPopover from './ChartSettingsPopover.svelte';
   import HikeFlyLayer from './HikeFlyLayer.svelte';
@@ -43,6 +43,7 @@
     highlighted,
     onInspectModels,
     selectedTime,
+    bottomControls,
     latitude = $bindable(46.41526),
     longitude = $bindable(8.10828),
     chartOpen = $bindable(false),
@@ -60,6 +61,7 @@
     highlighted: CompassModel | null;
     onInspectModels: (models: CompassModel[]) => void;
     selectedTime?: Date;
+    bottomControls?: Snippet;
     latitude?: number;
     longitude?: number;
     chartOpen?: boolean;
@@ -83,6 +85,8 @@
   let mapContainer: HTMLElement;
   let map: Map = $state.raw(undefined!)!;
   let mapError = $state<string | null>(null);
+  let hikeFlyControlsHeight = $state(0);
+  let bottomControlsHeight = $state(0);
   let marker: Marker;
   let selectedLocationElement: HTMLDivElement;
   let compassMarker = $state.raw<Marker>();
@@ -604,6 +608,8 @@
       updateSelectedGridCellMarker();
       updateGridCellConnectorGeometry();
     });
+
+    return autoCollapseAttribution(mapContainer);
   });
 
   onDestroy(() => {
@@ -636,7 +642,11 @@
   });
 </script>
 
-<div class="relative h-full w-full">
+<div
+  class="relative h-full w-full"
+  class:has-bottom-controls={!!bottomControls && !hikeFlyActive}
+  style:--map-bottom-controls-height={`${bottomControlsHeight}px`}
+>
   <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
 
   <div hidden>
@@ -762,10 +772,29 @@
     </div>
   {/if}
 
-  <HikeFlyLayer {map} bind:active={hikeFlyActive} bind:takeoff={hikeFlyTakeoff} />
+  <HikeFlyLayer
+    {map}
+    bind:active={hikeFlyActive}
+    bind:takeoff={hikeFlyTakeoff}
+    bind:controlsHeight={hikeFlyControlsHeight}
+  />
+
+  {#if bottomControls}
+    <div
+      bind:offsetHeight={bottomControlsHeight}
+      class="pointer-events-none absolute inset-x-11 bottom-[max(calc(env(safe-area-inset-bottom,0px)+0.375rem),var(--hike-fly-controls-offset))] z-20 flex justify-center max-[359px]:left-2"
+      style:--hike-fly-controls-offset={hikeFlyActive ? `calc(${hikeFlyControlsHeight}px + 1rem)` : '0px'}
+    >
+      {@render bottomControls()}
+    </div>
+  {/if}
 </div>
 
 <style>
+  .has-bottom-controls :global(.maplibregl-ctrl-bottom-right:has(.maplibregl-compact-show)) {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + var(--map-bottom-controls-height));
+  }
+
   :global(.maplibregl-ctrl-top-left) {
     top: calc(env(safe-area-inset-top, 0px) + var(--map-controls-top-offset, 0.75rem));
     left: calc(env(safe-area-inset-left, 0px) + 0.75rem);
