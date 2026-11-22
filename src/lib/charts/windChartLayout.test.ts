@@ -151,7 +151,7 @@ describe('wind chart layout', () => {
     [90, -1, 0],
     [180, 0, -1],
     [270, 1, 0],
-  ])('points wind from %s degrees toward the correct bearing', (direction, dx, dy) => {
+  ])('points downwind for a source bearing of %s degrees', (direction, dx, dy) => {
     const rotation = windRotation(direction);
     expect(Math.sin(rotation)).toBeCloseTo(dx);
     expect(-Math.cos(rotation)).toBeCloseTo(dy);

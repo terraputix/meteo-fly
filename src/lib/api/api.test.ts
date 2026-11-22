@@ -1,22 +1,20 @@
+import { Model } from '@openmeteo/sdk/model';
+import { COMPASS_MODELS } from '#lib/api/models.js';
 import { resetLocalTimeZone } from '@internationalized/date';
 import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest';
 import { fetchWeatherApi } from 'openmeteo';
 import type { VariablesWithTime } from '@openmeteo/sdk/variables-with-time';
 import type { WeatherApiResponse } from '@openmeteo/sdk/weather-api-response';
-import { resolveLocationTimezone } from '#lib/api/timezone.js';
 import { getVariablesForModel } from './variables';
 import {
   createHourlyParams,
   createQueryParams,
+  fetchSurfaceWindDay,
   fetchModelGridElevation,
   fetchSkewTData,
   fetchWindChartData,
+  lastCompleteForecastDay,
 } from '#lib/api/api.js';
-
-vi.mock('#lib/api/timezone.js', () => ({
-  FORECAST_URL: 'https://api.open-meteo.com/v1/forecast',
-  resolveLocationTimezone: vi.fn(),
-}));
 
 vi.mock('openmeteo', () => ({
   fetchWeatherApi: vi.fn(),
@@ -26,8 +24,10 @@ function createHourlySection(
   names: string[],
   valuesByName: Record<string, number[] | null>,
   length: number = 24,
-  interval: number = 3600
+  interval: number = 3600,
+  start = '2026-07-16T00:00:00Z'
 ): VariablesWithTime {
+  const startSeconds = BigInt(Date.parse(start) / 1000);
   const variables = names.map((name) => {
     const values = valuesByName[name];
     if (values === undefined) return null;
@@ -37,8 +37,8 @@ function createHourlySection(
   });
 
   return {
-    time: () => BigInt(Date.parse('2026-07-16T00:00:00Z') / 1000),
-    timeEnd: () => BigInt(Date.parse('2026-07-16T00:00:00Z') / 1000) + BigInt(length * interval),
+    time: () => startSeconds,
+    timeEnd: () => startSeconds + BigInt(length * interval),
     interval: () => interval,
     variablesLength: () => variables.length,
     variables: (position: number) => variables[position] ?? null,
@@ -80,7 +80,6 @@ function createResponse({
 describe('API Configuration', () => {
   beforeEach(() => {
     vi.mocked(fetchWeatherApi).mockReset();
-    vi.mocked(resolveLocationTimezone).mockReset().mockResolvedValue('UTC');
   });
 
   afterEach(() => {
@@ -88,23 +87,65 @@ describe('API Configuration', () => {
     resetLocalTimeZone();
   });
 
+  it('loads one local day in a batch and aligns reordered model forecasts with gusts by timestamp', async () => {
+    const names = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'];
+    const firstHour = '2026-07-15T22:00:00Z';
+    const secondHour = '2026-07-15T23:00:00Z';
+    const icon = createHourlySection(names, { wind_speed_10m: [7], wind_direction_10m: [45] }, 24, 3600, firstHour);
+    const gfs = createHourlySection(
+      names,
+      { wind_speed_10m: [18], wind_direction_10m: [90], wind_gusts_10m: [32] },
+      23,
+      3600,
+      secondHour
+    );
+    vi.mocked(fetchWeatherApi).mockResolvedValueOnce([
+      Object.assign(createResponse({ hourly: gfs }), { model: () => Model.gfs_global }),
+      Object.assign(createResponse({ hourly: icon }), { model: () => Model.icon_d2 }),
+    ]);
+    const day = await fetchSurfaceWindDay(
+      { latitude: 46, longitude: 8 },
+      'Europe/Zurich',
+      0,
+      'nearest',
+      new AbortController().signal,
+      new Date('2026-07-16T12:00:00Z')
+    );
+    expect(fetchWeatherApi).toHaveBeenCalledTimes(1);
+    expect(day.time).toHaveLength(24);
+    expect(day.time.slice(0, 2)).toEqual([new Date(firstHour), new Date(secondHour)]);
+    expect(day.timezone).toBe('Europe/Zurich');
+    expect(vi.mocked(fetchWeatherApi).mock.calls[0][1]).toMatchObject({
+      models: COMPASS_MODELS.map(({ id }) => id),
+      hourly: names,
+      timezone: 'GMT',
+      start_hour: '2026-07-15T22:00',
+      end_hour: '2026-07-16T21:00',
+    });
+    expect(day.models.gfs_global?.get(Date.parse(firstHour))).toBeUndefined();
+    expect(day.models.gfs_global?.get(Date.parse(secondHour))).toEqual({ speed: 18, direction: 90, gust: 32 });
+    expect(day.models.icon_d2?.get(Date.parse(firstHour))).toEqual({ speed: 7, direction: 45, gust: NaN });
+    expect(day.models.icon_eu).toBeUndefined();
+  });
+
   it.each([
     ['2026-03-28T23:00:00Z', 23],
     ['2026-10-24T22:00:00Z', 25],
   ])('preserves every hourly sample on a DST day starting %s', async (start, count) => {
-    vi.mocked(resolveLocationTimezone).mockResolvedValue('Europe/Berlin');
     const names = createHourlyParams(getVariablesForModel('icon_seamless', 4000)).hourly;
-    const hourly = createHourlySection(names, {}, count);
-    const seconds = BigInt(new Date(start).getTime() / 1000);
-    hourly.time = () => seconds;
-    hourly.timeEnd = () => seconds + BigInt(count * 3600);
+    const hourly = createHourlySection(names, {}, count, 3600, start);
     vi.mocked(fetchWeatherApi).mockResolvedValue([
       createResponse({
         hourly,
         daily: createDailySection(true, true, start.startsWith('2026-03') ? '2026-03-29' : '2026-10-25'),
       }),
     ]);
-    const result = await fetchWindChartData({ latitude: 52, longitude: 13 }, 'icon_seamless', new Date(start));
+    const result = await fetchWindChartData(
+      { latitude: 52, longitude: 13 },
+      'icon_seamless',
+      new Date(start),
+      'Europe/Berlin'
+    );
     expect(result.hourly.time).toHaveLength(count);
     expect(result.hourly.time[0].toISOString()).toBe(start.replace('Z', '.000Z'));
     for (let i = 1; i < count; i++) {
@@ -122,7 +163,6 @@ describe('API Configuration', () => {
       vi.stubEnv('TZ', 'UTC');
       resetLocalTimeZone();
       const signal = new AbortController().signal;
-      vi.mocked(resolveLocationTimezone).mockResolvedValue('Europe/Berlin');
       const sunrise = createDailySection(true, true, day);
       vi.mocked(fetchWeatherApi).mockImplementation(async (_url, params) => {
         const start = Date.parse(`${params.start_hour}Z`);
@@ -145,8 +185,8 @@ describe('API Configuration', () => {
       const reference = new Date(`${day}T12:00:00Z`);
       const result =
         view === 'wind'
-          ? await fetchWindChartData(location, 'icon_d2', reference, 1, 4000, 'nearest', signal)
-          : await fetchSkewTData(location, 'icon_d2', reference, 4000, 'nearest', signal);
+          ? await fetchWindChartData(location, 'icon_d2', reference, 'Europe/Berlin', 1, 4000, 'nearest', signal)
+          : await fetchSkewTData(location, 'icon_d2', reference, 'Europe/Berlin', 4000, 'nearest', signal);
       expect(vi.mocked(fetchWeatherApi)).toHaveBeenCalledTimes(1);
       const params = vi.mocked(fetchWeatherApi).mock.calls[0]?.[1];
       if (view === 'skewt') {
@@ -194,7 +234,6 @@ describe('API Configuration', () => {
       0,
     ],
   ])('selects sunrise and sunset by local date in %s', async (timezone, date, sunrises, sunsets, index) => {
-    vi.mocked(resolveLocationTimezone).mockResolvedValue(timezone);
     const daily = {
       variables: (position: number) => ({
         valuesInt64Length: () => 2,
@@ -208,6 +247,7 @@ describe('API Configuration', () => {
       { latitude: 0, longitude: 0 },
       'icon_global',
       new Date(`${date}T00:00Z`),
+      timezone,
       1,
       4000,
       'nearest',
@@ -238,7 +278,12 @@ describe('API Configuration', () => {
     vi.mocked(fetchWeatherApi).mockImplementation(async (_url, params) => [
       createResponse({ hourly: createHourlySection(params.hourly as string[], { temperature_2m: [5] }), daily }),
     ]);
-    const result = await fetchWindChartData({ latitude: 78, longitude: 15 }, 'icon_global', new Date(`${date}T12:00Z`));
+    const result = await fetchWindChartData(
+      { latitude: 78, longitude: 15 },
+      'icon_global',
+      new Date(`${date}T12:00Z`),
+      'UTC'
+    );
     expect(result.sunrise).toEqual(noSunrise ? null : new Date(`${date}T06:00Z`));
     expect(result.sunset).toEqual(noSunset ? null : new Date(`${date}T18:00Z`));
     expect(result.hourly.temperature_2m[0]).toBe(5);
@@ -248,7 +293,6 @@ describe('API Configuration', () => {
     ['polar night', 0],
     ['polar day', 86400],
   ])('ignores midnight placeholders from real %s responses', async (_name, duration) => {
-    vi.mocked(resolveLocationTimezone).mockResolvedValue('Europe/Oslo');
     const midnight = BigInt(Date.parse('2026-10-21T00:00Z') / 1000);
     const daily = {
       variables: (position: number) => ({
@@ -262,7 +306,8 @@ describe('API Configuration', () => {
     const result = await fetchWindChartData(
       { latitude: 89, longitude: 15 },
       'icon_global',
-      new Date('2026-10-22T12:00Z')
+      new Date('2026-10-22T12:00Z'),
+      'Europe/Oslo'
     );
     expect(result.sunrise).toBeNull();
     expect(result.sunset).toBeNull();
@@ -284,7 +329,8 @@ describe('API Configuration', () => {
     const result = await fetchWindChartData(
       { latitude: 78, longitude: 15 },
       'icon_global',
-      new Date('2026-07-16T12:00Z')
+      new Date('2026-07-16T12:00Z'),
+      'UTC'
     );
     expect(result.sunrise).toEqual(new Date('2026-07-16T06:00Z'));
     expect(result.sunset).toEqual(new Date('2026-07-16T18:00Z'));
@@ -308,6 +354,16 @@ describe('API Configuration', () => {
     beforeEach(() => {
       vi.stubEnv('TZ', 'Europe/Berlin');
       resetLocalTimeZone();
+    });
+
+    it.each([
+      ['2026-11-22T12:00:00Z', 'America/New_York', 16, 15],
+      ['2026-11-22T02:00:00Z', 'America/New_York', 16, 16],
+      ['2026-11-22T12:00:00Z', 'UTC', 16, 16],
+      ['2026-11-22T18:00:00Z', 'Asia/Tokyo', 16, 15],
+      ['2026-11-22T12:00:00Z', 'America/New_York', 5, 5],
+    ])('caps complete forecast days for %s in %s with a %i-day model', (now, timezone, days, expected) => {
+      expect(lastCompleteForecastDay(new Date(now), timezone, days)).toBe(expected);
     });
 
     it('requests exact UTC hours and the covering daily dates', () => {
@@ -376,6 +432,7 @@ describe('API Configuration', () => {
             { latitude: 46.8, longitude: 8.2 },
             'icon_d2',
             new Date('2026-07-16T00:00:00Z'),
+            'UTC',
             1,
             4000,
             'nearest',
@@ -389,6 +446,7 @@ describe('API Configuration', () => {
             { latitude: 46.8, longitude: 8.2 },
             'icon_d2',
             new Date('2026-07-16T00:00:00Z'),
+            'UTC',
             4000,
             'nearest',
             signal
@@ -412,7 +470,6 @@ describe('API Configuration', () => {
     const start = new Date('2026-07-16T00:00:00Z');
 
     it('uses the location calendar date without a forecast retry', async () => {
-      vi.mocked(resolveLocationTimezone).mockResolvedValue('America/Los_Angeles');
       vi.mocked(fetchWeatherApi).mockImplementation(async (_url, params) => [
         createResponse({
           hourly: createHourlySection(params.hourly as string[], {}),
@@ -424,7 +481,12 @@ describe('API Configuration', () => {
           } as unknown as VariablesWithTime,
         }),
       ]);
-      const result = await fetchWindChartData(location, 'icon_d2', new Date('2026-07-16T01:00:00Z'));
+      const result = await fetchWindChartData(
+        location,
+        'icon_d2',
+        new Date('2026-07-16T01:00:00Z'),
+        'America/Los_Angeles'
+      );
       expect(fetchWeatherApi).toHaveBeenCalledTimes(1);
       expect(vi.mocked(fetchWeatherApi).mock.calls[0]?.[1]).toMatchObject({
         timezone: 'GMT',
@@ -448,7 +510,7 @@ describe('API Configuration', () => {
         ];
       });
 
-      const result = await fetchWindChartData(location, 'icon_d2', start);
+      const result = await fetchWindChartData(location, 'icon_d2', start, 'UTC');
 
       expect(Array.from(result.hourly.temperature_2m)).toEqual([20, ...Array(23).fill(NaN)]);
       expect(Array.from(result.hourly.windSpeedProfile._1000hPa ?? [])).toEqual([10, ...Array(23).fill(NaN)]);
@@ -470,8 +532,9 @@ describe('API Configuration', () => {
         ];
       });
 
-      const result = await fetchSkewTData(location, 'icon_d2', start);
+      const result = await fetchSkewTData(location, 'icon_d2', start, 'UTC');
 
+      expect(result.selectedGridCell).toEqual({ latitude: 46.8, longitude: 8.2 });
       expect(result.hourly.temperatureProfile._1000hPa).toEqual(new Float32Array([18, 19, 20, ...Array(21).fill(NaN)]));
       expect(result.hourly.dewpointProfile._1000hPa).toBeUndefined();
       expect(Array.from(result.hourly.temperature_2m).every(Number.isNaN)).toBe(true);
@@ -513,7 +576,7 @@ describe('API Configuration', () => {
     ])('rejects a response with %s', async (_name, responses, error) => {
       vi.mocked(fetchWeatherApi).mockResolvedValueOnce(responses);
 
-      await expect(fetchWindChartData(location, 'icon_d2', start)).rejects.toThrow(error);
+      await expect(fetchWindChartData(location, 'icon_d2', start, 'UTC')).rejects.toThrow(error);
     });
 
     it('accepts a structurally valid response with no usable values', async () => {
@@ -522,7 +585,7 @@ describe('API Configuration', () => {
         return [createResponse({ hourly: createHourlySection(names, {}) })];
       });
 
-      const result = await fetchWindChartData(location, 'icon_d2', start);
+      const result = await fetchWindChartData(location, 'icon_d2', start, 'UTC');
 
       expect(Array.from(result.hourly.temperature_2m).every(Number.isNaN)).toBe(true);
       expect(result.hourly.windSpeedProfile).toEqual({});
@@ -538,7 +601,7 @@ describe('API Configuration', () => {
         ];
       });
 
-      await expect(fetchWindChartData(location, 'icon_d2', start)).rejects.toThrow('invalid hourly timeline');
+      await expect(fetchWindChartData(location, 'icon_d2', start, 'UTC')).rejects.toThrow('invalid hourly timeline');
     });
   });
 });

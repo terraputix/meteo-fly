@@ -10,6 +10,7 @@ import {
 } from '#lib/meteo/thermo.js';
 import { CHART_COLORS } from '#lib/charts/chartColors.js';
 import { windColorScale, strokeWidthScale } from '#lib/charts/scales.js';
+import { windRotation } from '#lib/charts/windChartLayout.js';
 import { type SkewTData, type SkewTLevelData, type SkewTTrace } from '#lib/meteo/types.js';
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
@@ -502,7 +503,7 @@ function drawAnnotations(
   const arrowX = plotLeft + plotWidth + 50;
   for (const level of trace.levels) {
     const y = pressureToCanvasY(layout, level.pressure);
-    const rotation = ((level.windDirection - 180) * Math.PI) / 180;
+    const rotation = windRotation(level.windDirection);
     ctx.save();
     ctx.translate(arrowX, y);
     ctx.rotate(rotation);

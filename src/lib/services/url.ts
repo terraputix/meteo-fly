@@ -30,7 +30,8 @@ export function readURLParams(params: Pick<URLSearchParams, 'get'>): PageParamet
   const maxAltitude: MaxAltitude = maxAlt ? (Number(maxAlt) as MaxAltitude) : 4000;
   const selectedCellSelection: CellSelection =
     cellSelection === 'nearest' || cellSelection === 'land' ? cellSelection : defaultCellSelection;
-  const chartView: ChartView | undefined = view === 'wind' || view === 'skewt' ? view : undefined;
+  const chartView: ChartView | undefined =
+    view === 'wind' || view === 'skewt' || view === 'comparison' ? view : undefined;
   const hour = hourStr ? Number(hourStr) : undefined;
   const daylightOnly = daylightStr !== '0';
 
@@ -41,7 +42,7 @@ export function readURLParams(params: Pick<URLSearchParams, 'get'>): PageParamet
     maxAltitude,
     cellSelection: selectedCellSelection,
     chartView,
-    hour,
+    hour: hour !== undefined && Number.isSafeInteger(hour) && hour >= 0 ? hour : undefined,
     daylightOnly,
   };
 }

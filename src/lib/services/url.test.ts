@@ -21,6 +21,11 @@ describe('read-only forecast URL parameters', () => {
     });
   });
 
+  it('ignores a negative hour index', () => {
+    const params = new URLSearchParams({ lat: '46', lon: '8', day: '1', model: 'icon_d2', hour: '-1' });
+    expect(readURLParams(params)?.hour).toBeUndefined();
+  });
+
   it('uses defaults when the read-only reader has no forecast parameters', () => {
     const params = { get: () => null };
 

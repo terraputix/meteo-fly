@@ -1,4 +1,8 @@
 <script lang="ts">
+  import WindCompass from '#lib/components/WindCompass.svelte';
+  import { COMPASS_MODELS, type CompassModel } from '#lib/api/models.js';
+  import type { SurfaceWindDay } from '#lib/api/api.js';
+  import { windBearing } from '#lib/meteo/surfaceWind.js';
   import { units } from '#lib/stores/units.js';
   import { formatAltitude } from '#lib/utils/units.js';
   import { onMount, onDestroy } from 'svelte';
@@ -34,6 +38,11 @@
   } from './mapLocationSelection';
 
   let {
+    comparison,
+    comparing,
+    highlighted,
+    onInspectModels,
+    selectedTime,
     latitude = $bindable(46.41526),
     longitude = $bindable(8.10828),
     chartOpen = $bindable(false),
@@ -46,6 +55,11 @@
     onToggleChart = undefined as (() => void) | undefined,
     onMapViewChange = undefined as (() => void) | undefined,
   }: {
+    comparison: SurfaceWindDay | null;
+    comparing: boolean;
+    highlighted: CompassModel | null;
+    onInspectModels: (models: CompassModel[]) => void;
+    selectedTime?: Date;
     latitude?: number;
     longitude?: number;
     chartOpen?: boolean;
@@ -70,12 +84,24 @@
   let map: Map = $state.raw(undefined!)!;
   let mapError = $state<string | null>(null);
   let marker: Marker;
-  let elevationBadge: HTMLDivElement | undefined;
+  let selectedLocationElement: HTMLDivElement;
+  let compassMarker = $state.raw<Marker>();
+  let compassElement: HTMLDivElement;
+  const rows = $derived.by(() => {
+    const t = selectedTime?.getTime();
+    return COMPASS_MODELS.map((option) => {
+      const sample = t === undefined ? undefined : comparison?.models[option.id]?.get(t);
+      const speed = sample?.speed ?? NaN;
+      const bearing = windBearing(speed, sample?.direction ?? NaN);
+      return { ...option, bearing, speed, gust: sample?.gust ?? NaN };
+    });
+  });
+
   let selectedGridCellMarker: Marker | null = null;
   let distanceMarker: Marker | null = null;
   let unsubscribe: () => void;
   let isTerrainEnabled = true;
-  let lastTerrainElevation: number | undefined;
+  let lastTerrainElevation = $state<number>();
   const deferredLocationSelection = createDeferredMapLocationSelection(({ latitude, longitude }) => {
     updatePosition(latitude, longitude);
   });
@@ -89,17 +115,20 @@
   // Hike & fly state
   let hikeFlyActive = $state(false);
   let hikeFlyTakeoff: { latitude: number; longitude: number; elevation: number } | null = $state(null);
-  let contextMenuPos: { x: number; y: number } | null = $state(null);
+  let contextMenuPos: { x: number; y: number; alignLeft: boolean; alignAbove: boolean } | null = $state(null);
   let contextMenuLngLat: { lng: number; lat: number } | null = $state(null);
   let contextMenuElevation: number | undefined = $state(undefined);
 
   function onContextMenu(e: MouseEvent) {
     e.preventDefault();
     if (!map) return;
+    deferredLocationSelection.cancel();
     const rect = mapContainer.getBoundingClientRect();
     const lngLat = map.unproject([e.clientX - rect.left, e.clientY - rect.top]);
     contextMenuLngLat = { lng: lngLat.lng, lat: lngLat.lat };
-    contextMenuPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    contextMenuPos = { x, y, alignLeft: x > rect.width / 2, alignAbove: y > rect.height / 2 };
     const elev = map.queryTerrainElevation([lngLat.lng, lngLat.lat]);
     contextMenuElevation = elev != null ? Math.round(elev) : undefined;
   }
@@ -138,21 +167,16 @@
     if (elev == null) return;
     const rounded = Math.round(elev);
     lastTerrainElevation = rounded;
-    updateElevationBadge();
   }
 
-  function updateElevationBadge() {
-    if (!elevationBadge) return;
-    const parts: string[] = [];
-    if (lastTerrainElevation != null) parts.push(`Map ${formatAltitude(lastTerrainElevation, $units)}`);
-    if (gridCellElevation != null) parts.push(`API DEM ${formatAltitude(gridCellElevation, $units)}`);
-    if (parts.length === 0) {
-      elevationBadge.style.display = 'none';
-      return;
-    }
-    elevationBadge.style.display = '';
-    elevationBadge.textContent = parts.join(' · ');
-  }
+  const elevationLabel = $derived(
+    [
+      lastTerrainElevation == null ? '' : `Map ${formatAltitude(lastTerrainElevation, $units)}`,
+      gridCellElevation == null ? '' : `API DEM ${formatAltitude(gridCellElevation, $units)}`,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  );
 
   function updatePosition(lat: number, lng: number) {
     const nextLatitude = Math.round(lat * 100_000) / 100_000;
@@ -261,7 +285,9 @@
 
     const lngLat: LngLatLike = [selectedGridCell.longitude, selectedGridCell.latitude];
     const badgeText =
-      modelGridElevation != null ? `Grid cell · ${formatAltitude(modelGridElevation, $units)}` : 'Grid cell';
+      !comparing && modelGridElevation != null
+        ? `Grid cell · ${formatAltitude(modelGridElevation, $units)}`
+        : 'Grid cell';
 
     if (!selectedGridCellMarker) {
       const element = document.createElement('div');
@@ -302,7 +328,6 @@
       map.once('idle', () => queryElevation(latitude, longitude));
     } else {
       lastTerrainElevation = undefined;
-      updateElevationBadge();
     }
   }
 
@@ -327,11 +352,6 @@
     void longitude;
     if (map) updateGridCellConnectorGeometry();
   });
-  $effect(() => {
-    void gridCellElevation;
-    void modelGridElevation;
-    updateElevationBadge();
-  });
 
   function handleMapMove() {
     updateGridCellDistanceVisibility();
@@ -353,7 +373,11 @@
   }
 
   function handleMapClick(e: MapMouseEvent) {
-    if ($isMobile && hikeFlyActive) return;
+    if (
+      ($isMobile && hikeFlyActive) ||
+      (e.originalEvent.target instanceof Element && e.originalEvent.target.closest('[data-wind-compass-label]'))
+    )
+      return;
 
     const timestamp = e.originalEvent.timeStamp;
     if (timestamp <= ignoreMapClicksUntil) return;
@@ -479,14 +503,9 @@
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
 
-    const selectedLocationElement = document.createElement('div');
-    selectedLocationElement.className = 'selected-location-marker';
-    selectedLocationElement.innerHTML =
-      '<span class="selected-location-marker__outer"></span><span class="selected-location-marker__inner"></span><span class="selected-location-marker__core"></span>';
-
-    elevationBadge = document.createElement('div');
-    elevationBadge.className = 'selected-location-marker__elevation';
-    selectedLocationElement.appendChild(elevationBadge);
+    compassMarker = new Marker({ element: compassElement, anchor: 'center' })
+      .setLngLat([longitude, latitude])
+      .addTo(map);
     marker = new Marker({
       element: selectedLocationElement,
       draggable: true,
@@ -603,6 +622,7 @@
     if (distanceMarker) {
       distanceMarker.remove();
     }
+    compassMarker?.remove();
     if (map) {
       map.off('click', handleMapClick);
       map.off('touchstart', handleMapTouchStart);
@@ -619,6 +639,23 @@
 <div class="relative h-full w-full">
   <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
 
+  <div hidden>
+    <div bind:this={compassElement} style:pointer-events="none">
+      {#if comparing && selectedTime && map && compassMarker}
+        <div class="pointer-events-none absolute left-1/2 top-1/2 size-[348px] -translate-x-1/2 -translate-y-1/2">
+          <WindCompass {rows} {highlighted} {onInspectModels} {map} marker={compassMarker} {latitude} {longitude} />
+        </div>
+      {/if}
+    </div>
+    <div bind:this={selectedLocationElement} class="selected-location-marker">
+      <span class="selected-location-marker__outer"></span><span class="selected-location-marker__inner"></span><span
+        class="selected-location-marker__core"
+      ></span>
+      {#if !comparing && elevationLabel}
+        <span class="selected-location-marker__elevation">{elevationLabel}</span>
+      {/if}
+    </div>
+  </div>
   {#if mapError}
     <div class="absolute inset-0 flex items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-600">
       <p role="alert">{mapError}</p>
@@ -631,9 +668,7 @@
       <p>Interactive weather forecasts for paragliding and hang gliding.</p>
     </header>
 
-    <div class="pointer-events-auto">
-      <ModelSelector bind:model />
-    </div>
+    {#if !comparing}<div class="pointer-events-auto"><ModelSelector bind:model /></div>{/if}
 
     <button
       type="button"
@@ -693,7 +728,9 @@
   {#if contextMenuPos}
     <div
       class="pointer-events-auto absolute z-30 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xl"
-      style="left: {contextMenuPos.x}px; top: {contextMenuPos.y}px; transform: translate(8px, -4px);"
+      style="left: {contextMenuPos.x}px; top: {contextMenuPos.y}px; transform: translate({contextMenuPos.alignLeft
+        ? 'calc(-100% - 4px)'
+        : '4px'}, {contextMenuPos.alignAbove ? '-100%' : '0'});"
       role="presentation"
       onclick={(e) => e.stopPropagation()}
     >
@@ -784,7 +821,7 @@
   }
 
   :global(.selected-location-marker) {
-    position: relative;
+    position: absolute;
     width: 22px;
     height: 22px;
     cursor: grab;
@@ -825,7 +862,7 @@
 
   :global(.selected-location-marker__elevation) {
     position: absolute;
-    top: calc(100% + 6px);
+    top: calc(100% + 11px);
     left: 50%;
     transform: translateX(-50%);
     padding: 2px 6px;

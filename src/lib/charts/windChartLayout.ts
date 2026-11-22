@@ -85,7 +85,7 @@ export function rainDropCount(rain: number): number {
   return !Number.isFinite(rain) || rain <= 0 ? 0 : rain > 5 ? 3 : rain > 1 ? 2 : 1;
 }
 
-// Canvas rotates clockwise; meteorological directions describe where wind comes from.
+// Meteorological bearings name the source. Arrows show flow, so a north wind points south.
 export function windRotation(direction: number): number {
   return ((direction - 180) * Math.PI) / 180;
 }

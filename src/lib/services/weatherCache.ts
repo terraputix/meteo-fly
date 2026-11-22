@@ -1,3 +1,5 @@
+import { SURFACE_WIND_FIELDS } from '#lib/api/forecastFields.js';
+
 export const WEATHER_CACHE_NAME = 'weather-api-cache-v2';
 export const LEGACY_WEATHER_CACHE_NAMES = ['weather-api-cache'];
 export const CACHED_AT_HEADER = 'x-meteo-fly-cached-at';
@@ -12,7 +14,7 @@ export interface WeatherCacheExpiration {
   delete(): Promise<void>;
 }
 
-export type WeatherCacheDataset = 'wind' | 'skewt';
+export type WeatherCacheDataset = 'wind' | 'skewt' | 'comparison';
 
 export interface WeatherCacheDependencies {
   cacheStorage: Pick<CacheStorage, 'open' | 'delete'>;
@@ -59,7 +61,9 @@ function createCachedResponse(response: Response, cachedAt: number): Response {
 function getWeatherCacheDataset(request: Request): WeatherCacheDataset | null {
   const searchParams = new URL(request.url).searchParams;
   if (searchParams.has('daily')) return 'wind';
-  if (searchParams.has('hourly')) return 'skewt';
+  const hourly = searchParams.get('hourly');
+  if (hourly === SURFACE_WIND_FIELDS.join(',')) return 'comparison';
+  if (hourly !== null) return 'skewt';
   return null;
 }
 
@@ -178,6 +182,10 @@ export async function cleanupLegacyWeatherCaches(cacheStorage: Pick<CacheStorage
 export function isWeatherCacheOutdatedMessage(value: unknown): value is WeatherCacheOutdatedMessage {
   if (typeof value !== 'object' || value === null) return false;
   if (!('type' in value) || value.type !== 'weather-cache-outdated') return false;
-  if (!('dataset' in value) || (value.dataset !== 'wind' && value.dataset !== 'skewt')) return false;
+  if (
+    !('dataset' in value) ||
+    (value.dataset !== 'wind' && value.dataset !== 'skewt' && value.dataset !== 'comparison')
+  )
+    return false;
   return 'cachedAt' in value && typeof value.cachedAt === 'number' && Number.isFinite(value.cachedAt);
 }

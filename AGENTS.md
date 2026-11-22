@@ -20,7 +20,7 @@
 
 - `src/routes/+layout.svelte`: global shell, metadata, PWA registration, and update/offline status
 - `src/service-worker/index.ts`: app-shell navigation, precaching, weather fallback, and bounded map runtime caches
-- `src/routes/+page.svelte`: main page state, URL sync, and weather fetch lifecycle
+- `src/routes/+page.svelte`: main page state, URL sync, and forecast request inputs
 - `src/lib/api/`: Open-Meteo API integration, request config, and response types
 - `src/lib/meteo/`: pure meteorological calculations and altitude/pressure helpers
 - `src/lib/charts/`: pure chart data preparation/layout and Canvas 2D drawing
@@ -39,11 +39,12 @@
 
 - **Single-page client app**: Keep everything browser-compatible. Do not introduce server runtime files.
 - **State source of truth**: Page parameters drive selected location, day, model, and max altitude; they are mirrored to URL params and persisted locally.
-- **Data flow**: `+page.svelte` fetches weather data, passes it into `ChartContainer.svelte`, then `WindChart.svelte` offloads heavy chart preparation to `src/lib/workers/chartWorker.ts`.
+- **Data flow**: `+page.svelte` supplies the selection to `src/lib/services/forecastRequests.svelte.ts`, which owns the request for the active view, including timezone resolution and optional grid elevation. The page passes results to the map and `ChartContainer.svelte`. `WindChart.svelte` offloads heavy chart preparation to `src/lib/workers/chartWorker.ts`.
+- **Forecast timeline**: The time selector appears in the forecast panel and below the map when Compare winds is active and the panel is closed. The page owns the selected day and hour, the location timezone, and any pending step across midnight. Compare winds automatically shows the wind compass at the selected point. Its rim uses a 2 km ground radius with a minimum on-screen diameter of 33% of the map pane’s shorter side on desktop and 60% on mobile. Each fletch shows a model’s 10 m wind. The comparison panel includes gusts from the same full-day batch, including when the chart pane is closed. Skew-T selects its trace by timestamp.
 - **Worker split**: Expensive chart shaping and Hike & Fly terrain/raster processing belong in pure helpers or workers, not in UI components.
 - **Display units**: Persist preferences in `src/lib/stores/units.ts`; conversions live in `src/lib/utils/units.ts`. Keep API data, workers, calculations, chart geometry, and wind color thresholds in canonical metric units. Convert only display values; pressure remains hPa.
 - **Chart stack**: Reuse existing chart builders and tooltip/state helpers before adding new rendering abstractions.
-- **Forecast time ranges**: Cache location timezone metadata and request hourly data using explicit UTC bounds for the selected local calendar days. Select sunrise/sunset by local date. Preserve 23- and 25-hour DST days.
+- **Forecast time ranges**: Resolve and cache the location timezone before requesting forecasts. Use it for the selector and request explicit UTC bounds for the selected local calendar days. Forecast results carry the timezone used in the request. Select sunrise/sunset by local date. Preserve 23- and 25-hour DST days.
 - **Forecast models**: Supported models are defined canonically in `src/lib/api/types.ts`; UI selectors must stay aligned with that union.
 - **PWA**: Registration and update UI live in `+layout.svelte`; precache inputs come from `$app/manifest`; navigation
   fallback and runtime caching live in `src/service-worker/index.ts`. The worker has its own TypeScript project.
@@ -93,6 +94,9 @@
 - Location state and geolocation behavior live in `src/lib/services/location/`.
 
 ### Charting
+
+- Wind Chart, Skew-T, and comparison table arrows show the direction the air travels. Direction labels such as SSW report where the wind comes from.
+- Map compass tips point outward at the wind's source bearing on the rim.
 
 - UI container: `src/lib/components/ChartContainer.svelte`
 - Canvas lifecycle, interaction, and worker orchestration: `src/lib/components/WindChart.svelte`

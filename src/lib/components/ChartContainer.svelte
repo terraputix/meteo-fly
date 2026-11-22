@@ -1,79 +1,62 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { units } from '#lib/stores/units.js';
   import { windSpeed } from '#lib/utils/units.js';
-  import type { WindChartData, WeatherModel, SkewTWeatherData } from '#lib/api/types.js';
-  import { MODEL_FORECAST_DAYS } from '#lib/api/models.js';
+  import type { WeatherModel } from '#lib/api/types.js';
   import WindChart from './WindChart.svelte';
   import SkewTChart from './SkewTChart.svelte';
-  import BottomControls from './BottomControls.svelte';
   import Footer from './Footer.svelte';
   import { windColors, windMaxSpeed } from '#lib/charts/scales.js';
   import { CHART_COLORS, WIND_CLOUD_BANDS, WIND_CLOUD_EDGE_ALPHA } from '#lib/charts/chartColors.js';
   import { buildSkewTData } from '#lib/meteo/skewT.js';
   import type { MaxAltitude } from '#lib/meteo/types.js';
   import type { ChartView } from '#lib/services/types.js';
+  import type { ForecastData } from '#lib/services/forecastRequests.svelte.js';
 
   let {
-    windChartData,
-    skewTWeatherData = null,
-    startDate,
-    isWindChartLoading = false,
-    isSkewTLoading = false,
-    skewTError = null,
-    selectedDay = $bindable(),
+    forecastData,
+    isLoading,
     maxAltitude = $bindable(4000),
     model = $bindable<WeatherModel>('icon_seamless'),
     chartView = $bindable<ChartView>('wind'),
-    hour = $bindable(0),
+    selectedTime,
+    comparisonGrid,
+    timestepControls,
     daylightOnly = $bindable(false),
-    keyboardNavigationEnabled = false,
     onContentHeightChange,
-    onRetrySkewT,
     onClose,
   }: {
-    windChartData: WindChartData | null;
-    skewTWeatherData?: SkewTWeatherData | null;
-    startDate: Date;
-    isWindChartLoading?: boolean;
-    isSkewTLoading?: boolean;
-    skewTError?: string | null;
-    selectedDay: number;
+    forecastData: ForecastData | null;
+    isLoading: boolean;
     maxAltitude?: MaxAltitude;
     model?: WeatherModel;
     chartView?: ChartView;
-    hour?: number;
+    selectedTime?: Date;
+    comparisonGrid: Snippet;
+    timestepControls: Snippet;
     daylightOnly?: boolean;
-    keyboardNavigationEnabled?: boolean;
     onContentHeightChange?: (height: number) => void;
-    onRetrySkewT?: () => void;
     onClose?: () => void;
   } = $props();
 
-  let skewTData = $derived.by(() => {
-    if (!skewTWeatherData || chartView !== 'skewt') return null;
-    return buildSkewTData(skewTWeatherData, model, maxAltitude, windChartData?.modelGridElevation);
+  const skewTData = $derived.by(() => {
+    if (forecastData?.view !== 'skewt' || chartView !== 'skewt') return null;
+    const { weather } = forecastData;
+    return buildSkewTData(weather, model, maxAltitude, weather.modelGridElevation);
   });
   let traceHours = $derived(skewTData?.traces.map((t) => t.time) ?? []);
-  let maxForecastDays = $derived(MODEL_FORECAST_DAYS[model]);
-
-  $effect(() => {
-    if (selectedDay > maxForecastDays) {
-      selectedDay = maxForecastDays;
-    }
-  });
-
   let legendOpen = $state(false);
   let bodyHeight = $state(0);
-  let controlsHeight = $state(0);
   let bodyElement: HTMLDivElement;
   let controlsElement: HTMLDivElement;
+  let controlsHeight = $state(0);
 
   export function measureContentHeight() {
     return bodyElement.offsetHeight + controlsElement.offsetHeight + 2;
   }
 
   $effect(() => {
-    if (bodyHeight > 0 && controlsHeight > 0) {
+    if (bodyHeight > 0) {
       onContentHeightChange?.(bodyHeight + controlsHeight + 2);
     }
   });
@@ -96,11 +79,7 @@
     })
     .join(', ')})`;
 
-  $effect(() => {
-    if (hour >= traceHours.length && traceHours.length > 0) {
-      hour = traceHours.length - 1;
-    }
-  });
+  let soundingHour = $derived(traceHours.findIndex((time) => +time === selectedTime?.getTime()));
 </script>
 
 <div
@@ -110,43 +89,42 @@
     <div
       bind:this={bodyElement}
       bind:offsetHeight={bodyHeight}
-      class="flex flex-col px-2 pt-3 pb-1 sm:min-h-full sm:px-4 sm:pt-4 sm:pb-0"
+      class="@container flex flex-col px-2 pt-3 pb-1 sm:min-h-full sm:px-4 sm:pt-4 sm:pb-0"
     >
-      <div class="mb-2 flex shrink-0 items-center justify-center">
-        <div class="inline-flex rounded-xl bg-slate-100 p-1">
-          <button
-            type="button"
-            class="rounded-lg px-4 py-1.5 text-sm font-medium transition"
-            class:bg-white={chartView === 'wind'}
-            class:text-slate-900={chartView === 'wind'}
-            class:shadow-sm={chartView === 'wind'}
-            class:ring-1={chartView === 'wind'}
-            class:ring-slate-200={chartView === 'wind'}
-            class:text-slate-500={chartView !== 'wind'}
-            class:hover:text-slate-700={chartView !== 'wind'}
-            onclick={() => (chartView = 'wind')}
-          >
-            Wind Chart
-          </button>
-          <button
-            type="button"
-            class="rounded-lg px-4 py-1.5 text-sm font-medium transition"
-            class:bg-white={chartView === 'skewt'}
-            class:text-slate-900={chartView === 'skewt'}
-            class:shadow-sm={chartView === 'skewt'}
-            class:ring-1={chartView === 'skewt'}
-            class:ring-slate-200={chartView === 'skewt'}
-            class:text-slate-500={chartView !== 'skewt'}
-            class:hover:text-slate-700={chartView !== 'skewt'}
-            onclick={() => (chartView = 'skewt')}
-          >
-            Skew-T
-          </button>
+      <div class="mb-2 grid shrink-0 grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-x-1">
+        <div class="col-start-2 row-start-1 overflow-x-auto">
+          <div class="mx-auto flex w-max rounded-xl bg-slate-100 p-1">
+            {#each [{ id: 'wind', name: 'Wind Chart' }, { id: 'skewt', name: 'Skew-T' }, { id: 'comparison', name: 'Compare winds' }] as const as tab (tab.id)}
+              <button
+                type="button"
+                class="shrink-0 rounded-lg px-1.5 py-1.5 text-xs font-medium whitespace-nowrap text-slate-700 @min-[22rem]:px-3 @min-[22rem]:text-sm"
+                class:bg-white={chartView === tab.id}
+                class:shadow-sm={chartView === tab.id}
+                aria-pressed={chartView === tab.id}
+                onclick={() => (chartView = tab.id)}>{tab.name}</button
+              >
+            {/each}
+          </div>
         </div>
+        <button
+          type="button"
+          aria-label="Close chart panel"
+          onclick={onClose}
+          class="col-start-3 row-start-1 inline-flex size-9 items-center justify-center rounded-lg text-xl text-slate-500 hover:bg-slate-100"
+          >×</button
+        >
       </div>
 
-      {#if chartView === 'wind'}
-        <WindChart {windChartData} bind:maxAltitude {model} bind:daylightOnly isLoading={isWindChartLoading} />
+      {#if chartView === 'comparison'}
+        {@render comparisonGrid()}
+      {:else if chartView === 'wind'}
+        <WindChart
+          windChartData={forecastData?.view === 'wind' ? forecastData.weather : null}
+          bind:maxAltitude
+          {model}
+          bind:daylightOnly
+          {isLoading}
+        />
         <Footer>
           {#snippet heading()}
             <button
@@ -197,27 +175,13 @@
       {:else}
         <div class="relative flex flex-1 flex-col">
           <SkewTChart
-            {skewTData}
-            {hour}
+            skewTData={soundingHour >= 0 ? skewTData : null}
+            hour={soundingHour}
             bind:maxAltitude
             {model}
-            isLoading={isSkewTLoading || (isWindChartLoading && !windChartData)}
+            {isLoading}
           />
-          {#if skewTError}
-            <div
-              class="absolute top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3 rounded-md bg-red-50 px-4 py-3 text-center text-sm text-red-700 ring-1 ring-red-200"
-              role="alert"
-            >
-              <span>{skewTError}</span>
-              <button
-                type="button"
-                class="rounded-md bg-red-700 px-3 py-1.5 font-medium text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                onclick={onRetrySkewT}
-              >
-                Retry
-              </button>
-            </div>
-          {:else if windChartData && !isSkewTLoading && traceHours.length === 0}
+          {#if skewTData && !isLoading && soundingHour < 0}
             <div class="absolute inset-0 flex items-center justify-center text-sm text-slate-500">
               No sounding data available
             </div>
@@ -227,22 +191,11 @@
       {/if}
     </div>
   </div>
-
   <div
     bind:this={controlsElement}
     bind:offsetHeight={controlsHeight}
-    class="shrink-0 border-t border-slate-200 bg-linear-to-b from-slate-50 to-white px-3 pb-2 pt-1 sm:px-5"
+    class="shrink-0 border-t border-slate-200 bg-white px-3 pt-1 pb-[max(.25rem,env(safe-area-inset-bottom))]"
   >
-    <BottomControls
-      bind:selectedDay
-      {startDate}
-      bind:hour
-      {traceHours}
-      timezone={skewTData?.timezone ?? windChartData?.timezone}
-      {maxForecastDays}
-      {chartView}
-      {keyboardNavigationEnabled}
-      onclose={onClose}
-    />
+    {@render timestepControls()}
   </div>
 </div>
