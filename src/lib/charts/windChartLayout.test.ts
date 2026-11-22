@@ -147,8 +147,8 @@ describe('wind chart layout', () => {
   });
 
   it('ignores Float32 snowfall rounding when counting rain drops in mixed hours', () => {
-    expect(rainDropCount(2 - Math.fround(0.7) / 0.7)).toBe(1);
-    expect(rainDropCount(7 - Math.fround(1.4) / 0.7)).toBe(2);
+    expect(rainDropCount(Math.fround(1.1) - Math.fround(0.1))).toBe(1);
+    expect(rainDropCount(Math.fround(5.3) - Math.fround(0.3))).toBe(2);
   });
 
   it.each([

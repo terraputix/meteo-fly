@@ -14,7 +14,7 @@ function createData(): WindChartData {
       temperature_2m: new Float32Array([20, 21]),
       dewpoint_2m: new Float32Array([NaN, 15]),
       precipitation: new Float32Array([NaN, 1]),
-      snowfall: new Float32Array([NaN, NaN]),
+      snowfallWaterEquivalent: new Float32Array([NaN, NaN]),
       relativeHumidity_2m: new Float32Array([60, 65]),
       cloudCoverLow: new Float32Array([NaN, 40]),
       cloudCoverMid: new Float32Array([20, 30]),
@@ -31,7 +31,7 @@ describe('chart worker preparation', () => {
     const windChartData = createData();
     windChartData.hourly.time = [0, 10, 11].map((hour) => new Date(Date.UTC(2026, 6, 16, hour)));
     windChartData.hourly.precipitation = new Float32Array([5, 1, 2]);
-    windChartData.hourly.snowfall = new Float32Array([3.5, 0.7, 0.7]);
+    windChartData.hourly.snowfallWaterEquivalent = new Float32Array([5, 1, 1]);
 
     const { rainCloudChartData } = prepareChartData({
       windChartData,
@@ -69,6 +69,25 @@ describe('chart worker preparation', () => {
     });
     expect(result.windData).toEqual([]);
     expect(result.xDomain.every((date) => Number.isFinite(date.getTime()))).toBe(true);
+  });
+
+  it.each([
+    [-6.6, 0.75, 0, 1],
+    [-3, 0.75, 0.25, 0.75],
+    [NaN, 0.75, 0.25, 0.75],
+    [-6.6, NaN, 1, NaN],
+  ])('classifies leftover precipitation at %s °C with %s mm reported snow', (temperature, snow, rain, expectedSnow) => {
+    const windChartData = createData();
+    windChartData.hourly.temperature_2m[1] = temperature;
+    windChartData.hourly.snowfallWaterEquivalent[1] = snow;
+
+    const { rainCloudChartData } = prepareChartData({ windChartData, maxAltitude: 4000, model: 'icon_d2' });
+
+    expect(rainCloudChartData.precipitation[1]).toEqual({
+      time: windChartData.hourly.time[1],
+      rain,
+      snow: expectedSnow,
+    });
   });
 
   it.each(['sunrise', 'sunset', 'both'] as const)(

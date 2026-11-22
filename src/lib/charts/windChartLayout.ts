@@ -83,7 +83,7 @@ export function temperatureRange(values: number[]): [number, number] {
 
 export function rainDropCount(rain: number): number {
   if (!Number.isFinite(rain) || rain <= 0) return 0;
-  // Subtracting Float32 snowfall can leave a residual just above an icon threshold.
+  // Subtracting Float32 precipitation values can leave a residual just above an icon threshold.
   const thresholdScale = 1 + 1e-6;
   return rain > 5 * thresholdScale ? 3 : rain > thresholdScale ? 2 : 1;
 }
