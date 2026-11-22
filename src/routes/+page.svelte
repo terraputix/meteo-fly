@@ -410,13 +410,14 @@
   />
 </svelte:head>
 
-{#snippet timeSelector()}
+{#snippet timeSelector(singleRow = false)}
   <ForecastTimeSelector
     date={forecast.date}
     hour={selectedHour}
     times={timeline}
     timezone={forecast.timezone}
     showHours={chartView !== 'wind'}
+    {singleRow}
     canStep={(mode, direction) => getForecastStep(mode, direction) !== null}
     onStep={stepForecastTime}
     onHourChange={selectHour}
@@ -434,12 +435,12 @@
         Showing cached wind forecast from {new Date(forecast.cachedAt).toLocaleString()}.
       </p>
     {/if}
-    {@render timeSelector()}
+    {@render timeSelector(true)}
   </div>
 {/snippet}
 
 <div
-  class="relative flex flex-col h-dvh w-full overflow-hidden bg-slate-100"
+  class="relative flex h-dvh w-full flex-col overflow-hidden bg-slate-100 [@media(display-mode:standalone)]:h-svh"
   style="--map-controls-top-offset: {mapControlsTopOffset}; --initial-mobile-chart-max: {defaultPaneSizes.vertical}%; --mobile-pane-min: {mobilePaneMinSize}%;"
 >
   {#if showMapLoading || mapError}

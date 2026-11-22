@@ -118,7 +118,7 @@
   <meta name="twitter:card" content="summary" />
 </svelte:head>
 
-<div class="flex min-h-dvh flex-col">
+<div class="flex min-h-dvh flex-col [@media(display-mode:standalone)]:min-h-svh">
   <main class="flex-grow">
     {@render children()}
   </main>

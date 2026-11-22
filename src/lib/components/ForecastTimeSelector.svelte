@@ -8,6 +8,7 @@
     times,
     timezone,
     showHours,
+    singleRow = false,
     canStep,
     onStep,
     onHourChange,
@@ -17,6 +18,7 @@
     times: Date[];
     timezone?: string;
     showHours: boolean;
+    singleRow?: boolean;
     canStep: (mode: TimestepMode, direction: TimestepDirection) => boolean;
     onStep: (mode: TimestepMode, direction: TimestepDirection) => void;
     onHourChange: (hour: number) => void;
@@ -118,11 +120,14 @@
     </button>
   {/if}
 
-  <div class="flex min-w-0 flex-wrap items-center justify-center gap-x-1 px-0.5 text-center">
-    <span class="font-medium text-slate-800">{dayLabel ?? '—'}</span>
+  <div class="flex min-w-0 items-center justify-center gap-x-1 px-0.5 text-center" class:flex-wrap={!singleRow}>
+    <span class="font-medium text-slate-800" class:truncate={singleRow} title={singleRow ? dayLabel : undefined}>
+      {dayLabel ?? '—'}
+    </span>
     {#if showHours}
       <select
         class="min-w-0 max-w-full cursor-pointer rounded-md px-1 py-0.5 font-semibold text-indigo-900 hover:bg-white focus-visible:outline-2 focus-visible:outline-indigo-600 disabled:cursor-default disabled:opacity-50"
+        class:shrink-0={singleRow}
         aria-label="Forecast time"
         disabled={!times.length}
         value={times.length ? hour : ''}
