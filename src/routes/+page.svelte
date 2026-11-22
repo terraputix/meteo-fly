@@ -5,7 +5,13 @@
   import { afterNavigate, goto } from '$app/navigation';
   import { isMobile } from '#lib/stores/media.js';
   import WindComparisonGrid from '#lib/components/WindComparisonGrid.svelte';
-  import BottomControls from '#lib/components/BottomControls.svelte';
+  import ForecastTimeSelector from '#lib/components/ForecastTimeSelector.svelte';
+  import {
+    resolveTimestepHour,
+    stepTimestep,
+    type TimestepDirection,
+    type TimestepMode,
+  } from '#lib/components/timestepNavigation.js';
   import ForecastError from '#lib/components/ForecastError.svelte';
   import { MODEL_FORECAST_DAYS, type CompassModel } from '#lib/api/models.js';
   import LocationMap from '#lib/components/LocationMap.svelte';
@@ -19,9 +25,12 @@
     fetchWindChartData,
     fetchModelGridElevation,
     fetchSkewTData,
+    FORECAST_API_MAX_DAYS,
+    forecastDayStart,
+    lastCompleteForecastDay,
   } from '#lib/api/api.js';
   import type { Location, WindChartData, SkewTWeatherData } from '#lib/api/types.js';
-  import { addDays } from '#lib/utils/dateExtensions.js';
+  import { resolveLocationTimezone } from '#lib/api/timezone.js';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { onDestroy, onMount, tick } from 'svelte';
   import { createLatestRequest, isAbortError, type RequestHandle } from '#lib/services/latestRequest.js';
@@ -36,6 +45,7 @@
   let chartView: ChartView = $state(parameters.chartView ?? 'comparison');
   const comparing = $derived(chartView === 'comparison');
   let selectedHour = $state(parameters.hour ?? 0);
+  let pendingLastHourDay = $state<number | null>(null);
   let windChartData = $state.raw<WindChartData | null>(null);
   let skewTWeatherData = $state.raw<SkewTWeatherData | null>(null);
   let isWindChartLoading = $state(true);
@@ -46,27 +56,62 @@
   let comparison = $state.raw<SurfaceWindDay | null>(null);
   let inspectedModels = $state<CompassModel[]>([]);
   let highlighted = $state<CompassModel | null>(null);
-  let comparisonFailed = $state(false);
+  let comparisonRequestFailed = $state(false);
   let comparisonRetry = $state(0);
   let comparisonCachedAt = $state<number | null>(null);
+  const locationKey = $derived(`${parameters.location.latitude},${parameters.location.longitude}`);
+  let timezoneResult = $state.raw<{ key: string; timezone: string | null }>();
+  let timezoneRetry = $state(0);
+  const locationTimezone = $derived(timezoneResult?.key === locationKey ? timezoneResult.timezone : undefined);
+  const timezoneError = $derived(
+    locationTimezone === null ? 'Could not determine the forecast location’s time zone.' : null
+  );
+  const comparisonError = $derived(
+    timezoneError ?? (comparisonRequestFailed ? 'Wind comparison could not load.' : null)
+  );
+  const referenceDate = $derived.by(() => {
+    void locationKey;
+    void parameters.selectedDay;
+    return new Date();
+  });
+
+  $effect(() => {
+    const key = locationKey;
+    void timezoneRetry;
+    const controller = new AbortController();
+    void resolveLocationTimezone({ ...parameters.location }, controller.signal)
+      .then((timezone) => {
+        if (!controller.signal.aborted) timezoneResult = { key, timezone };
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) timezoneResult = { key, timezone: null };
+      });
+    return () => controller.abort();
+  });
+
   $effect(() => {
     void comparisonRetry;
     comparison = null;
-    comparisonFailed = false;
+    comparisonRequestFailed = false;
     comparisonCachedAt = null;
-    if (!comparing) return;
+    const selectedDay = parameters.selectedDay;
+    if (!comparing || !locationTimezone || selectedDay > maxForecastDays) return;
     const controller = new AbortController();
     void fetchSurfaceWindDay(
       { ...parameters.location },
-      parameters.selectedDay - 1,
+      locationTimezone,
+      selectedDay - 1,
       parameters.cellSelection,
-      controller.signal
+      controller.signal,
+      referenceDate
     )
       .then((day) => {
-        if (!controller.signal.aborted) comparison = day;
+        if (controller.signal.aborted) return;
+        comparison = day;
+        resolveLoadedHour(selectedDay, day.time);
       })
       .catch(() => {
-        if (!controller.signal.aborted) comparisonFailed = true;
+        if (!controller.signal.aborted) comparisonRequestFailed = true;
       });
     return () => controller.abort();
   });
@@ -77,9 +122,37 @@
         ? (skewTWeatherData?.hourly.time ?? [])
         : []
   );
-  $effect(() => {
-    if (timeline.length && selectedHour >= timeline.length) selectedHour = timeline.length - 1;
-  });
+  function resolveLoadedHour(day: number, times: Date[]) {
+    if (!times.length) return;
+    const useLastHour = pendingLastHourDay === day;
+    selectedHour = resolveTimestepHour(useLastHour ? 'last' : selectedHour, times.length);
+    if (useLastHour) pendingLastHourDay = null;
+  }
+
+  function selectHour(hour: number) {
+    pendingLastHourDay = null;
+    selectedHour = hour;
+  }
+
+  function getForecastStep(mode: TimestepMode, direction: TimestepDirection) {
+    if (!startDate) return null;
+    return stepTimestep({
+      mode,
+      direction,
+      selectedDay: parameters.selectedDay,
+      hour: selectedHour,
+      traceCount: timeline.length,
+      maxForecastDays,
+    });
+  }
+
+  function stepForecastTime(mode: TimestepMode, direction: TimestepDirection) {
+    const next = getForecastStep(mode, direction);
+    if (!next) return;
+    pendingLastHourDay = next.hour === 'last' ? next.selectedDay : null;
+    if (next.hour !== 'last') selectedHour = next.hour;
+    parameters.selectedDay = next.selectedDay;
+  }
 
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
   let panelTransitionTimer: ReturnType<typeof setTimeout> | null = null;
@@ -87,6 +160,7 @@
   let renderChartPanel = $state(true);
   let chartPanelReady = $state(false);
   let chartContainer = $state<ChartContainer>();
+  let mapTimeSelector = $state<HTMLDivElement>();
   let pageElement: HTMLDivElement;
   let isChartPaneDragging = $state(false);
   let viewportHeight = $state(0);
@@ -105,6 +179,7 @@
     location: Location;
     model: PageParameters['selectedModel'];
     referenceDate: Date;
+    timezone: string;
     dayOffset: number;
     maxAltitude: PageParameters['maxAltitude'];
     cellSelection: PageParameters['cellSelection'];
@@ -117,26 +192,28 @@
 
   let windFailure = $state.raw<WeatherRequestFailure | null>(null);
   let skewTFailure = $state.raw<WeatherRequestFailure | null>(null);
+  const windError = $derived(timezoneError ?? windFailure?.message ?? null);
 
   const paneDirection = $derived<'horizontal' | 'vertical'>($isMobile ? 'vertical' : 'horizontal');
   const startDate = $derived(
-    addDays(new Date(), parameters.selectedDay - 1, comparison?.timezone ?? windChartData?.timezone)
+    locationTimezone ? forecastDayStart(referenceDate, locationTimezone, parameters.selectedDay) : undefined
   );
-  const maxForecastDays = $derived(
-    comparing ? MODEL_FORECAST_DAYS.gfs_seamless : MODEL_FORECAST_DAYS[parameters.selectedModel]
-  );
+  const maxForecastDays = $derived.by(() => {
+    const modelDays = comparing ? FORECAST_API_MAX_DAYS : MODEL_FORECAST_DAYS[parameters.selectedModel];
+    return locationTimezone ? lastCompleteForecastDay(referenceDate, locationTimezone, modelDays) : modelDays;
+  });
   const mapForecastStatus = $derived(
     showChart
       ? null
       : comparing
         ? {
-            loading: !comparison && !comparisonFailed,
-            errorMessage: comparisonFailed ? 'Wind comparison could not load.' : null,
-            retry: () => comparisonRetry++,
+            loading: !comparison && !comparisonError,
+            errorMessage: comparisonError,
+            retry: retryComparison,
           }
         : {
             loading: isWindChartLoading && !windChartData,
-            errorMessage: windFailure?.message ?? null,
+            errorMessage: windError,
             retry: retryWindChart,
           }
   );
@@ -273,14 +350,18 @@
       closeChartPanel();
     } else {
       void openChartPanel();
-      if (!comparing && !windChartData && !isWindChartLoading) {
-        scheduleWindChartUpdate(getWeatherRequestParameters());
+      if (!comparing && locationTimezone && !windChartData && !isWindChartLoading) {
+        scheduleWindChartUpdate(getWeatherRequestParameters(locationTimezone));
       }
     }
   }
 
   function updateLocation(location: Location) {
     parameters.location = location;
+
+    if (!showChart && comparing && document.activeElement?.closest('.maplibregl-map')) {
+      mapTimeSelector?.focus({ preventScroll: true });
+    }
 
     if (windChartData) {
       windChartData = {
@@ -290,14 +371,15 @@
     }
   }
 
-  function getWeatherRequestParameters(): WeatherRequestParameters {
+  function getWeatherRequestParameters(timezone: string): WeatherRequestParameters {
     return {
       location: {
         latitude: parameters.location.latitude,
         longitude: parameters.location.longitude,
       },
       model: parameters.selectedModel,
-      referenceDate: new Date(),
+      referenceDate,
+      timezone,
       dayOffset: parameters.selectedDay - 1,
       maxAltitude: parameters.maxAltitude,
       cellSelection: parameters.cellSelection,
@@ -328,8 +410,20 @@
     void updateSkewTData(requestParameters, request);
   }
 
+  function retryTimezone() {
+    timezoneResult = undefined;
+    timezoneRetry++;
+  }
+
+  function retryComparison() {
+    if (timezoneError) retryTimezone();
+    else comparisonRetry++;
+  }
+
   function retryWindChart() {
-    if (windFailure) {
+    if (timezoneError) {
+      retryTimezone();
+    } else if (windFailure) {
       scheduleWindChartUpdate(windFailure.requestParameters);
     }
   }
@@ -363,8 +457,8 @@
     clearPanelTransitionTimer();
     renderChartPanel = true;
     showChart = true;
-    if (!comparing && !windChartData && !isWindChartLoading) {
-      scheduleWindChartUpdate(getWeatherRequestParameters());
+    if (!comparing && locationTimezone && !windChartData && !isWindChartLoading) {
+      scheduleWindChartUpdate(getWeatherRequestParameters(locationTimezone));
     }
   }
 
@@ -377,18 +471,19 @@
   $effect(() => {
     const maxDay = maxForecastDays;
     if (parameters.selectedDay > maxDay) {
+      pendingLastHourDay = null;
       parameters.selectedDay = maxDay;
       return;
     }
-    if (comparing) {
+    if (comparing || !locationTimezone) {
       windRequest.cancel();
       clearTimeout(updateTimer ?? undefined);
       windChartData = null;
-      isWindChartLoading = false;
+      isWindChartLoading = !comparing && locationTimezone === undefined;
       windFailure = null;
       return;
     }
-    scheduleWindChartUpdate(getWeatherRequestParameters());
+    scheduleWindChartUpdate(getWeatherRequestParameters(locationTimezone));
   });
 
   $effect(() => {
@@ -398,13 +493,17 @@
   });
 
   $effect(() => {
-    if (!showChart || chartView !== 'skewt') {
+    if (!showChart || chartView !== 'skewt' || !locationTimezone) {
       skewTRequest.cancel();
-      isSkewTLoading = false;
+      isSkewTLoading = showChart && chartView === 'skewt' && locationTimezone === undefined;
+      if (!locationTimezone) {
+        skewTWeatherData = null;
+        skewTFailure = null;
+      }
       return;
     }
 
-    scheduleSkewTUpdate(getWeatherRequestParameters());
+    if (parameters.selectedDay <= maxForecastDays) scheduleSkewTUpdate(getWeatherRequestParameters(locationTimezone));
   });
 
   async function updateWindChart(requestParameters: WeatherRequestParameters, request: RequestHandle) {
@@ -413,6 +512,7 @@
         requestParameters.location,
         requestParameters.model,
         requestParameters.referenceDate,
+        requestParameters.timezone,
         1,
         requestParameters.maxAltitude,
         requestParameters.cellSelection,
@@ -458,6 +558,7 @@
         requestParameters.location,
         requestParameters.model,
         requestParameters.referenceDate,
+        requestParameters.timezone,
         requestParameters.maxAltitude,
         requestParameters.cellSelection,
         request.signal,
@@ -465,6 +566,7 @@
       );
       if (!skewTRequest.isCurrent(request)) return;
       skewTWeatherData = result;
+      resolveLoadedHour(requestParameters.dayOffset + 1, result.hourly.time);
     } catch (err) {
       if (!skewTRequest.isCurrent(request) || isAbortError(err)) return;
       console.error(err);
@@ -536,6 +638,19 @@
     content="Interactive multi-model wind and weather forecasts for paragliding and hang gliding."
   />
 </svelte:head>
+
+{#snippet timeSelector()}
+  <ForecastTimeSelector
+    date={startDate}
+    hour={selectedHour}
+    times={timeline}
+    timezone={locationTimezone ?? undefined}
+    showHours={chartView !== 'wind'}
+    canStep={(mode, direction) => getForecastStep(mode, direction) !== null}
+    onStep={stepForecastTime}
+    onHourChange={selectHour}
+  />
+{/snippet}
 
 <div
   class="relative flex flex-col h-dvh w-full overflow-hidden bg-slate-100"
@@ -650,39 +765,24 @@
               onClose={closeChartPanel}
             >
               {#snippet timestepControls()}
-                <BottomControls
-                  bind:selectedDay={parameters.selectedDay}
-                  {startDate}
-                  bind:hour={selectedHour}
-                  traceHours={timeline}
-                  timezone={comparing
-                    ? comparison?.timezone
-                    : chartView === 'skewt'
-                      ? skewTWeatherData?.timezone
-                      : windChartData?.timezone}
-                  {maxForecastDays}
-                  keyboardNavigationEnabled={showChart}
-                  dayNavigationOnly={chartView === 'wind'}
-                />
+                {#if showChart}
+                  {@render timeSelector()}
+                {/if}
               {/snippet}
               {#snippet comparisonGrid()}
                 <WindComparisonGrid
                   bind:highlighted
                   {inspectedModels}
                   day={comparison}
-                  failed={comparisonFailed}
-                  retry={() => comparisonRetry++}
-                  bind:hour={selectedHour}
+                  error={comparisonError}
+                  retry={retryComparison}
+                  bind:hour={() => selectedHour, selectHour}
                 />
               {/snippet}
             </ChartContainer>
-            {#if windFailure && chartView !== 'comparison'}
+            {#if windError && !comparing}
               <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
-                <ForecastError
-                  message={windFailure.message}
-                  retry={retryWindChart}
-                  class="max-w-md flex-col text-center"
-                />
+                <ForecastError message={windError} retry={retryWindChart} class="max-w-md flex-col text-center" />
               </div>
             {/if}
           </div>
@@ -690,9 +790,18 @@
       </ResizablePane>
     </ResizablePaneGroup>
   </div>
-  {#if !showChart && comparing && comparisonCachedAt !== null}
-    <p class="text-center text-xs text-amber-800">
-      Showing cached wind forecast from {new Date(comparisonCachedAt).toLocaleString()}.
-    </p>
+  {#if !showChart && comparing}
+    <div
+      bind:this={mapTimeSelector}
+      tabindex="-1"
+      class="shrink-0 border-t border-slate-200 bg-white px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]"
+    >
+      {#if comparisonCachedAt !== null}
+        <p class="mb-1 text-center text-xs text-amber-800">
+          Showing cached wind forecast from {new Date(comparisonCachedAt).toLocaleString()}.
+        </p>
+      {/if}
+      {@render timeSelector()}
+    </div>
   {/if}
 </div>

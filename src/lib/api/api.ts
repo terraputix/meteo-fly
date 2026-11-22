@@ -18,7 +18,7 @@ import {
   type SkewTWeatherData,
 } from './types';
 import { getVariablesForModel, makeProfileVar } from './variables';
-import { FORECAST_URL, resolveLocationTimezone } from '#lib/api/timezone.js';
+import { FORECAST_URL } from '#lib/api/timezone.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
 import { SURFACE_WIND_FIELDS } from '#lib/api/forecastFields.js';
 
@@ -169,6 +169,20 @@ function formatDateToYYYYMMDD(date: Date, timeZone: string): string {
   return toCalendarDate(fromDate(date, timeZone)).toString();
 }
 
+export function forecastDayStart(referenceDate: Date, timezone: string, day: number): Date {
+  const date = toCalendarDate(fromDate(referenceDate, timezone)).add({ days: day - 1 });
+  return toZoned(date, timezone).toDate();
+}
+
+export const FORECAST_API_MAX_DAYS = 16;
+
+export function lastCompleteForecastDay(referenceDate: Date, timezone: string, modelDays: number): number {
+  const utcLimit = forecastDayStart(referenceDate, 'UTC', FORECAST_API_MAX_DAYS + 1);
+  let day = Math.min(modelDays, FORECAST_API_MAX_DAYS);
+  while (+forecastDayStart(referenceDate, timezone, day + 1) - 3600000 >= +utcLimit) day--;
+  return day;
+}
+
 export function createQueryParams(
   location: Location,
   hourlyParams: HourlyParams,
@@ -179,9 +193,8 @@ export function createQueryParams(
   timezone: string,
   dayOffset: number = 0
 ) {
-  const date = toCalendarDate(fromDate(referenceDate, timezone)).add({ days: dayOffset });
-  const start = toZoned(date, timezone).toDate();
-  const end = new Date(+toZoned(date.add({ days: numberOfDays }), timezone).toDate() - 3600000);
+  const start = forecastDayStart(referenceDate, timezone, dayOffset + 1);
+  const end = new Date(+forecastDayStart(referenceDate, timezone, dayOffset + numberOfDays + 1) - 3600000);
 
   return {
     ...hourlyParams,
@@ -240,6 +253,7 @@ export async function fetchWindChartData(
   location: Location,
   model: WeatherModel = 'icon_seamless',
   referenceDate: Date,
+  timezone: string,
   numberOfDays: number = 1,
   maxAltitude: MaxAltitude = 4000,
   cellSelection: CellSelection = 'nearest',
@@ -248,7 +262,6 @@ export async function fetchWindChartData(
 ): Promise<WindChartData> {
   const modelVariables = getVariablesForModel(model, maxAltitude);
   const hourlyParams = createHourlyParams(modelVariables);
-  const timezone = await resolveLocationTimezone(location, signal);
   const params = createQueryParams(
     location,
     hourlyParams,
@@ -315,13 +328,13 @@ export async function fetchSkewTData(
   location: Location,
   model: WeatherModel = 'icon_seamless',
   referenceDate: Date,
+  timezone: string,
   maxAltitude: MaxAltitude = 4000,
   cellSelection: CellSelection = 'nearest',
   signal?: AbortSignal,
   dayOffset: number = 0
 ): Promise<SkewTWeatherData> {
   const variables = getSkewTVariablesForModel(model, maxAltitude);
-  const timezone = await resolveLocationTimezone(location, signal);
   const hourlyParams = [...variables.flatMap((v) => v.apiNames), 'temperature_2m', 'dew_point_2m'];
   const params = createQueryParams(
     location,
@@ -385,11 +398,12 @@ export type SurfaceWindDay = {
 
 export async function fetchSurfaceWindDay(
   location: Location,
+  timezone: string,
   dayOffset: number,
   cellSelection: CellSelection,
-  signal: AbortSignal
+  signal: AbortSignal,
+  referenceDate = new Date()
 ): Promise<SurfaceWindDay> {
-  const timezone = await resolveLocationTimezone(location, signal);
   const names = [...SURFACE_WIND_FIELDS];
   const models = COMPASS_MODELS.map(({ id }) => id);
   const params = createQueryParams(
@@ -397,7 +411,7 @@ export async function fetchSurfaceWindDay(
     { hourly: names },
     models,
     cellSelection,
-    new Date(),
+    referenceDate,
     1,
     timezone,
     dayOffset

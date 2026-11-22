@@ -13,14 +13,14 @@
     day,
     highlighted = $bindable(null),
     inspectedModels,
-    failed,
+    error,
     retry,
     hour = $bindable(0),
   }: {
     highlighted?: CompassModel | null;
     inspectedModels: CompassModel[];
     day: SurfaceWindDay | null;
-    failed: boolean;
+    error: string | null;
     retry: () => void;
     hour?: number;
   } = $props();
@@ -65,8 +65,8 @@
   });
 </script>
 
-{#if failed}
-  <ForecastError message="Wind comparison could not load." {retry} />
+{#if error}
+  <ForecastError message={error} {retry} />
 {:else if day}
   <div class="mb-1 flex items-baseline justify-between gap-2 px-1">
     <h2 class="text-sm font-semibold text-slate-800">
@@ -105,6 +105,7 @@
             >
               <button
                 class="w-full py-1.5"
+                data-forecast-hour
                 aria-label={fmtTime(time, day.timezone, true)}
                 aria-pressed={hour === i}
                 onclick={() => (hour = i)}>{fmtTime(time, day.timezone)}</button
@@ -154,6 +155,7 @@
                   class:ring-inset={inspectedModels.includes(model.id) && hour === i}
                   style:--tw-ring-color={Number.isFinite(speed) ? windColorScale(speed) : 'var(--color-slate-400)'}
                   tabindex="-1"
+                  data-forecast-hour
                   aria-label={`${model.name}, ${fmtTime(time, day.timezone, true)}, ${wind.wind}, gust ${wind.gust}`}
                   onclick={() => (hour = i)}
                 >
