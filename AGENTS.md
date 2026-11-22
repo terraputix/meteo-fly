@@ -38,6 +38,7 @@
 ## Core Architecture
 
 - **Single-page client app**: Keep everything browser-compatible. Do not introduce server runtime files.
+- **Mobile viewport**: The root layout applies safe-area insets on all four edges. Forecast panes and map controls use the remaining space, with PWA notices below the panes so they cannot cover the timeline.
 - **State source of truth**: Page parameters drive selected location, day, model, and max altitude; they are mirrored to URL params and persisted locally.
 - **Data flow**: `+page.svelte` supplies the selection to `src/lib/services/forecastRequests.svelte.ts`, which owns the request for the active view, including timezone resolution and optional grid elevation. The page passes results to the map and `ChartContainer.svelte`. `WindChart.svelte` offloads heavy chart preparation to `src/lib/workers/chartWorker.ts`.
 - **Forecast timeline**: The time selector appears in the forecast panel and floats over the map when Compare winds is active and the panel is closed. The page owns the selected day and hour, the location timezone, and any pending step across midnight. Compare winds automatically shows the wind compass at the selected point. Its rim uses a 2 km ground radius with a minimum on-screen diameter of 33% of the map pane’s shorter side on desktop and 60% on mobile. Each fletch shows a model’s 10 m wind. The comparison panel includes gusts from the same full-day batch, including when the chart pane is closed. Skew-T selects its trace by timestamp.

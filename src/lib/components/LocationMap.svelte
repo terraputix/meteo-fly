@@ -782,7 +782,7 @@
   {#if bottomControls}
     <div
       bind:offsetHeight={bottomControlsHeight}
-      class="pointer-events-none absolute inset-x-11 bottom-[max(calc(env(safe-area-inset-bottom,0px)+0.375rem),var(--hike-fly-controls-offset))] z-20 flex justify-center max-[359px]:left-2"
+      class="pointer-events-none absolute inset-x-3 bottom-[max(0.375rem,var(--hike-fly-controls-offset))] z-20 flex justify-center sm:inset-x-11"
       style:--hike-fly-controls-offset={hikeFlyActive ? `calc(${hikeFlyControlsHeight}px + 1rem)` : '0px'}
     >
       {@render bottomControls()}
@@ -792,12 +792,18 @@
 
 <style>
   .has-bottom-controls :global(.maplibregl-ctrl-bottom-right:has(.maplibregl-compact-show)) {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + var(--map-bottom-controls-height));
+    bottom: calc(var(--map-bottom-controls-height) + 0.375rem);
+  }
+
+  @media (width < 40rem) {
+    .has-bottom-controls :global(.maplibregl-ctrl-bottom-right) {
+      bottom: calc(var(--map-bottom-controls-height) + 0.375rem);
+    }
   }
 
   :global(.maplibregl-ctrl-top-left) {
-    top: calc(env(safe-area-inset-top, 0px) + var(--map-controls-top-offset, 0.75rem));
-    left: calc(env(safe-area-inset-left, 0px) + 0.75rem);
+    top: var(--map-controls-top-offset, 0.75rem);
+    left: 0.75rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -1005,7 +1011,7 @@
   }
 
   .controls-stack {
-    top: calc(env(safe-area-inset-top, 0px) + var(--map-controls-top-offset, 0.75rem));
+    top: var(--map-controls-top-offset, 0.75rem);
   }
 
   button.chart-open {
