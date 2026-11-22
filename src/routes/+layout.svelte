@@ -121,8 +121,10 @@
 </svelte:head>
 
 <div
-  class="flex min-h-dvh flex-col bg-slate-100 pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)]"
-  class:h-dvh={isForecastPage}
+  class={[
+    'flex flex-col bg-slate-100 pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)]',
+    isForecastPage ? 'h-dvh [@media(display-mode:standalone)]:h-svh' : 'min-h-dvh',
+  ]}
 >
   <main class="flex min-h-0 flex-1 flex-col">
     {@render children()}
