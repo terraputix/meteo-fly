@@ -360,6 +360,18 @@
 </script>
 
 <svelte:head>
+  <script>
+    try {
+      for (const [direction, minimum] of Object.entries({ horizontal: 30, vertical: 10 })) {
+        const size = Number(localStorage.getItem(`meteo-fly-chart-pane-${direction}`));
+        if (size >= minimum && size <= 100 - minimum) {
+          document.documentElement.style.setProperty(`--saved-chart-pane-${direction}`, size);
+        }
+      }
+    } catch {
+      // The first paint uses the default layout when storage is unavailable.
+    }
+  </script>
   <title>Meteo-Fly - Wind & Weather Forecast for Paragliding & Hang Gliding</title>
   <link rel="canonical" href="https://meteo-fly.com/" />
   <meta

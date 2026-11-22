@@ -4,18 +4,6 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script>
-      try {
-        for (const [direction, minimum] of Object.entries({ horizontal: 30, vertical: 10 })) {
-          const size = Number(localStorage.getItem(`meteo-fly-chart-pane-${direction}`));
-          if (size >= minimum && size <= 100 - minimum) {
-            document.documentElement.style.setProperty(`--saved-chart-pane-${direction}`, size);
-          }
-        }
-      } catch {
-        // The first paint uses the default layout when storage is unavailable.
-      }
-    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
