@@ -85,6 +85,8 @@
   let mapError = $state<string | null>(null);
   let marker: Marker;
   let selectedLocationElement: HTMLDivElement;
+  let compassMarker: Marker | undefined;
+  let compassElement: HTMLDivElement;
   const rows = $derived.by(() => {
     const t = selectedTime?.getTime();
     return COMPASS_MODELS.map((option) => {
@@ -337,6 +339,9 @@
       map.setCenter(newPos);
     }
   });
+  $effect(() => {
+    if (map && compassMarker) compassMarker.setLngLat([longitude, latitude]);
+  });
 
   $effect(() => {
     void selectedGridCell;
@@ -501,6 +506,9 @@
     map.addControl(locationControlManager, 'top-left');
     map.addControl(terrainControl, 'top-left');
 
+    compassMarker = new Marker({ element: compassElement, anchor: 'center' })
+      .setLngLat([longitude, latitude])
+      .addTo(map);
     marker = new Marker({
       element: selectedLocationElement,
       draggable: true,
@@ -617,6 +625,7 @@
     if (distanceMarker) {
       distanceMarker.remove();
     }
+    compassMarker?.remove();
     if (map) {
       map.off('click', handleMapClick);
       map.off('touchstart', handleMapTouchStart);
@@ -634,15 +643,17 @@
   <div bind:this={mapContainer} id="map" class="h-full w-full"></div>
 
   <div hidden>
-    <div bind:this={selectedLocationElement} class="selected-location-marker">
-      <span class="selected-location-marker__outer"></span><span class="selected-location-marker__inner"></span><span
-        class="selected-location-marker__core"
-      ></span>
+    <div bind:this={compassElement} style:pointer-events="none">
       {#if comparing && selectedTime && map}
         <div class="pointer-events-none absolute left-1/2 top-1/2 size-[348px] -translate-x-1/2 -translate-y-1/2">
           <WindCompass {rows} {highlighted} {onInspectModels} {map} {latitude} {longitude} />
         </div>
       {/if}
+    </div>
+    <div bind:this={selectedLocationElement} class="selected-location-marker">
+      <span class="selected-location-marker__outer"></span><span class="selected-location-marker__inner"></span><span
+        class="selected-location-marker__core"
+      ></span>
       {#if !comparing && elevationLabel}
         <span class="selected-location-marker__elevation">{elevationLabel}</span>
       {/if}
