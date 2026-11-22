@@ -2,6 +2,7 @@
   import type { SurfaceWindDay } from '#lib/api/api.js';
   import { COMPASS_MODELS, type CompassModel } from '#lib/api/models.js';
   import ForecastError from '#lib/components/ForecastError.svelte';
+  import type { ForecastFailure } from '#lib/api/forecastFailure.js';
   import { windColorScale, windColors, windMaxSpeed } from '#lib/charts/scales.js';
   import { windRotation } from '#lib/charts/windChartLayout.js';
   import { fmtTime } from '#lib/helpers.js';
@@ -20,7 +21,7 @@
     highlighted?: CompassModel | null;
     inspectedModels: CompassModel[];
     day: SurfaceWindDay | null;
-    error: string | null;
+    error: ForecastFailure | null;
     retry: () => void;
     hour?: number;
   } = $props();
@@ -66,7 +67,7 @@
 </script>
 
 {#if error}
-  <ForecastError message={error} {retry} />
+  <ForecastError failure={error} {retry} />
 {:else if day}
   <div class="mb-1 flex items-baseline justify-between gap-2 px-1">
     <h2 class="text-sm font-semibold text-slate-800">

@@ -105,6 +105,7 @@
   let viewportHeight = $state(0);
   let chartContentHeight = $state(0);
   let cacheNoticeHeight = $state(0);
+  let mapNoticeHeight = $state(0);
   let preferredPaneSizes = $state<Partial<Record<ChartPaneDirection, number>>>({});
   let paneDrag: { direction: ChartPaneDirection; startSize?: number } | undefined;
   let dragClosedPane: { direction: ChartPaneDirection; size: number } | undefined;
@@ -131,7 +132,7 @@
   const showMapLoading = $derived(!showChart && forecast.loading);
   const mapError = $derived(showChart ? null : forecast.error);
   const mapControlsTopOffset = $derived(
-    $isMobile && mapError ? '7.5rem' : $isMobile && showMapLoading ? '3.75rem' : '0.75rem'
+    $isMobile && (mapError || showMapLoading) ? `calc(1.5rem + ${mapNoticeHeight}px)` : '0.75rem'
   );
 
   const outdatedCachedAtLabel = $derived(
@@ -441,20 +442,21 @@
   class="relative flex flex-col h-dvh w-full overflow-hidden bg-slate-100"
   style="--map-controls-top-offset: {mapControlsTopOffset}; --initial-mobile-chart-max: {defaultPaneSizes.vertical}%; --mobile-pane-min: {mobilePaneMinSize}%;"
 >
-  {#if showMapLoading}
+  {#if showMapLoading || mapError}
     <div
-      class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
-      role="status"
-    >
-      <div class="rounded-md bg-white/95 px-4 py-2 text-sm text-slate-600 shadow-md ring-1 ring-slate-200">
-        Loading weather data…
-      </div>
-    </div>
-  {:else if mapError}
-    <div
+      bind:offsetHeight={mapNoticeHeight}
       class="pointer-events-none absolute inset-x-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex justify-center"
     >
-      <ForecastError message={mapError} retry={forecast.retry} class="max-w-lg shadow-md" />
+      {#if showMapLoading}
+        <div
+          role="status"
+          class="rounded-md bg-white/95 px-4 py-2 text-sm text-slate-600 shadow-md ring-1 ring-slate-200"
+        >
+          Loading weather data…
+        </div>
+      {:else if mapError}
+        <ForecastError failure={mapError} retry={forecast.retry} class="max-w-lg shadow-md" />
+      {/if}
     </div>
   {/if}
 
@@ -559,7 +561,7 @@
             </ChartContainer>
             {#if forecast.error && !comparing}
               <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
-                <ForecastError message={forecast.error} retry={forecast.retry} class="max-w-md flex-col text-center" />
+                <ForecastError failure={forecast.error} retry={forecast.retry} class="max-w-md flex-col text-center" />
               </div>
             {/if}
           </div>
