@@ -20,6 +20,7 @@ import {
 import { getVariablesForModel, makeProfileVar } from './variables';
 import { FORECAST_URL, resolveLocationTimezone } from '#lib/api/timezone.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
+import { SURFACE_WIND_FIELDS } from '#lib/api/forecastFields.js';
 
 export interface HourlyParams {
   hourly: string[];
@@ -171,7 +172,7 @@ function formatDateToYYYYMMDD(date: Date, timeZone: string): string {
 export function createQueryParams(
   location: Location,
   hourlyParams: HourlyParams,
-  model: WeatherModel,
+  models: WeatherModel | CompassModel[],
   cellSelection: CellSelection,
   referenceDate: Date,
   numberOfDays: number,
@@ -190,7 +191,7 @@ export function createQueryParams(
     end_date: end.toISOString().slice(0, 10),
     start_hour: start.toISOString().slice(0, 16),
     end_hour: end.toISOString().slice(0, 16),
-    models: model,
+    models,
     cell_selection: cellSelection,
     timezone: 'GMT',
   };
@@ -389,21 +390,19 @@ export async function fetchSurfaceWindDay(
   signal: AbortSignal
 ): Promise<SurfaceWindDay> {
   const timezone = await resolveLocationTimezone(location, signal);
-  const names = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'];
+  const names = [...SURFACE_WIND_FIELDS];
+  const models = COMPASS_MODELS.map(({ id }) => id);
   const params = createQueryParams(
     location,
     { hourly: names },
-    'icon_seamless',
+    models,
     cellSelection,
     new Date(),
     1,
     timezone,
     dayOffset
   );
-  const models = COMPASS_MODELS.map((option) => option.id);
-  const responses = await fetchWeatherApi(FORECAST_URL, { ...params, models }, undefined, undefined, undefined, {
-    signal,
-  });
+  const responses = await fetchWeatherApi(FORECAST_URL, params, undefined, undefined, undefined, { signal });
   const result: SurfaceWindDay = { time: [], timezone, models: {} };
   const timestamps = new Set<number>();
   for (const response of responses) {

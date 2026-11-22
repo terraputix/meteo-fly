@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { SURFACE_WIND_FIELDS } from '#lib/api/forecastFields.js';
 import {
   CACHED_AT_HEADER,
   CACHE_FIRST_MS,
@@ -169,20 +170,27 @@ describe('weather cache policy', () => {
     expect(notifyOutdated).toHaveBeenCalledWith('wind', cachedAt);
   });
 
-  it('identifies outdated Skew-T fallback separately from wind data', async () => {
+  it.each([
+    ['skewt', SKEWT_REQUEST],
+    ['comparison', new Request(`https://api.open-meteo.com/v1/forecast?hourly=${SURFACE_WIND_FIELDS.join(',')}`)],
+    [
+      'skewt',
+      new Request(`https://api.open-meteo.com/v1/forecast?hourly=${SURFACE_WIND_FIELDS.join(',')},temperature`),
+    ],
+  ])('identifies an outdated %s fallback for %s', async (dataset, request) => {
     const cachedAt = NOW - OUTDATED_WARNING_MS;
     const cacheStorage = new MemoryCacheStorage();
-    cacheStorage.getWeatherCache().responses.set(SKEWT_REQUEST.url, createCachedResponse('cached', cachedAt));
+    cacheStorage.getWeatherCache().responses.set(request.url, createCachedResponse('cached', cachedAt));
     const notifyOutdated = vi.fn().mockResolvedValue(undefined);
     const dependencies = createDependencies(cacheStorage, {
       fetchRequest: vi.fn().mockRejectedValue(new TypeError('offline')),
       notifyOutdated,
     });
 
-    const response = await handleWeatherRequest(SKEWT_REQUEST, dependencies);
+    const response = await handleWeatherRequest(request, dependencies);
 
     expect(await response.text()).toBe('cached');
-    expect(notifyOutdated).toHaveBeenCalledWith('skewt', cachedAt);
+    expect(notifyOutdated).toHaveBeenCalledWith(dataset, cachedAt);
   });
 
   it('invokes the network fetch without binding the dependency object as its receiver', async () => {

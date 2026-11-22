@@ -1,3 +1,5 @@
+import { SURFACE_WIND_FIELDS } from '#lib/api/forecastFields.js';
+
 export const WEATHER_CACHE_NAME = 'weather-api-cache-v2';
 export const LEGACY_WEATHER_CACHE_NAMES = ['weather-api-cache'];
 export const CACHED_AT_HEADER = 'x-meteo-fly-cached-at';
@@ -58,13 +60,10 @@ function createCachedResponse(response: Response, cachedAt: number): Response {
 
 function getWeatherCacheDataset(request: Request): WeatherCacheDataset | null {
   const searchParams = new URL(request.url).searchParams;
-  if (
-    searchParams.get('hourly')?.startsWith('wind_speed_10m,wind_direction_10m,wind_gusts_10m') &&
-    !searchParams.has('daily')
-  )
-    return 'comparison';
   if (searchParams.has('daily')) return 'wind';
-  if (searchParams.has('hourly')) return 'skewt';
+  const hourly = searchParams.get('hourly');
+  if (hourly === SURFACE_WIND_FIELDS.join(',')) return 'comparison';
+  if (hourly !== null) return 'skewt';
   return null;
 }
 

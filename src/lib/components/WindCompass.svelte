@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Map as ForecastMap, Marker } from 'maplibre-gl';
-  import { untrack } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import type { CompassModel } from '#lib/api/models.js';
   import { windCompassRimPoint } from '#lib/meteo/surfaceWind.js';
   import { windColorScale } from '#lib/charts/scales.js';
@@ -107,12 +107,16 @@
       })
       .sort((a, b) => Number(a.id === highlighted) - Number(b.id === highlighted));
   });
-  const inspected = $derived(arrows.filter(({ id }) => (hovered.length ? hovered.includes(id) : id === focused)));
-  const inspectedModels = $derived(inspected.map(({ id }) => id));
+  const inspectedModels = $derived(
+    rows
+      .filter(({ id, bearing }) => bearing !== null && (hovered.length ? hovered.includes(id) : id === focused))
+      .map(({ id }) => id)
+  );
+  const inspected = $derived(arrows.filter(({ id }) => inspectedModels.includes(id)));
   $effect(() => {
     onInspectModels(inspectedModels);
-    return () => onInspectModels([]);
   });
+  onDestroy(() => onInspectModels([]));
   const tooltipWidth = $derived(Math.min(276, Math.max(0, paneSize.width - 16)));
   const tooltipHeight = $derived(40 + inspected.length * 18);
   const tooltipX = $derived(
