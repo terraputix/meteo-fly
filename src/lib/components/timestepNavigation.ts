@@ -49,6 +49,16 @@ export function stepTimestep(options: StepTimestepOptions): TimestepTarget | nul
   return stepTrace(options, options.direction, options.traceCount, options.maxForecastDays);
 }
 
-export function resolveTimestepHour(hour: TimestepTarget['hour'], count: number): number {
-  return hour === 'last' ? count - 1 : Math.min(hour, count - 1);
+export function shortcutMode(key: string, showHours: boolean): TimestepMode {
+  return showHours && (key === 'ArrowLeft' || key === 'ArrowRight') ? 'hour' : 'day';
+}
+
+export function resolveTimestepHour(hour: TimestepTarget['hour'] | Date, times: Date[]): number {
+  if (hour instanceof Date) {
+    return times.reduce(
+      (nearest, time, i) => (Math.abs(+time - +hour) < Math.abs(+times[nearest] - +hour) ? i : nearest),
+      0
+    );
+  }
+  return hour === 'last' ? times.length - 1 : Math.min(hour, times.length - 1);
 }

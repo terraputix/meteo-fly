@@ -41,7 +41,7 @@
   let chartView: ChartView = $state(parameters.chartView ?? 'wind');
   const comparing = $derived(chartView === 'comparison');
   let selectedHour = $state(parameters.hour ?? 0);
-  let pendingLastHourDay = $state<number | null>(null);
+  let pendingHour = $state.raw<{ day: number; target: Date | 'last' } | null>(null);
   let inspectedModels = $state<CompassModel[]>([]);
   let highlighted = $state<CompassModel | null>(null);
 
@@ -63,13 +63,13 @@
 
   function resolveLoadedHour(day: number, times: Date[]) {
     if (!times.length) return;
-    const useLastHour = pendingLastHourDay === day;
-    selectedHour = resolveTimestepHour(useLastHour ? 'last' : selectedHour, times.length);
-    if (useLastHour) pendingLastHourDay = null;
+    const target = pendingHour?.day === day ? pendingHour.target : selectedHour;
+    selectedHour = resolveTimestepHour(target, times);
+    pendingHour = null;
   }
 
   function selectHour(hour: number) {
-    pendingLastHourDay = null;
+    pendingHour = null;
     selectedHour = hour;
   }
 
@@ -88,7 +88,7 @@
   function stepForecastTime(mode: TimestepMode, direction: TimestepDirection) {
     const next = getForecastStep(mode, direction);
     if (!next) return;
-    pendingLastHourDay = next.hour === 'last' ? next.selectedDay : null;
+    pendingHour = next.hour === 'last' ? { day: next.selectedDay, target: 'last' } : null;
     if (next.hour !== 'last') selectedHour = next.hour;
     parameters.selectedDay = next.selectedDay;
   }
@@ -331,7 +331,7 @@
 
   $effect(() => {
     if (parameters.selectedDay > forecast.maxDays) {
-      pendingLastHourDay = null;
+      pendingHour = null;
       parameters.selectedDay = forecast.maxDays;
     }
   });
@@ -421,8 +421,11 @@
     onStep={stepForecastTime}
     day={parameters.selectedDay}
     maxDay={forecast.maxDays}
-    onSelect={(day, hour) => {
+    onSelect={(day, hour, timestamp) => {
       selectHour(hour);
+      if (timestamp && (day !== parameters.selectedDay || !timeline.length)) {
+        pendingHour = { day, target: timestamp };
+      }
       parameters.selectedDay = day;
     }}
   />

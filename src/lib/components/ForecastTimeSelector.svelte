@@ -4,7 +4,7 @@
   import { fade } from 'svelte/transition';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import ChevronsRight from '@lucide/svelte/icons/chevrons-right';
-  import type { TimestepDirection, TimestepMode } from '#lib/components/timestepNavigation.js';
+  import { shortcutMode, type TimestepDirection, type TimestepMode } from '#lib/components/timestepNavigation.js';
   import {
     buildForecastTimeline,
     dayJumpIndex,
@@ -34,18 +34,20 @@
     onStep: (mode: TimestepMode, direction: TimestepDirection) => void;
     day: number;
     maxDay: number;
-    onSelect: (day: number, hour: number) => void;
+    onSelect: (day: number, hour: number, timestamp?: Date) => void;
   } = $props();
 
   const dayLabel = $derived(
     date?.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: timezone })
   );
   const timeLabel = $derived(times[hour] && timezone ? fmtTime(times[hour], timezone, true) : '');
-  const horizontalMode = $derived(showHours && times.length ? 'hour' : 'day');
   const selectionLabel = $derived([dayLabel, showHours && timeLabel].filter(Boolean).join(' '));
 
+  let innerWidth = $state(0);
   const rail = $derived(
-    date && timezone ? buildForecastTimeline(date, timezone, day, maxDay, showHours ? times : undefined) : null
+    date && timezone
+      ? buildForecastTimeline(date, timezone, day, maxDay, showHours ? times : undefined, innerWidth)
+      : null
   );
   const weekday = $derived(new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: timezone }));
   const shortDate = $derived(
@@ -55,7 +57,6 @@
     Math.max(0, rail?.slots.findIndex((slot) => slot.day === day && (!showHours || slot.hour === hour)) ?? 0)
   );
   let width = $state(0);
-  let innerWidth = $state(0);
   const segments = $derived(
     rail && width && innerWidth ? layoutForecastRail(rail, (width - innerWidth) / (2 * width)) : []
   );
@@ -98,7 +99,7 @@
     const slot = rail?.slots[index];
     draft = null;
     hover = null;
-    if (slot) onSelect(slot.day, showHours ? slot.hour : hour);
+    if (slot) onSelect(slot.day, showHours ? slot.hour : hour, showHours ? slot.time : undefined);
   }
 
   function handleKeydown(event: KeyboardEvent) {
@@ -125,7 +126,7 @@
     )
       return;
 
-    const mode = event.key === 'ArrowUp' || event.key === 'ArrowDown' ? 'day' : horizontalMode;
+    const mode = shortcutMode(event.key, showHours);
     const direction = event.key === 'ArrowRight' || event.key === 'ArrowUp' ? 1 : -1;
     if (canStep(mode, direction)) {
       event.preventDefault();

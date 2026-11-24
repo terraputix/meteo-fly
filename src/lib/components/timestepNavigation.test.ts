@@ -3,6 +3,7 @@ import {
   MIN_FORECAST_DAY,
   resolveTimestepHour,
   stepTimestep,
+  shortcutMode,
   type TimestepDirection,
   type TimestepMode,
   type TimestepState,
@@ -38,11 +39,21 @@ describe('timestep navigation', () => {
     const destination = step('hour', { selectedDay: 1, hour: 0 }, -1, 24);
     assert(destination);
     expect(destination.selectedDay).toBe(0);
-    expect(resolveTimestepHour(destination.hour, 25)).toBe(24);
+    expect(
+      resolveTimestepHour(
+        destination.hour,
+        Array.from({ length: 25 }, (_, i) => new Date(i * 3600000))
+      )
+    ).toBe(24);
   });
 
   it('clamps an hour index when the selected day is shorter', () => {
-    expect(resolveTimestepHour(24, 23)).toBe(22);
+    expect(
+      resolveTimestepHour(
+        24,
+        Array.from({ length: 23 }, (_, i) => new Date(i * 3600000))
+      )
+    ).toBe(22);
   });
 
   it('does not step traces beyond the available days', () => {
@@ -51,6 +62,19 @@ describe('timestep navigation', () => {
 
     expect(step('hour', first, -1)).toBeNull();
     expect(step('hour', last, 1)).toBeNull();
+  });
+
+  it.each(['ArrowLeft', 'ArrowRight'])('ignores repeated %s in hourly views while the new day loads', (key) => {
+    const direction = key === 'ArrowLeft' ? -1 : 1;
+    const state = { selectedDay: 2, hour: 0 };
+    expect(step(shortcutMode(key, true), state, direction, 0)).toBeNull();
+    expect(step(shortcutMode(key, false), state, direction, 0)?.selectedDay).toBe(2 + direction);
+  });
+
+  it('resolves a preview against the timestamps returned by the destination day', () => {
+    const times = [2, 5, 8].map((hour) => new Date(Date.UTC(2026, 10, 24, hour)));
+    expect(resolveTimestepHour(new Date('2026-11-24T05:00Z'), times)).toBe(1);
+    expect(resolveTimestepHour(new Date('2026-11-24T07:00Z'), times)).toBe(2);
   });
 
   it('does not step when trace data is empty', () => {

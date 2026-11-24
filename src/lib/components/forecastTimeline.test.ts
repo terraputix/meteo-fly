@@ -29,6 +29,18 @@ describe('forecast timeline', () => {
     }
   });
 
+  it.each([
+    [96, 1],
+    [128, 3],
+    [240, 5],
+    [320, 7],
+  ])('fits centered daily labels into %i pixels', (width, count) => {
+    const rail = buildForecastTimeline(new Date('2026-11-24T12:00Z'), 'UTC', 1, 8, undefined, width);
+    expect(rail.innerDayStarts).toHaveLength(count);
+    expect(rail.slots[rail.innerDayStarts[Math.floor(count / 2)]].day).toBe(1);
+    expect(width / count).toBeGreaterThanOrEqual(40);
+  });
+
   it('shows seven individually selectable dates for a daily chart', () => {
     const { slots, innerDayStarts } = buildForecastTimeline(new Date('2026-11-24T12:00Z'), 'UTC', 1, 8);
     expect(innerDayStarts.map((index) => slots[index].day)).toEqual([-2, -1, 0, 1, 2, 3, 4]);

@@ -2,10 +2,18 @@ import { fromDate } from '@internationalized/date';
 import { forecastDayStart } from '#lib/api/api.js';
 import { MIN_FORECAST_DAY } from '#lib/components/timestepNavigation.js';
 
-export function buildForecastTimeline(date: Date, timezone: string, day: number, maxDay: number, times?: Date[]) {
+export function buildForecastTimeline(
+  date: Date,
+  timezone: string,
+  day: number,
+  maxDay: number,
+  times?: Date[],
+  innerWidth = Infinity
+) {
   const slots: { day: number; hour: number; time: Date }[] = [];
   const dayStarts: number[] = [];
-  const visibleDays = times ? 3 : 7;
+  const columns = times ? 3 : Math.max(1, Math.min(7, Math.floor(innerWidth / 40)));
+  const visibleDays = columns % 2 === 0 ? columns - 1 : columns;
   const radius = Math.floor(visibleDays / 2);
   const firstDay = Math.max(MIN_FORECAST_DAY, day - radius - 1);
   const lastDay = Math.min(maxDay, day + radius + 1);
