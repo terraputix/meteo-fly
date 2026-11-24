@@ -1,5 +1,5 @@
 import type { CellSelection, Location, WeatherModel } from '#lib/api/types.js';
-import { DEFAULT_WIND_COMPARISON_LEVEL } from '#lib/api/forecastFields.js';
+import { DEFAULT_WIND_COMPARISON_LEVEL, type WindComparisonLevel } from '#lib/api/forecastFields.js';
 import type { PageParameters } from './types';
 import { readURLParams } from './url';
 
@@ -8,12 +8,14 @@ export const defaultWeatherModel: WeatherModel = 'icon_seamless';
 export const defaultCellSelection: CellSelection = 'nearest';
 export const defaultDay = 1;
 
-/// Initial parameters will be first read from the URL, then from local storage.
-/// If neither are present, defaults will be used.
-export function getInitialParameters(urlParams: Pick<URLSearchParams, 'get'>): PageParameters {
+export function getInitialParameters(
+  urlParams: Pick<URLSearchParams, 'get'>,
+  savedComparisonLevel?: WindComparisonLevel
+): PageParameters {
   const parsedUrlParams = readURLParams(urlParams);
+  const comparisonLevel = parsedUrlParams?.comparisonLevel ?? savedComparisonLevel ?? DEFAULT_WIND_COMPARISON_LEVEL;
   if (parsedUrlParams) {
-    return parsedUrlParams;
+    return { ...parsedUrlParams, comparisonLevel };
   }
 
   return {
@@ -22,7 +24,7 @@ export function getInitialParameters(urlParams: Pick<URLSearchParams, 'get'>): P
     selectedDay: defaultDay,
     maxAltitude: 4000,
     cellSelection: defaultCellSelection,
-    comparisonLevel: DEFAULT_WIND_COMPARISON_LEVEL,
+    comparisonLevel,
     daylightOnly: true,
   };
 }

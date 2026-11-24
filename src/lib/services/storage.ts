@@ -1,7 +1,26 @@
+import { parseWindComparisonLevel, type WindComparisonLevel } from '#lib/api/forecastFields.js';
+
 const LAST_URL_KEY = 'last-url';
 const CHART_PANE_CLOSED_KEY = 'meteo-fly-chart-pane-closed';
+const COMPARISON_LEVEL_KEY = 'meteo-fly-comparison-level';
 
 export type ChartPaneDirection = 'horizontal' | 'vertical';
+
+export function getSavedComparisonLevel(): WindComparisonLevel | undefined {
+  try {
+    return parseWindComparisonLevel(localStorage.getItem(COMPARISON_LEVEL_KEY));
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveComparisonLevel(level: WindComparisonLevel) {
+  try {
+    localStorage.setItem(COMPARISON_LEVEL_KEY, level);
+  } catch {
+    // The current page keeps the selected level in memory.
+  }
+}
 
 export function getInitialChartPaneOpen(): boolean {
   try {

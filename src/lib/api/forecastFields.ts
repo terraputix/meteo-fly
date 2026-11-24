@@ -11,6 +11,13 @@ export const WIND_COMPARISON_PRESSURES = [
 
 export type WindComparisonLevel = (typeof WIND_COMPARISON_HEIGHTS)[number] | `${number}hPa`;
 
+export function parseWindComparisonLevel(value: string | null): WindComparisonLevel | undefined {
+  return (
+    WIND_COMPARISON_HEIGHTS.find((height) => height === value) ??
+    WIND_COMPARISON_PRESSURES.find((pressure) => pressure === value)
+  );
+}
+
 export function windComparisonFields(level: WindComparisonLevel): string[] {
   const fields = [`wind_speed_${level}`, `wind_direction_${level}`];
   if (level === DEFAULT_WIND_COMPARISON_LEVEL) fields.push('wind_gusts_10m');

@@ -3,8 +3,10 @@
     buildVisitedURL,
     getInitialChartPaneOpen,
     getInitialChartPaneSize,
+    getSavedComparisonLevel,
     saveChartPaneOpen,
     saveChartPaneSize,
+    saveComparisonLevel,
     saveLastVisitedURL,
     type ChartPaneDirection,
   } from '#lib/services/storage.js';
@@ -36,7 +38,10 @@
   import { units } from '#lib/stores/units.js';
 
   let parameters: PageParameters = $state(
-    getInitialParameters(browser ? page.url.searchParams : new URLSearchParams())
+    getInitialParameters(
+      browser ? page.url.searchParams : new URLSearchParams(),
+      browser ? getSavedComparisonLevel() : undefined
+    )
   );
   let showChart = $state(true);
   let routerReady = $state(false);
@@ -195,6 +200,10 @@
 
   $effect(() => {
     if (routerReady) void syncURL();
+  });
+
+  $effect(() => {
+    if (comparing) saveComparisonLevel(parameters.comparisonLevel);
   });
 
   function clearPanelTransitionTimer() {
