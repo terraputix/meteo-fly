@@ -38,7 +38,7 @@
 ## Core Architecture
 
 - **Single-page client app**: Keep everything browser-compatible. Do not introduce server runtime files.
-- **State source of truth**: Page parameters drive selected location, day, model, and max altitude; they are mirrored to URL params and persisted locally.
+- **State source of truth**: Page parameters drive selected location, day, model, max altitude, and comparison level. They are mirrored to URL params and persisted locally. The comparison level is included in URLs for the Compare winds view.
 - **Data flow**: `+page.svelte` supplies the selection to `src/lib/services/forecastRequests.svelte.ts`, which owns the request for the active view, including timezone resolution and optional grid elevation. The page passes results to the map and `ChartContainer.svelte`. `WindChart.svelte` offloads heavy chart preparation to `src/lib/workers/chartWorker.ts`.
 - **Forecast timeline**: The time selector appears in the forecast panel and floats over the map when Compare winds is active and the panel is closed. The page owns the selected day and hour, the location timezone, and any pending step across midnight. Compare winds automatically shows the wind compass at the selected point. Its rim uses a 2 km ground radius with a minimum on-screen diameter of 33% of the map pane’s shorter side on desktop and 60% on mobile. The table and compass share one full-day model batch for the level selected in the table header. The default 10 m level includes gusts, including when the chart pane is closed. Skew-T selects its trace by timestamp.
 - **Worker split**: Expensive chart shaping and Hike & Fly terrain/raster processing belong in pure helpers or workers, not in UI components.

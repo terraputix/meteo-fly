@@ -16,6 +16,7 @@ describe('read-only forecast URL parameters', () => {
       maxAltitude: 5000,
       cellSelection: 'land',
       chartView: 'skewt',
+      comparisonLevel: '10m',
       hour: 12,
       daylightOnly: false,
     });
@@ -24,6 +25,17 @@ describe('read-only forecast URL parameters', () => {
   it('ignores a negative hour index', () => {
     const params = new URLSearchParams({ lat: '46', lon: '8', day: '1', model: 'icon_d2', hour: '-1' });
     expect(readURLParams(params)?.hour).toBeUndefined();
+  });
+
+  it.each([
+    ['comparison&level=80m', '80m'],
+    ['comparison&level=850hPa', '850hPa'],
+    ['comparison', '10m'],
+    ['comparison&level=777hPa', '10m'],
+    ['wind&level=80m', '10m'],
+  ])('reads the wind comparison level from view=%s as %s', (view, expectedLevel) => {
+    const params = new URLSearchParams(`lat=46&lon=8&day=1&model=icon_d2&view=${view}`);
+    expect(getInitialParameters(params).comparisonLevel).toBe(expectedLevel);
   });
 
   it('uses defaults when the read-only reader has no forecast parameters', () => {

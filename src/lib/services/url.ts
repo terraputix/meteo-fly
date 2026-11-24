@@ -1,6 +1,11 @@
 import type { PageParameters, ChartView } from './types';
 import { defaultCellSelection, defaultDay, defaultLocation, defaultWeatherModel } from './defaults';
 import type { CellSelection, WeatherModel, Location } from '#lib/api/types.js';
+import {
+  DEFAULT_WIND_COMPARISON_LEVEL,
+  WIND_COMPARISON_HEIGHTS,
+  WIND_COMPARISON_PRESSURES,
+} from '#lib/api/forecastFields.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
 
 export function readURLParams(params: Pick<URLSearchParams, 'get'>): PageParameters | null {
@@ -32,6 +37,7 @@ export function readURLParams(params: Pick<URLSearchParams, 'get'>): PageParamet
     cellSelection === 'nearest' || cellSelection === 'land' ? cellSelection : defaultCellSelection;
   const chartView: ChartView | undefined =
     view === 'wind' || view === 'skewt' || view === 'comparison' ? view : undefined;
+  const level = chartView === 'comparison' ? params.get('level') : null;
   const hour = hourStr ? Number(hourStr) : undefined;
   const daylightOnly = daylightStr !== '0';
 
@@ -42,6 +48,10 @@ export function readURLParams(params: Pick<URLSearchParams, 'get'>): PageParamet
     maxAltitude,
     cellSelection: selectedCellSelection,
     chartView,
+    comparisonLevel:
+      WIND_COMPARISON_HEIGHTS.find((height) => height === level) ??
+      WIND_COMPARISON_PRESSURES.find((pressure) => pressure === level) ??
+      DEFAULT_WIND_COMPARISON_LEVEL,
     hour: hour !== undefined && Number.isSafeInteger(hour) && hour >= 0 ? hour : undefined,
     daylightOnly,
   };

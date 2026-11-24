@@ -1,4 +1,5 @@
 import type { CellSelection, Location, WeatherModel } from '#lib/api/types.js';
+import { DEFAULT_WIND_COMPARISON_LEVEL } from '#lib/api/forecastFields.js';
 import type { PageParameters } from './types';
 import { readURLParams } from './url';
 
@@ -21,6 +22,7 @@ export function getInitialParameters(urlParams: Pick<URLSearchParams, 'get'>): P
     selectedDay: defaultDay,
     maxAltitude: 4000,
     cellSelection: defaultCellSelection,
+    comparisonLevel: DEFAULT_WIND_COMPARISON_LEVEL,
     daylightOnly: true,
   };
 }
