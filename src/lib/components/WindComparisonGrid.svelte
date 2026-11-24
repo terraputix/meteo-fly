@@ -1,5 +1,12 @@
 <script lang="ts">
-  import type { SurfaceWindDay } from '#lib/api/api.js';
+  import type { WindComparisonDay } from '#lib/api/api.js';
+  import {
+    DEFAULT_WIND_COMPARISON_LEVEL,
+    formatWindComparisonLevel,
+    WIND_COMPARISON_HEIGHTS,
+    WIND_COMPARISON_PRESSURES,
+    type WindComparisonLevel,
+  } from '#lib/api/forecastFields.js';
   import { COMPASS_MODELS, type CompassModel } from '#lib/api/models.js';
   import ForecastError from '#lib/components/ForecastError.svelte';
   import type { ForecastFailure } from '#lib/api/forecastFailure.js';
@@ -17,15 +24,19 @@
     error,
     retry,
     hour = $bindable(0),
+    level = $bindable(DEFAULT_WIND_COMPARISON_LEVEL),
   }: {
     highlighted?: CompassModel | null;
     inspectedModels: CompassModel[];
-    day: SurfaceWindDay | null;
+    day: WindComparisonDay | null;
     error: ForecastFailure | null;
     retry: () => void;
     hour?: number;
+    level?: WindComparisonLevel;
   } = $props();
   let viewport = $state<HTMLDivElement>();
+  const levelLabel = $derived(formatWindComparisonLevel(level, $units));
+  const showGusts = $derived(level === DEFAULT_WIND_COMPARISON_LEVEL);
   const value = (n: number) => (Number.isFinite(n) ? Math.round(windSpeed(n, $units)) : '–');
   const visibleModels = $derived(
     COMPASS_MODELS.filter(({ id, regional }) => {
@@ -66,9 +77,7 @@
   });
 </script>
 
-{#if error}
-  <ForecastError failure={error} {retry} />
-{:else if day}
+{#if day}
   <div class="mb-1 flex items-baseline justify-between gap-2 px-1">
     <h2 class="text-sm font-semibold text-slate-800">
       {day.time[0].toLocaleDateString(undefined, {
@@ -78,7 +87,7 @@
         timeZone: day.timezone,
       })}
     </h2>
-    <span class="text-xs text-slate-600">Wind / gust · {$units.wind}</span>
+    <span class="text-xs text-slate-600">{showGusts ? 'Wind / gust' : 'Wind'} · {$units.wind}</span>
   </div>
   <div
     class="mb-1 flex items-center justify-end gap-1 px-1 text-[10px] text-slate-500"
@@ -90,14 +99,33 @@
     >
     <span>{value(windMaxSpeed - windMaxSpeed / windColors.length)}+ {$units.wind}</span>
   </div>
-  <div bind:this={viewport} class="relative max-w-full overflow-x-auto">
-    <table
-      class="w-full border-separate border-spacing-0 text-center text-xs tabular-nums"
-      aria-label="Hourly wind and preceding-hour peak gusts at 10 m"
-    >
-      <thead
-        ><tr>
-          <th class="sticky left-0 z-10 bg-white px-2 text-left text-slate-500">10 m</th>
+{/if}
+<div bind:this={viewport} class="relative max-w-full overflow-x-auto">
+  <table
+    class="w-full border-separate border-spacing-0 text-center text-xs tabular-nums"
+    aria-label={`Hourly wind${showGusts ? ' and preceding-hour peak gusts' : ''} at ${levelLabel}`}
+  >
+    <thead
+      ><tr>
+        <th scope="col" class="sticky left-0 z-10 bg-white px-2 text-left text-slate-500">
+          <select
+            bind:value={level}
+            aria-label="Compare winds level"
+            class="cursor-pointer rounded border border-slate-200 bg-slate-50 py-1 pr-1 pl-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            <optgroup label="Height above ground">
+              {#each WIND_COMPARISON_HEIGHTS as height (height)}
+                <option value={height}>{formatWindComparisonLevel(height, $units)}</option>
+              {/each}
+            </optgroup>
+            <optgroup label="Pressure level">
+              {#each WIND_COMPARISON_PRESSURES as pressure (pressure)}
+                <option value={pressure}>{formatWindComparisonLevel(pressure, $units)}</option>
+              {/each}
+            </optgroup>
+          </select>
+        </th>
+        {#if day}
           {#each day.time as time, i (+time)}
             <th
               data-hour={i}
@@ -113,8 +141,10 @@
               >
             </th>
           {/each}
-        </tr></thead
-      >
+        {/if}
+      </tr></thead
+    >
+    {#if day}
       <tbody>
         {#each visibleModels as model (model.id)}
           <tr data-model={model.id}
@@ -157,7 +187,7 @@
                   style:--tw-ring-color={Number.isFinite(speed) ? windColorScale(speed) : 'var(--color-slate-400)'}
                   tabindex="-1"
                   data-forecast-hour
-                  aria-label={`${model.name}, ${fmtTime(time, day.timezone, true)}, ${wind.wind}, gust ${wind.gust}`}
+                  aria-label={`${model.name}, ${fmtTime(time, day.timezone, true)}, ${wind.wind}${showGusts ? `, gust ${wind.gust}` : ''}`}
                   onclick={() => (hour = i)}
                 >
                   <span class="flex items-center justify-center gap-0.5 font-semibold">
@@ -170,15 +200,18 @@
                       >{/if}
                     {value(speed)}
                   </span>
-                  <span class="block text-[10px] text-slate-500">{value(gust)}</span>
+                  {#if showGusts}<span class="block text-[10px] text-slate-500">{value(gust)}</span>{/if}
                 </button>
               </td>
             {/each}
           </tr>
         {/each}
       </tbody>
-    </table>
-  </div>
-{:else}
+    {/if}
+  </table>
+</div>
+{#if error}
+  <ForecastError failure={error} {retry} />
+{:else if !day}
   <p role="status" class="p-4 text-sm text-slate-600">Loading wind comparison…</p>
 {/if}

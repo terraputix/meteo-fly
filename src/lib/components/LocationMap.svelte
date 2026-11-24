@@ -1,7 +1,7 @@
 <script lang="ts">
   import WindCompass from '#lib/components/WindCompass.svelte';
   import { COMPASS_MODELS, type CompassModel } from '#lib/api/models.js';
-  import type { SurfaceWindDay } from '#lib/api/api.js';
+  import type { WindComparisonDay } from '#lib/api/api.js';
   import { windBearing } from '#lib/meteo/surfaceWind.js';
   import { units } from '#lib/stores/units.js';
   import { formatAltitude } from '#lib/utils/units.js';
@@ -56,7 +56,7 @@
     onToggleChart = undefined as (() => void) | undefined,
     onMapViewChange = undefined as (() => void) | undefined,
   }: {
-    comparison: SurfaceWindDay | null;
+    comparison: WindComparisonDay | null;
     comparing: boolean;
     highlighted: CompassModel | null;
     onInspectModels: (models: CompassModel[]) => void;
@@ -651,9 +651,18 @@
 
   <div hidden>
     <div bind:this={compassElement} style:pointer-events="none">
-      {#if comparing && selectedTime && map && compassMarker}
+      {#if comparing && comparison && selectedTime && map && compassMarker}
         <div class="pointer-events-none absolute left-1/2 top-1/2 size-[348px] -translate-x-1/2 -translate-y-1/2">
-          <WindCompass {rows} {highlighted} {onInspectModels} {map} marker={compassMarker} {latitude} {longitude} />
+          <WindCompass
+            {rows}
+            level={comparison.level}
+            {highlighted}
+            {onInspectModels}
+            {map}
+            marker={compassMarker}
+            {latitude}
+            {longitude}
+          />
         </div>
       {/if}
     </div>
