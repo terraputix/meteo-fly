@@ -4,12 +4,13 @@ import {
   FORECAST_API_MAX_DAYS,
   fetchModelGridElevation,
   fetchSkewTData,
-  fetchSurfaceWindDay,
+  fetchWindComparisonDay,
   fetchWindChartData,
   forecastDayStart,
   lastCompleteForecastDay,
-  type SurfaceWindDay,
+  type WindComparisonDay,
 } from '#lib/api/api.js';
+import type { WindComparisonLevel } from '#lib/api/forecastFields.js';
 import { MODEL_FORECAST_DAYS } from '#lib/api/models.js';
 import { resolveLocationTimezone } from '#lib/api/timezone.js';
 import { describeForecastFailure, type ForecastFailure } from '#lib/api/forecastFailure.js';
@@ -19,12 +20,15 @@ import type { ChartView, PageParameters } from '#lib/services/types.js';
 import { isWeatherCacheOutdatedMessage } from '#lib/services/weatherCache.js';
 
 type ForecastSelection = Pick<PageParameters, 'location' | 'selectedDay' | 'cellSelection'> &
-  ({ view: 'comparison' } | ({ view: 'wind' | 'skewt' } & Pick<PageParameters, 'selectedModel' | 'maxAltitude'>));
+  (
+    | { view: 'comparison'; level: WindComparisonLevel }
+    | ({ view: 'wind' | 'skewt' } & Pick<PageParameters, 'selectedModel' | 'maxAltitude'>)
+  );
 
 export type ForecastData =
   | { view: 'wind'; weather: WindChartData }
   | { view: 'skewt'; weather: SkewTWeatherData }
-  | { view: 'comparison'; weather: SurfaceWindDay };
+  | { view: 'comparison'; weather: WindComparisonDay };
 
 const loadErrors: Record<ChartView, string> = {
   wind: 'The wind forecast could not load.',
@@ -83,7 +87,15 @@ export function createForecastRequest(
       errorMessage = loadErrors[view];
       const offset = selectedDay - 1;
       if (input.view === 'comparison') {
-        const weather = await fetchSurfaceWindDay(location, zone, offset, cellSelection, signal, reference);
+        const weather = await fetchWindComparisonDay(
+          location,
+          zone,
+          offset,
+          input.level,
+          cellSelection,
+          signal,
+          reference
+        );
         if (!latest.isCurrent(handle)) return;
         data = { view: 'comparison', weather };
         resolveHour(selectedDay, weather.time);

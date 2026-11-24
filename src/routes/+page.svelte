@@ -21,6 +21,11 @@
     type TimestepMode,
   } from '#lib/components/timestepNavigation.js';
   import ForecastError from '#lib/components/ForecastError.svelte';
+  import {
+    DEFAULT_WIND_COMPARISON_LEVEL,
+    formatWindComparisonLevel,
+    type WindComparisonLevel,
+  } from '#lib/api/forecastFields.js';
   import type { CompassModel } from '#lib/api/models.js';
   import LocationMap from '#lib/components/LocationMap.svelte';
   import ChartContainer from '#lib/components/ChartContainer.svelte';
@@ -32,6 +37,7 @@
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import type { PaneAPI } from 'paneforge';
+  import { units } from '#lib/stores/units.js';
 
   let parameters: PageParameters = $state(
     getInitialParameters(browser ? page.url.searchParams : new URLSearchParams())
@@ -40,6 +46,7 @@
   let routerReady = $state(false);
   let chartView: ChartView = $state(parameters.chartView ?? 'wind');
   const comparing = $derived(chartView === 'comparison');
+  let comparisonLevel = $state<WindComparisonLevel>(DEFAULT_WIND_COMPARISON_LEVEL);
   let selectedHour = $state(parameters.hour ?? 0);
   let pendingHour = $state.raw<{ day: number; target: Date | 'last' } | null>(null);
   let inspectedModels = $state<CompassModel[]>([]);
@@ -52,10 +59,14 @@
       cellSelection: parameters.cellSelection,
     };
     return chartView === 'comparison'
-      ? { ...selection, view: chartView }
+      ? { ...selection, view: chartView, level: comparisonLevel }
       : { ...selection, view: chartView, selectedModel: parameters.selectedModel, maxAltitude: parameters.maxAltitude };
   }, resolveLoadedHour);
-  const comparison = $derived(forecast.data?.view === 'comparison' ? forecast.data.weather : null);
+  const comparison = $derived(
+    forecast.data?.view === 'comparison' && forecast.data.weather.level === comparisonLevel
+      ? forecast.data.weather
+      : null
+  );
   const gridWeather = $derived(forecast.data?.view === 'comparison' ? null : forecast.data?.weather);
   const timeline = $derived(
     comparison?.time ?? (forecast.data?.view === 'skewt' ? forecast.data.weather.hourly.time : [])
@@ -438,6 +449,9 @@
     class="pointer-events-auto w-96 min-w-0 max-w-full rounded-b-lg bg-white/92 shadow-lg backdrop-blur-md"
   >
     {@render timeSelector()}
+    <p class="px-2 pb-1 text-center text-xs text-slate-600">
+      Wind at {formatWindComparisonLevel(comparisonLevel, $units)}
+    </p>
     {#if forecast.cachedAt !== null}
       <p class="px-2 pb-1 text-center text-xs text-amber-800">
         Showing cached wind forecast from {new Date(forecast.cachedAt).toLocaleString()}.
@@ -564,6 +578,7 @@
                   error={forecast.error}
                   retry={forecast.retry}
                   bind:hour={() => selectedHour, selectHour}
+                  bind:level={comparisonLevel}
                 />
               {/snippet}
             </ChartContainer>

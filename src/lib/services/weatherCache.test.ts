@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SURFACE_WIND_FIELDS } from '#lib/api/forecastFields.js';
+import { windComparisonFields, type WindComparisonLevel } from '#lib/api/forecastFields.js';
 import {
   CACHED_AT_HEADER,
   CACHE_FIRST_MS,
@@ -171,8 +171,14 @@ describe('weather cache policy', () => {
   });
 
   it.each([
-    ['skewt', SKEWT_REQUEST],
-    ['comparison', new Request(`https://api.open-meteo.com/v1/forecast?hourly=${SURFACE_WIND_FIELDS.join(',')}`)],
+    ['skewt', SKEWT_REQUEST] as const,
+    ...(['10m', '120m', '850hPa'] satisfies WindComparisonLevel[]).map(
+      (level) =>
+        [
+          'comparison',
+          new Request(`https://api.open-meteo.com/v1/forecast?hourly=${windComparisonFields(level).join(',')}`),
+        ] as const
+    ),
   ])('identifies an outdated %s fallback for %s', async (dataset, request) => {
     const cachedAt = NOW - OUTDATED_WARNING_MS;
     const cacheStorage = new MemoryCacheStorage();

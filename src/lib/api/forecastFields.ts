@@ -1,1 +1,27 @@
-export const SURFACE_WIND_FIELDS = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'] as const;
+import { MODEL_NATIVE_LEVELS } from '#lib/meteo/pressureLevels.js';
+import { formatAltitude, type UnitPreferences } from '#lib/utils/units.js';
+
+export const WIND_COMPARISON_HEIGHTS = ['10m', '80m', '120m', '180m'] as const;
+export const DEFAULT_WIND_COMPARISON_LEVEL = WIND_COMPARISON_HEIGHTS[0];
+export const WIND_COMPARISON_PRESSURES = [
+  ...new Set(Object.values(MODEL_NATIVE_LEVELS).flatMap((levels) => levels.map(({ hPa }) => hPa))),
+]
+  .sort((a, b) => b - a)
+  .map((hPa) => `${hPa}hPa` as const);
+
+export type WindComparisonLevel = (typeof WIND_COMPARISON_HEIGHTS)[number] | `${number}hPa`;
+
+export function windComparisonFields(level: WindComparisonLevel): string[] {
+  const fields = [`wind_speed_${level}`, `wind_direction_${level}`];
+  if (level === DEFAULT_WIND_COMPARISON_LEVEL) fields.push('wind_gusts_10m');
+  return fields;
+}
+
+export function formatWindComparisonLevel(level: WindComparisonLevel, units: UnitPreferences): string {
+  const value = Number.parseInt(level, 10);
+  return level.endsWith('m') ? formatAltitude(value, units) : `${value} hPa`;
+}
+
+export const WIND_COMPARISON_FIELD_SETS = new Set(
+  [...WIND_COMPARISON_HEIGHTS, ...WIND_COMPARISON_PRESSURES].map((level) => windComparisonFields(level).join(','))
+);

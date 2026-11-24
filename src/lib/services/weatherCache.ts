@@ -1,4 +1,4 @@
-import { SURFACE_WIND_FIELDS } from '#lib/api/forecastFields.js';
+import { WIND_COMPARISON_FIELD_SETS } from '#lib/api/forecastFields.js';
 
 export const WEATHER_CACHE_NAME = 'weather-api-cache-v2';
 export const LEGACY_WEATHER_CACHE_NAMES = ['weather-api-cache'];
@@ -62,9 +62,8 @@ function getWeatherCacheDataset(request: Request): WeatherCacheDataset | null {
   const searchParams = new URL(request.url).searchParams;
   if (searchParams.has('daily')) return 'wind';
   const hourly = searchParams.get('hourly');
-  if (hourly === SURFACE_WIND_FIELDS.join(',')) return 'comparison';
-  if (hourly !== null) return 'skewt';
-  return null;
+  if (hourly === null) return null;
+  return WIND_COMPARISON_FIELD_SETS.has(hourly) ? 'comparison' : 'skewt';
 }
 
 async function purgeWeatherCache(dependencies: WeatherCacheDependencies): Promise<void> {

@@ -20,7 +20,7 @@ import {
 import { getVariablesForModel, makeProfileVar } from './variables';
 import { FORECAST_URL } from '#lib/api/timezone.js';
 import type { MaxAltitude } from '#lib/meteo/types.js';
-import { SURFACE_WIND_FIELDS } from '#lib/api/forecastFields.js';
+import { windComparisonFields, type WindComparisonLevel } from '#lib/api/forecastFields.js';
 
 export interface HourlyParams {
   hourly: string[];
@@ -391,21 +391,23 @@ export async function fetchSkewTData(
   };
 }
 
-export type SurfaceWindDay = {
+export type WindComparisonDay = {
   time: Date[];
   timezone: string;
+  level: WindComparisonLevel;
   models: Partial<Record<CompassModel, Map<number, { speed: number; direction: number; gust: number }>>>;
 };
 
-export async function fetchSurfaceWindDay(
+export async function fetchWindComparisonDay(
   location: Location,
   timezone: string,
   dayOffset: number,
+  level: WindComparisonLevel,
   cellSelection: CellSelection,
   signal: AbortSignal,
   referenceDate = new Date()
-): Promise<SurfaceWindDay> {
-  const names = [...SURFACE_WIND_FIELDS];
+): Promise<WindComparisonDay> {
+  const names = windComparisonFields(level);
   const models = COMPASS_MODELS.map(({ id }) => id);
   const params = createQueryParams(
     location,
@@ -418,7 +420,7 @@ export async function fetchSurfaceWindDay(
     dayOffset
   );
   const responses = await fetchWeatherApi(FORECAST_URL, params, undefined, undefined, undefined, { signal });
-  const result: SurfaceWindDay = { time: [], timezone, models: {} };
+  const result: WindComparisonDay = { time: [], timezone, level, models: {} };
   const timestamps = new Set<number>();
   for (const response of responses) {
     const model = models.find((id) => Model[id] === response.model());
