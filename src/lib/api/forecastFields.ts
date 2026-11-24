@@ -28,7 +28,3 @@ export function formatWindComparisonLevel(level: WindComparisonLevel, units: Uni
   const value = Number.parseInt(level, 10);
   return level.endsWith('m') ? formatAltitude(value, units) : `${value} hPa`;
 }
-
-export const WIND_COMPARISON_FIELD_SETS = new Set(
-  [...WIND_COMPARISON_HEIGHTS, ...WIND_COMPARISON_PRESSURES].map((level) => windComparisonFields(level).join(','))
-);

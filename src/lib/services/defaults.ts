@@ -10,12 +10,11 @@ export const defaultDay = 1;
 
 export function getInitialParameters(
   urlParams: Pick<URLSearchParams, 'get'>,
-  savedComparisonLevel?: WindComparisonLevel
+  savedComparisonLevel: WindComparisonLevel = DEFAULT_WIND_COMPARISON_LEVEL
 ): PageParameters {
-  const parsedUrlParams = readURLParams(urlParams);
-  const comparisonLevel = parsedUrlParams?.comparisonLevel ?? savedComparisonLevel ?? DEFAULT_WIND_COMPARISON_LEVEL;
+  const parsedUrlParams = readURLParams(urlParams, savedComparisonLevel);
   if (parsedUrlParams) {
-    return { ...parsedUrlParams, comparisonLevel };
+    return parsedUrlParams;
   }
 
   return {
@@ -24,7 +23,7 @@ export function getInitialParameters(
     selectedDay: defaultDay,
     maxAltitude: 4000,
     cellSelection: defaultCellSelection,
-    comparisonLevel,
+    comparisonLevel: savedComparisonLevel,
     daylightOnly: true,
   };
 }

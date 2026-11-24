@@ -97,12 +97,14 @@
   });
   const outline = $derived(rim.map((point) => `${point.x * compassScale},${point.y * compassScale}`).join(' '));
   const labelScale = $derived(Math.min(1, Math.max(0.001, (Math.min(...rimDistances) * compassScale) / 136)));
+  const value = (n: number) => (Number.isFinite(n) ? String(Math.round(windSpeed(n, $units))) : '–');
   const arrows = $derived.by(() => {
     return rows
       .flatMap((row) => {
         if (row.bearing === null) return [];
         // Map compass tips mark the wind's source bearing on the rim.
         const point = projectedPoint(row.bearing);
+        const speed = value(row.speed);
         return [
           {
             ...row,
@@ -111,6 +113,7 @@
             radius: point.mag() * compassScale - tip * labelScale,
             color: Number.isFinite(row.speed) ? windColorScale(row.speed) : '#94a3b8',
             gustColor: Number.isFinite(row.gust) ? windColorScale(row.gust) : '#94a3b8',
+            speedLabel: showGusts ? `${speed} / ${value(row.gust)}` : speed,
           },
         ];
       })
@@ -137,7 +140,6 @@
       center.y >= tooltipHeight + 12 ? -tooltipHeight - 8 : Math.min(14, paneSize.height - center.y - tooltipHeight - 8)
     )
   );
-  const value = (n: number) => (Number.isFinite(n) ? Math.round(windSpeed(n, $units)) : '–');
 </script>
 
 <svg
@@ -213,7 +215,7 @@
         fill="#152334"
         text-anchor="middle"
         font-size="9"
-        font-weight="750">{value(arrow.speed)}{showGusts ? ` / ${value(arrow.gust)}` : ''}</text
+        font-weight="750">{arrow.speedLabel}</text
       >
     </g>
   {/each}
@@ -233,9 +235,7 @@
             <span class="text-right leading-[18px]"
               >{windDirectionLabel(arrow.bearing)} {Math.round(arrow.bearing) % 360}°</span
             >
-            <span class="text-right leading-[18px]"
-              >{value(arrow.speed)}{showGusts ? ` / ${value(arrow.gust)}` : ''}</span
-            >
+            <span class="text-right leading-[18px]">{arrow.speedLabel}</span>
           {/each}
         </div>
       </div>

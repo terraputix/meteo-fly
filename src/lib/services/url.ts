@@ -5,8 +5,9 @@ import { parseWindComparisonLevel, type WindComparisonLevel } from '#lib/api/for
 import type { MaxAltitude } from '#lib/meteo/types.js';
 
 export function readURLParams(
-  params: Pick<URLSearchParams, 'get'>
-): (Omit<PageParameters, 'comparisonLevel'> & { comparisonLevel?: WindComparisonLevel }) | null {
+  params: Pick<URLSearchParams, 'get'>,
+  fallbackComparisonLevel: WindComparisonLevel
+): PageParameters | null {
   const lat = params.get('lat');
   const lon = params.get('lon');
   const day = params.get('day');
@@ -35,6 +36,7 @@ export function readURLParams(
     cellSelection === 'nearest' || cellSelection === 'land' ? cellSelection : defaultCellSelection;
   const chartView: ChartView | undefined =
     view === 'wind' || view === 'skewt' || view === 'comparison' ? view : undefined;
+  const comparisonLevel = chartView === 'comparison' ? parseWindComparisonLevel(params.get('level')) : undefined;
   const hour = hourStr ? Number(hourStr) : undefined;
   const daylightOnly = daylightStr !== '0';
 
@@ -45,7 +47,7 @@ export function readURLParams(
     maxAltitude,
     cellSelection: selectedCellSelection,
     chartView,
-    comparisonLevel: chartView === 'comparison' ? parseWindComparisonLevel(params.get('level')) : undefined,
+    comparisonLevel: comparisonLevel ?? fallbackComparisonLevel,
     hour: hour !== undefined && Number.isSafeInteger(hour) && hour >= 0 ? hour : undefined,
     daylightOnly,
   };

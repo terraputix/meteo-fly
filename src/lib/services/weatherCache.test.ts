@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { windComparisonFields, type WindComparisonLevel } from '#lib/api/forecastFields.js';
 import {
   CACHED_AT_HEADER,
   CACHE_FIRST_MS,
@@ -15,7 +14,9 @@ import {
 } from './weatherCache';
 
 const REQUEST = new Request('https://api.open-meteo.com/v1/forecast?latitude=47&daily=sunrise');
-const SKEWT_REQUEST = new Request('https://api.open-meteo.com/v1/forecast?latitude=47&hourly=temperature');
+const SKEWT_REQUEST = new Request(
+  'https://api.open-meteo.com/v1/forecast?latitude=47&models=icon_d2&hourly=temperature'
+);
 const NOW = Date.parse('2026-07-16T12:00:00Z');
 
 class MemoryCache {
@@ -172,11 +173,15 @@ describe('weather cache policy', () => {
 
   it.each([
     ['skewt', SKEWT_REQUEST] as const,
-    ...(['10m', '120m', '850hPa'] satisfies WindComparisonLevel[]).map(
-      (level) =>
+    ...[
+      'wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+      'wind_speed_120m,wind_direction_120m',
+      'wind_direction_850hPa,wind_speed_850hPa,surface_pressure',
+    ].map(
+      (hourly) =>
         [
           'comparison',
-          new Request(`https://api.open-meteo.com/v1/forecast?hourly=${windComparisonFields(level).join(',')}`),
+          new Request(`https://api.open-meteo.com/v1/forecast?models=icon_d2%2Cgfs_global&hourly=${hourly}`),
         ] as const
     ),
   ])('identifies an outdated %s fallback for %s', async (dataset, request) => {

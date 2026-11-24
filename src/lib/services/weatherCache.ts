@@ -1,5 +1,3 @@
-import { WIND_COMPARISON_FIELD_SETS } from '#lib/api/forecastFields.js';
-
 export const WEATHER_CACHE_NAME = 'weather-api-cache-v2';
 export const LEGACY_WEATHER_CACHE_NAMES = ['weather-api-cache'];
 export const CACHED_AT_HEADER = 'x-meteo-fly-cached-at';
@@ -61,9 +59,8 @@ function createCachedResponse(response: Response, cachedAt: number): Response {
 function getWeatherCacheDataset(request: Request): WeatherCacheDataset | null {
   const searchParams = new URL(request.url).searchParams;
   if (searchParams.has('daily')) return 'wind';
-  const hourly = searchParams.get('hourly');
-  if (hourly === null) return null;
-  return WIND_COMPARISON_FIELD_SETS.has(hourly) ? 'comparison' : 'skewt';
+  if (!searchParams.has('hourly')) return null;
+  return searchParams.get('models')?.includes(',') ? 'comparison' : 'skewt';
 }
 
 async function purgeWeatherCache(dependencies: WeatherCacheDependencies): Promise<void> {
