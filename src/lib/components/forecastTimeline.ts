@@ -42,6 +42,10 @@ export function buildForecastTimeline(
   return { slots, dayStarts, visibleDays, innerFirstDay, innerDayStarts };
 }
 
+export function selectedForecastIndex(rail: ReturnType<typeof buildForecastTimeline>, day: number, hour: number) {
+  return rail.slots.findLastIndex((slot) => slot.day === day && slot.hour <= Math.max(0, hour));
+}
+
 export function dayJumpIndex(
   rail: ReturnType<typeof buildForecastTimeline>,
   start: number,

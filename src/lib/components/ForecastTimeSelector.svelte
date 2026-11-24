@@ -4,10 +4,16 @@
   import { fade } from 'svelte/transition';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import ChevronsRight from '@lucide/svelte/icons/chevrons-right';
-  import { shortcutMode, type TimestepDirection, type TimestepMode } from '#lib/components/timestepNavigation.js';
+  import {
+    MIN_FORECAST_DAY,
+    shortcutMode,
+    type TimestepDirection,
+    type TimestepMode,
+  } from '#lib/components/timestepNavigation.js';
   import {
     buildForecastTimeline,
     dayJumpIndex,
+    selectedForecastIndex,
     layoutForecastRail,
     forecastIndexAt,
   } from '#lib/components/forecastTimeline.js';
@@ -45,7 +51,7 @@
 
   let innerWidth = $state(0);
   const rail = $derived(
-    date && timezone
+    date && timezone && day >= MIN_FORECAST_DAY && day <= maxDay
       ? buildForecastTimeline(date, timezone, day, maxDay, showHours ? times : undefined, innerWidth)
       : null
   );
@@ -53,9 +59,7 @@
   const shortDate = $derived(
     new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: timezone })
   );
-  const selected = $derived(
-    Math.max(0, rail?.slots.findIndex((slot) => slot.day === day && (!showHours || slot.hour === hour)) ?? 0)
-  );
+  const selected = $derived(rail ? selectedForecastIndex(rail, day, hour) : 0);
   let width = $state(0);
   const segments = $derived(
     rail && width && innerWidth ? layoutForecastRail(rail, (width - innerWidth) / (2 * width)) : []

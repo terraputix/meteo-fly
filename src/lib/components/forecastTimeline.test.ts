@@ -4,6 +4,7 @@ import {
   dayJumpIndex,
   forecastIndexAt,
   layoutForecastRail,
+  selectedForecastIndex,
 } from '#lib/components/forecastTimeline.js';
 
 describe('forecast timeline', () => {
@@ -16,6 +17,18 @@ describe('forecast timeline', () => {
     expect(day).toHaveLength(length);
     expect(+day[1].time - +day[0].time).toBe(3600000);
     expect(dayStarts.slice(-2)).toEqual([slots.indexOf(day[0]), slots.indexOf(day[0]) + length]);
+  });
+
+  it.each([
+    ['2026-10-26', 24, 23, '2026-10-27T22:00:00Z'],
+    ['2026-03-29', 23, 22, '2026-03-30T21:00:00Z'],
+  ] as const)('keeps an out-of-range hour on the loading day %s for subsequent day jumps', (date, hour, last, next) => {
+    const zone = 'Europe/Zurich';
+    const rail = buildForecastTimeline(new Date(date + 'T12:00Z'), zone, 1, 8, []);
+    const selected = selectedForecastIndex(rail, 1, hour);
+    expect(rail.slots[selected]).toMatchObject({ day: 1, hour: last });
+    const jump = dayJumpIndex(rail, rail.innerDayStarts[2], selected, zone);
+    expect(rail.slots[jump].time).toEqual(new Date(next));
   });
 
   it.each([true, false])('keeps the active day centered even at forecast limits (hourly: %s)', (hourly) => {
