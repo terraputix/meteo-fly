@@ -194,7 +194,7 @@
   <div
     bind:this={controlsElement}
     bind:offsetHeight={controlsHeight}
-    class="shrink-0 border-t border-slate-200 bg-white px-3 pt-1 pb-[max(.25rem,env(safe-area-inset-bottom))]"
+    class="shrink-0 bg-white pb-[env(safe-area-inset-bottom)]"
   >
     {@render timestepControls()}
   </div>

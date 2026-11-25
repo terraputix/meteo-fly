@@ -2,6 +2,11 @@
   import type { Map as ForecastMap, Marker } from 'maplibre-gl';
   import { onDestroy, untrack } from 'svelte';
   import type { CompassModel } from '#lib/api/models.js';
+  import {
+    DEFAULT_WIND_COMPARISON_LEVEL,
+    formatWindComparisonLevel,
+    type WindComparisonLevel,
+  } from '#lib/api/forecastFields.js';
   import { windCompassRimPoint } from '#lib/meteo/surfaceWind.js';
   import { windColorScale } from '#lib/charts/scales.js';
   import { windDirectionLabel } from '#lib/meteo/wind.js';
@@ -11,6 +16,7 @@
 
   let {
     rows,
+    level,
     map,
     marker,
     latitude,
@@ -19,6 +25,7 @@
     onInspectModels,
   }: {
     rows: { id: CompassModel; name: string; bearing: number | null; speed: number; gust: number }[];
+    level: WindComparisonLevel;
     map: ForecastMap;
     marker: Marker;
     latitude: number;
@@ -29,6 +36,8 @@
 
   const tail = -108;
   const tip = 20;
+  const showGusts = $derived(level === DEFAULT_WIND_COMPARISON_LEVEL);
+  const levelLabel = $derived(formatWindComparisonLevel(level, $units));
 
   let hovered = $state<CompassModel[]>([]);
   let focused = $state<CompassModel | null>(null);
@@ -88,12 +97,14 @@
   });
   const outline = $derived(rim.map((point) => `${point.x * compassScale},${point.y * compassScale}`).join(' '));
   const labelScale = $derived(Math.min(1, Math.max(0.001, (Math.min(...rimDistances) * compassScale) / 136)));
+  const value = (n: number) => (Number.isFinite(n) ? String(Math.round(windSpeed(n, $units))) : '–');
   const arrows = $derived.by(() => {
     return rows
       .flatMap((row) => {
         if (row.bearing === null) return [];
         // Map compass tips mark the wind's source bearing on the rim.
         const point = projectedPoint(row.bearing);
+        const speed = value(row.speed);
         return [
           {
             ...row,
@@ -102,6 +113,7 @@
             radius: point.mag() * compassScale - tip * labelScale,
             color: Number.isFinite(row.speed) ? windColorScale(row.speed) : '#94a3b8',
             gustColor: Number.isFinite(row.gust) ? windColorScale(row.gust) : '#94a3b8',
+            speedLabel: showGusts ? `${speed} / ${value(row.gust)}` : speed,
           },
         ];
       })
@@ -128,7 +140,6 @@
       center.y >= tooltipHeight + 12 ? -tooltipHeight - 8 : Math.min(14, paneSize.height - center.y - tooltipHeight - 8)
     )
   );
-  const value = (n: number) => (Number.isFinite(n) ? Math.round(windSpeed(n, $units)) : '–');
 </script>
 
 <svg
@@ -136,7 +147,7 @@
   viewBox="-174 -174 348 348"
   class="size-full overflow-visible"
   role="group"
-  aria-label={`Model wind directions, wind speed and preceding-hour gusts in ${$units.wind}`}
+  aria-label={`Model wind at ${levelLabel}${showGusts ? ' with preceding-hour gusts' : ''} in ${$units.wind}`}
   onpointerleave={() => (hovered = [])}
 >
   {#if arrows.length}
@@ -160,7 +171,7 @@
       transform={`rotate(${arrow.rotation}) translate(${arrow.radius} 0) scale(${labelScale})`}
       role="group"
       tabindex="0"
-      aria-label={`${arrow.name}, wind ${value(arrow.speed)} ${$units.wind}, gust ${value(arrow.gust)} ${$units.wind}, from ${Math.round(arrow.bearing) % 360} degrees`}
+      aria-label={`${arrow.name}, wind ${value(arrow.speed)} ${$units.wind}${showGusts ? `, gust ${value(arrow.gust)} ${$units.wind}` : ''}, from ${Math.round(arrow.bearing) % 360} degrees`}
       class="pointer-events-auto cursor-help outline-none"
       opacity={!active.includes(null) && !active.includes(arrow.id) ? 0.7 : 1}
       data-wind-compass-label={arrow.id}
@@ -178,7 +189,12 @@
       <path d={`M${tail} -6H-20V6H${tail}Z`} fill={`color-mix(in srgb, ${arrow.color} 38%, white)`} />
       <path d="M-20 -6H12L20 0L12 6H-20Z" fill={`color-mix(in srgb, ${arrow.color} 58%, white)`} />
       <path d="M12 -6L20 0L12 6Z" fill={arrow.color} />
-      <path d={shape} fill="none" stroke={arrow.gustColor} stroke-width={active.includes(arrow.id) ? 2 : 1.3} />
+      <path
+        d={shape}
+        fill="none"
+        stroke={showGusts ? arrow.gustColor : arrow.color}
+        stroke-width={active.includes(arrow.id) ? 2 : 1.3}
+      />
       <text
         x="-64"
         y="0"
@@ -199,7 +215,7 @@
         fill="#152334"
         text-anchor="middle"
         font-size="9"
-        font-weight="750">{value(arrow.speed)} / {value(arrow.gust)}</text
+        font-weight="750">{arrow.speedLabel}</text
       >
     </g>
   {/each}
@@ -213,13 +229,13 @@
         <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-2 text-[10px] tabular-nums">
           <span class="text-slate-300">Model</span>
           <span class="text-right text-slate-300">From</span>
-          <span class="text-right text-slate-300">Wind / gust · {$units.wind}</span>
+          <span class="text-right text-slate-300">{showGusts ? 'Wind / gust' : 'Wind'} · {$units.wind}</span>
           {#each inspected as arrow (arrow.id)}
             <span class="truncate leading-[18px] font-semibold">{arrow.name}</span>
             <span class="text-right leading-[18px]"
               >{windDirectionLabel(arrow.bearing)} {Math.round(arrow.bearing) % 360}°</span
             >
-            <span class="text-right leading-[18px]">{value(arrow.speed)} / {value(arrow.gust)}</span>
+            <span class="text-right leading-[18px]">{arrow.speedLabel}</span>
           {/each}
         </div>
       </div>

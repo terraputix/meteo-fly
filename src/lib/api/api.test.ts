@@ -9,7 +9,7 @@ import { getVariablesForModel } from './variables';
 import {
   createHourlyParams,
   createQueryParams,
-  fetchSurfaceWindDay,
+  fetchWindComparisonDay,
   fetchModelGridElevation,
   fetchSkewTData,
   fetchWindChartData,
@@ -103,10 +103,11 @@ describe('API Configuration', () => {
       Object.assign(createResponse({ hourly: gfs }), { model: () => Model.gfs_global }),
       Object.assign(createResponse({ hourly: icon }), { model: () => Model.icon_d2 }),
     ]);
-    const day = await fetchSurfaceWindDay(
+    const day = await fetchWindComparisonDay(
       { latitude: 46, longitude: 8 },
       'Europe/Zurich',
       0,
+      '10m',
       'nearest',
       new AbortController().signal,
       new Date('2026-07-16T12:00:00Z')
@@ -126,6 +127,30 @@ describe('API Configuration', () => {
     expect(day.models.gfs_global?.get(Date.parse(secondHour))).toEqual({ speed: 18, direction: 90, gust: 32 });
     expect(day.models.icon_d2?.get(Date.parse(firstHour))).toEqual({ speed: 7, direction: 45, gust: NaN });
     expect(day.models.icon_eu).toBeUndefined();
+  });
+
+  it.each(['80m', '120m', '180m', '850hPa'] as const)('requests wind at %s without 10 m gusts', async (level) => {
+    const speed = `wind_speed_${level}`;
+    const direction = `wind_direction_${level}`;
+    const names = [speed, direction];
+    const hourly = createHourlySection(names, { [speed]: [21], [direction]: [180] });
+    vi.mocked(fetchWeatherApi).mockResolvedValueOnce([
+      Object.assign(createResponse({ hourly }), { model: () => Model.gfs_global }),
+      Object.assign(createResponse({ hourly: createHourlySection(names, {}) }), { model: () => Model.icon_d2 }),
+    ]);
+    const day = await fetchWindComparisonDay(
+      { latitude: 46, longitude: 8 },
+      'UTC',
+      0,
+      level,
+      'nearest',
+      new AbortController().signal,
+      new Date('2026-07-16T12:00:00Z')
+    );
+    expect(day.level).toBe(level);
+    expect(vi.mocked(fetchWeatherApi).mock.calls[0][1]).toMatchObject({ hourly: names });
+    expect(day.models.gfs_global?.get(+day.time[0])).toEqual({ speed: 21, direction: 180, gust: NaN });
+    expect(day.models.icon_d2?.get(+day.time[0])).toEqual({ speed: NaN, direction: NaN, gust: NaN });
   });
 
   it.each([

@@ -3,8 +3,10 @@
     buildVisitedURL,
     getInitialChartPaneOpen,
     getInitialChartPaneSize,
+    getSavedComparisonLevel,
     saveChartPaneOpen,
     saveChartPaneSize,
+    saveComparisonLevel,
     saveLastVisitedURL,
     type ChartPaneDirection,
   } from '#lib/services/storage.js';
@@ -21,6 +23,7 @@
     type TimestepMode,
   } from '#lib/components/timestepNavigation.js';
   import ForecastError from '#lib/components/ForecastError.svelte';
+  import { formatWindComparisonLevel } from '#lib/api/forecastFields.js';
   import type { CompassModel } from '#lib/api/models.js';
   import LocationMap from '#lib/components/LocationMap.svelte';
   import ChartContainer from '#lib/components/ChartContainer.svelte';
@@ -32,16 +35,20 @@
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import type { PaneAPI } from 'paneforge';
+  import { units } from '#lib/stores/units.js';
 
   let parameters: PageParameters = $state(
-    getInitialParameters(browser ? page.url.searchParams : new URLSearchParams())
+    getInitialParameters(
+      browser ? page.url.searchParams : new URLSearchParams(),
+      browser ? getSavedComparisonLevel() : undefined
+    )
   );
   let showChart = $state(true);
   let routerReady = $state(false);
   let chartView: ChartView = $state(parameters.chartView ?? 'wind');
   const comparing = $derived(chartView === 'comparison');
   let selectedHour = $state(parameters.hour ?? 0);
-  let pendingLastHourDay = $state<number | null>(null);
+  let pendingHour = $state.raw<{ day: number; target: Date | 'last' } | null>(null);
   let inspectedModels = $state<CompassModel[]>([]);
   let highlighted = $state<CompassModel | null>(null);
 
@@ -52,10 +59,14 @@
       cellSelection: parameters.cellSelection,
     };
     return chartView === 'comparison'
-      ? { ...selection, view: chartView }
+      ? { ...selection, view: chartView, level: parameters.comparisonLevel }
       : { ...selection, view: chartView, selectedModel: parameters.selectedModel, maxAltitude: parameters.maxAltitude };
   }, resolveLoadedHour);
-  const comparison = $derived(forecast.data?.view === 'comparison' ? forecast.data.weather : null);
+  const comparison = $derived(
+    forecast.data?.view === 'comparison' && forecast.data.weather.level === parameters.comparisonLevel
+      ? forecast.data.weather
+      : null
+  );
   const gridWeather = $derived(forecast.data?.view === 'comparison' ? null : forecast.data?.weather);
   const timeline = $derived(
     comparison?.time ?? (forecast.data?.view === 'skewt' ? forecast.data.weather.hourly.time : [])
@@ -63,13 +74,13 @@
 
   function resolveLoadedHour(day: number, times: Date[]) {
     if (!times.length) return;
-    const useLastHour = pendingLastHourDay === day;
-    selectedHour = resolveTimestepHour(useLastHour ? 'last' : selectedHour, times.length);
-    if (useLastHour) pendingLastHourDay = null;
+    const target = pendingHour?.day === day ? pendingHour.target : selectedHour;
+    selectedHour = resolveTimestepHour(target, times);
+    pendingHour = null;
   }
 
   function selectHour(hour: number) {
-    pendingLastHourDay = null;
+    pendingHour = null;
     selectedHour = hour;
   }
 
@@ -88,7 +99,7 @@
   function stepForecastTime(mode: TimestepMode, direction: TimestepDirection) {
     const next = getForecastStep(mode, direction);
     if (!next) return;
-    pendingLastHourDay = next.hour === 'last' ? next.selectedDay : null;
+    pendingHour = next.hour === 'last' ? { day: next.selectedDay, target: 'last' } : null;
     if (next.hour !== 'last') selectedHour = next.hour;
     parameters.selectedDay = next.selectedDay;
   }
@@ -157,6 +168,7 @@
     });
     params.set('hour', selectedHour.toString());
     params.set('daylight', daylightOnly ? '1' : '0');
+    if (comparing) params.set('level', parameters.comparisonLevel);
     return `?${params.toString()}`;
   });
 
@@ -189,6 +201,10 @@
 
   $effect(() => {
     if (routerReady) void syncURL();
+  });
+
+  $effect(() => {
+    if (comparing) saveComparisonLevel(parameters.comparisonLevel);
   });
 
   function clearPanelTransitionTimer() {
@@ -332,7 +348,7 @@
 
   $effect(() => {
     if (parameters.selectedDay > forecast.maxDays) {
-      pendingLastHourDay = null;
+      pendingHour = null;
       parameters.selectedDay = forecast.maxDays;
     }
   });
@@ -411,17 +427,24 @@
   />
 </svelte:head>
 
-{#snippet timeSelector(singleRow = false)}
+{#snippet timeSelector()}
   <ForecastTimeSelector
     date={forecast.date}
     hour={selectedHour}
     times={timeline}
     timezone={forecast.timezone}
     showHours={chartView !== 'wind'}
-    {singleRow}
     canStep={(mode, direction) => getForecastStep(mode, direction) !== null}
     onStep={stepForecastTime}
-    onHourChange={selectHour}
+    day={parameters.selectedDay}
+    maxDay={forecast.maxDays}
+    onSelect={(day, hour, timestamp) => {
+      selectHour(hour);
+      if (timestamp && (day !== parameters.selectedDay || !timeline.length)) {
+        pendingHour = { day, target: timestamp };
+      }
+      parameters.selectedDay = day;
+    }}
   />
 {/snippet}
 
@@ -429,14 +452,17 @@
   <div
     bind:this={mapTimeSelector}
     tabindex="-1"
-    class="pointer-events-auto max-w-full min-w-0 rounded-xl border border-slate-200/80 bg-white/92 p-1.5 shadow-lg backdrop-blur-md"
+    class="pointer-events-auto w-96 max-w-full min-w-0 rounded-b-lg bg-white/92 shadow-lg backdrop-blur-md"
   >
+    {@render timeSelector()}
+    <p class="px-2 pb-1 text-center text-xs text-slate-600">
+      Wind at {formatWindComparisonLevel(parameters.comparisonLevel, $units)}
+    </p>
     {#if forecast.cachedAt !== null}
-      <p class="mb-1 text-center text-xs text-amber-800">
+      <p class="px-2 pb-1 text-center text-xs text-amber-800">
         Showing cached wind forecast from {new Date(forecast.cachedAt).toLocaleString()}.
       </p>
     {/if}
-    {@render timeSelector(true)}
   </div>
 {/snippet}
 
@@ -558,6 +584,7 @@
                   error={forecast.error}
                   retry={forecast.retry}
                   bind:hour={() => selectedHour, selectHour}
+                  bind:level={parameters.comparisonLevel}
                 />
               {/snippet}
             </ChartContainer>
