@@ -6,7 +6,6 @@ describe('map cache request classification', () => {
     ['https://tiles.openfreemap.org/styles/positron', 'openFreeMapMetadata'],
     ['https://tiles.openfreemap.org/styles/positron/sprite.json', 'openFreeMapMetadata'],
     ['https://tiles.openfreemap.org/fonts/Noto%20Sans/0-255.pbf', 'openFreeMapMetadata'],
-    ['https://tiles.openfreemap.org/planet', 'openFreeMapMetadata'],
     ['https://tiles.openfreemap.org/planet/12/2201/1432.pbf', 'openFreeMapTiles'],
     ['https://tiles.mapterhorn.com/tilejson.json', 'mapterhornMetadata'],
     ['https://tiles.mapterhorn.com/12/2201/1432.webp', 'mapterhornTiles'],
