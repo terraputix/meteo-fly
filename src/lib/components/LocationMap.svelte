@@ -652,7 +652,7 @@
   <div hidden>
     <div bind:this={compassElement} style:pointer-events="none">
       {#if comparing && selectedTime && map && compassMarker}
-        <div class="pointer-events-none absolute left-1/2 top-1/2 size-[348px] -translate-x-1/2 -translate-y-1/2">
+        <div class="pointer-events-none absolute top-1/2 left-1/2 size-[348px] -translate-x-1/2 -translate-y-1/2">
           <WindCompass {rows} {highlighted} {onInspectModels} {map} marker={compassMarker} {latitude} {longitude} />
         </div>
       {/if}
@@ -744,7 +744,7 @@
       role="presentation"
       onclick={(e) => e.stopPropagation()}
     >
-      <div class="mb-1 text-[10px] text-slate-400 whitespace-nowrap">
+      <div class="mb-1 text-[10px] whitespace-nowrap text-slate-400">
         {contextMenuLngLat?.lat.toFixed(5)}, {contextMenuLngLat?.lng.toFixed(5)}
         {#if contextMenuElevation != null}
           · {formatAltitude(contextMenuElevation, $units)}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import HikeFlyWorker from '#lib/workers/hikeFlyWorker.ts?worker';
   import { units } from '#lib/stores/units.js';
   import { formatAltitude } from '#lib/utils/units.js';
   import type { MapLayerMouseEvent } from 'maplibre-gl';
@@ -136,7 +137,7 @@
   }
 
   const workerController = new HikeFlyWorkerController({
-    createWorker: () => new Worker(new URL('#lib/workers/hikeFlyWorker.ts', import.meta.url), { type: 'module' }),
+    createWorker: () => new HikeFlyWorker(),
     removeRenderedResult,
     renderResult: (data, objectUrl) => {
       if (!map) throw new Error('Map is unavailable');
@@ -220,8 +221,8 @@
     bind:offsetHeight={controlsHeight}
     class="pointer-events-auto absolute z-20 flex flex-col rounded-xl border border-slate-200/80 bg-white/92 text-xs shadow-lg backdrop-blur-md
       {$isMobile
-      ? 'bottom-0 left-0 right-0 rounded-none rounded-t-xl border-b-0 px-4 py-3 gap-2'
-      : 'bottom-2 left-2 px-3 py-2 gap-1.5'}"
+      ? 'right-0 bottom-0 left-0 gap-2 rounded-none rounded-t-xl border-b-0 px-4 py-3'
+      : 'bottom-2 left-2 gap-1.5 px-3 py-2'}"
   >
     <div class="flex items-center gap-2">
       <span class="font-semibold text-slate-700 {$isMobile ? 'text-sm' : ''}">Hike & Fly</span>
@@ -231,7 +232,7 @@
       <button
         type="button"
         class="ml-auto text-slate-400 hover:text-slate-600 {$isMobile
-          ? 'h-8 w-8 flex items-center justify-center rounded-lg hover:bg-slate-100'
+          ? 'flex h-8 w-8 items-center justify-center rounded-lg hover:bg-slate-100'
           : ''}"
         onclick={() => (active = false)}
         aria-label="Close hike & fly layer">✕</button
@@ -271,7 +272,7 @@
           }}
           disabled={glideRatio >= 14}>+</button
         >
-        <span class="w-12 text-right tabular-nums text-slate-800 {$isMobile ? 'text-sm' : ''}">{glideRatio}:1</span>
+        <span class="w-12 text-right text-slate-800 tabular-nums {$isMobile ? 'text-sm' : ''}">{glideRatio}:1</span>
       </label>
       <label class="flex items-center gap-1.5 text-slate-600 {$isMobile ? 'w-full' : ''}">
         <span class="shrink-0 {$isMobile ? 'w-8 text-xs' : ''}">Grid</span>
@@ -317,7 +318,7 @@
           }}
           disabled={stepMeters >= 200}>+</button
         >
-        <span class="w-12 text-right tabular-nums text-slate-800 {$isMobile ? 'text-sm' : ''}"
+        <span class="w-12 text-right text-slate-800 tabular-nums {$isMobile ? 'text-sm' : ''}"
           >{formatAltitude(stepMeters, $units)}</span
         >
       </label>

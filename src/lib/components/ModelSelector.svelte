@@ -27,7 +27,7 @@
     aria-label="Select weather model"
     title="Select weather model"
   >
-    <span class="ml-auto min-w-0 max-w-28 truncate text-xs font-semibold text-slate-800">{currentName}</span>
+    <span class="ml-auto max-w-28 min-w-0 truncate text-xs font-semibold text-slate-800">{currentName}</span>
     <span
       class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"
       aria-hidden="true"
@@ -37,7 +37,7 @@
   </Popover.Trigger>
 
   <Popover.Content side="bottom" align="end" class="w-56 p-1.5" sideOffset={6}>
-    <div class="text-xs font-semibold tracking-wide text-slate-500 uppercase px-2 py-1.5">Select Model</div>
+    <div class="px-2 py-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">Select Model</div>
     <div class="mt-0.5 flex flex-col gap-0.5">
       {#each MODEL_OPTIONS as m (m.id)}
         <button

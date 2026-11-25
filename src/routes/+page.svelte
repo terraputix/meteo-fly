@@ -175,6 +175,7 @@
     saveLastVisitedURL(newURL);
     if (currentSearch === search) return;
     try {
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- The current pathname already includes the base path.
       await goto(newURL, { shallow: true, replace: true, state: page.state });
     } catch (error) {
       console.error('Failed to synchronize forecast URL', error);
@@ -428,7 +429,7 @@
   <div
     bind:this={mapTimeSelector}
     tabindex="-1"
-    class="pointer-events-auto min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-white/92 p-1.5 shadow-lg backdrop-blur-md"
+    class="pointer-events-auto max-w-full min-w-0 rounded-xl border border-slate-200/80 bg-white/92 p-1.5 shadow-lg backdrop-blur-md"
   >
     {#if forecast.cachedAt !== null}
       <p class="mb-1 text-center text-xs text-amber-800">

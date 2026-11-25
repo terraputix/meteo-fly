@@ -126,7 +126,7 @@
     </span>
     {#if showHours}
       <select
-        class="min-w-0 max-w-full cursor-pointer rounded-md px-1 py-0.5 font-semibold text-indigo-900 hover:bg-white focus-visible:outline-2 focus-visible:outline-indigo-600 disabled:cursor-default disabled:opacity-50"
+        class="max-w-full min-w-0 cursor-pointer rounded-md px-1 py-0.5 font-semibold text-indigo-900 hover:bg-white focus-visible:outline-2 focus-visible:outline-indigo-600 disabled:cursor-default disabled:opacity-50"
         class:shrink-0={singleRow}
         aria-label="Forecast time"
         disabled={!times.length}
