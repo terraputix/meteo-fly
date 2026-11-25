@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChartWorker from '#lib/workers/chartWorker.ts?worker';
   import { units } from '#lib/stores/units.js';
   import { formatAltitude, type UnitPreferences } from '#lib/utils/units.js';
   import { buildTooltipStore, formatTooltip, snapToNearest, type TooltipStore } from '#lib/charts/tooltipFormatter.js';
@@ -166,7 +167,7 @@
       isRendering = true;
       try {
         if (!worker) {
-          const source = new Worker(new URL('#lib/workers/chartWorker.ts', import.meta.url), { type: 'module' });
+          const source = new ChartWorker();
           worker = source;
           source.onmessage = (event: MessageEvent<ChartWorkerOutput>) => {
             const response = event.data;
@@ -337,7 +338,7 @@
     <ChartLoadingOverlay visible={isBusy} message="Loading weather data…" />
 
     <label
-      class="group absolute left-0 z-[5] flex h-5 w-[54px] items-center rounded bg-white text-[10px] transition hover:bg-slate-50 focus-within:ring-2 focus-within:ring-indigo-500/20"
+      class="group absolute left-0 z-[5] flex h-5 w-[54px] items-center rounded bg-white text-[10px] transition focus-within:ring-2 focus-within:ring-indigo-500/20 hover:bg-slate-50"
       style="top: {topHeightY}px; transform: translateY(-50%);"
     >
       <span
@@ -367,7 +368,7 @@
       aria-pressed={daylightOnly}
       aria-label={daylightOnly ? 'Extend chart to full day' : 'Compress chart to daylight hours'}
       title={daylightOnly ? 'Extend to full day' : 'Compress to daylight hours'}
-      class="absolute left-1 z-[5] flex h-5 w-5 items-center justify-center rounded-full bg-slate-100/80 text-slate-400 transition hover:bg-amber-50 hover:text-amber-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-inset focus-visible:outline-none"
+      class="absolute left-1 z-[5] flex h-5 w-5 items-center justify-center rounded-full bg-slate-100/80 text-slate-400 transition hover:bg-amber-50 hover:text-amber-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none focus-visible:ring-inset"
       style="top: {DAYLIGHT_CONTEXT_TOP + 6}px;"
       onclick={() => (daylightOnly = !daylightOnly)}
     >
@@ -405,14 +406,14 @@
       style="opacity: {isBusy ? 0 : 1};"
     >
       <canvas
-        class="h-full w-full touch-pan-y touch-pinch-zoom cursor-crosshair"
+        class="h-full w-full cursor-crosshair touch-pan-y touch-pinch-zoom"
         aria-label="Weather meteogram: temperature, humidity, precipitation, clouds and wind by altitude"
       ></canvas>
       <canvas data-overlay class="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true"></canvas>
       <div
         role="tooltip"
         hidden
-        class="pointer-events-none absolute z-10 w-max max-w-full max-h-[80vh] overflow-y-auto rounded-md border border-slate-200/80 bg-white/95 px-2 py-1.5 text-[11px] leading-snug text-slate-700 shadow-lg shadow-slate-900/10 tabular-nums"
+        class="pointer-events-none absolute z-10 max-h-[80vh] w-max max-w-full overflow-y-auto rounded-md border border-slate-200/80 bg-white/95 px-2 py-1.5 text-[11px] leading-snug text-slate-700 tabular-nums shadow-lg shadow-slate-900/10"
       ></div>
     </div>
     {#if renderError}

@@ -189,7 +189,7 @@
             onfocus={() => (hover = target)}
             onblur={() => (hover = null)}
             onclick={() => commit(target)}
-            class="min-h-6 min-w-0 cursor-pointer rounded-sm text-center hover:bg-indigo-50 hover:text-indigo-800 focus-visible:bg-indigo-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-indigo-600 text-[11px] leading-tight {slot.day ===
+            class="min-h-6 min-w-0 cursor-pointer rounded-sm text-center text-[11px] leading-tight hover:bg-indigo-50 hover:text-indigo-800 focus-visible:bg-indigo-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-indigo-600 {slot.day ===
             day
               ? 'font-semibold text-indigo-800'
               : 'text-slate-600'}"
@@ -232,7 +232,7 @@
           </div>
           <input
             type="range"
-            class="peer absolute inset-x-0 -top-3 m-0 h-5 touch-pan-y w-full cursor-pointer appearance-none bg-transparent opacity-0 [&::-moz-range-thumb]:w-px [&::-webkit-slider-thumb]:w-px [&::-webkit-slider-thumb]:appearance-none"
+            class="peer absolute inset-x-0 -top-3 m-0 h-5 w-full cursor-pointer touch-pan-y appearance-none bg-transparent opacity-0 [&::-moz-range-thumb]:w-px [&::-webkit-slider-thumb]:w-px [&::-webkit-slider-thumb]:appearance-none"
             aria-label={showHours ? 'Forecast timestamp' : 'Forecast day'}
             aria-valuetext={draft !== null ? previewLabel : selectionLabel}
             min={railStart}
@@ -259,7 +259,7 @@
           {#if previewLabel}
             <span
               aria-hidden="true"
-              class="pointer-events-none absolute bottom-full mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-xs text-white shadow"
+              class="pointer-events-none absolute bottom-full mb-2 -translate-x-1/2 rounded bg-slate-800 px-2 py-1 text-xs whitespace-nowrap text-white shadow"
               style:left={'clamp(min(6rem, 50%), ' + percentAt(previewIndex ?? 0) + '%, max(50%, calc(100% - 6rem)))'}
             >
               {previewLabel}

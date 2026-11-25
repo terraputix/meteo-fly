@@ -160,7 +160,7 @@
   >
     <div class="absolute top-0 left-1/2 -translate-x-1/2" style="width: {chartWidth}px; height: {totalHeight}px;">
       <label
-        class="group absolute left-0 z-[5] flex h-5 w-[58px] items-center rounded border border-transparent bg-white text-[10px] transition hover:border-slate-200 hover:bg-slate-50 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20"
+        class="group absolute left-0 z-[5] flex h-5 w-[58px] items-center rounded border border-transparent bg-white text-[10px] transition focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20 hover:border-slate-200 hover:bg-slate-50"
         style="top: {SKEWT_PLOT_TOP - 10}px;"
       >
         <select
