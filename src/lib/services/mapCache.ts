@@ -30,7 +30,8 @@ export function classifyMapCacheResource(url: URL): MapCacheResource | null {
   if (url.protocol !== 'https:') return null;
 
   if (url.hostname === 'tiles.openfreemap.org') {
-    return url.pathname.startsWith('/styles/') || url.pathname.startsWith('/fonts/')
+    const { pathname } = url;
+    return pathname === '/planet' || pathname.startsWith('/styles/') || pathname.startsWith('/fonts/')
       ? 'openFreeMapMetadata'
       : 'openFreeMapTiles';
   }
